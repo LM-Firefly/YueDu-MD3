@@ -3,7 +3,7 @@ name: Auto Release
 on:
   push:
     branches:
-      - main
+      - rename
     paths:
       - '**'
       # - '!**/assets/**'
@@ -15,7 +15,7 @@ on:
       - '**/modules/web/**'
   workflow_run:
     workflows: [Build Web]
-    branches: [master]
+    branches: [rename]
     types:
       - completed
   workflow_dispatch:
@@ -40,7 +40,7 @@ jobs:
       latest_tag: ${{ steps.set-ver.outputs.last_tag }}
       is_release: ${{ steps.set-ver.outputs.is_release }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -138,14 +138,14 @@ jobs:
       COMMIT_NUMBER_VAL: ${{ needs.prepare.outputs.commit_number }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - name: Set up JDK 17
+      - name: Set up JDK 24
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
-          java-version: 17
+          java-version: 24
       - name: Clear 18PlusList.txt
         run: |
           echo "清空18PlusList.txt"
@@ -155,14 +155,18 @@ jobs:
         shell: bash
         run: |
           echo "给apk增加签名"
-          cp $GITHUB_WORKSPACE/.github/workflows/firefly.jks $GITHUB_WORKSPACE/app/my-release-key.jks
-          sed '$a\RELEASE_STORE_FILE=./firefly.jks'          $GITHUB_WORKSPACE/gradle.properties -i
-          sed '$a\RELEASE_KEY_ALIAS=${{ secrets.KEY_ALIAS }}'                 $GITHUB_WORKSPACE/gradle.properties -i
-          sed '$a\RELEASE_STORE_PASSWORD=${{ secrets.STORE_PASSWORD }}'     $GITHUB_WORKSPACE/gradle.properties -i
-          sed '$a\RELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}'       $GITHUB_WORKSPACE/gradle.properties -i
+          cp "$GITHUB_WORKSPACE/.github/workflows/firefly.jks" "$GITHUB_WORKSPACE/app/firefly.jks"
+          # Ensure appended properties start on a new line even when the file has no trailing newline.
+          printf '\n' >> "$GITHUB_WORKSPACE/gradle.properties"
+          {
+            echo "RELEASE_STORE_FILE=$GITHUB_WORKSPACE/app/firefly.jks"
+            echo "RELEASE_KEY_ALIAS=${{ secrets.KEY_ALIAS }}"
+            echo "RELEASE_STORE_PASSWORD=${{ secrets.STORE_PASSWORD }}"
+            echo "RELEASE_KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}"
+          } >> "$GITHUB_WORKSPACE/gradle.properties"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
 
       - name: Build With Gradle
@@ -177,6 +181,54 @@ jobs:
         env:
           COMMIT_NUMBER: ${{ env.COMMIT_NUMBER_VAL }}
           APP_VERSION_NAME: ${{ env.VERSIONL }}
+
+      - name: Sign And Verify APKs
+        shell: bash
+        env:
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEY_ALIAS:-}" ] || [ -z "${STORE_PASSWORD:-}" ] || [ -z "${KEY_PASSWORD:-}" ]; then
+            echo "签名密钥未配置，跳过签名与验签步骤。"
+            exit 0
+          fi
+
+          APK_PATH="$GITHUB_WORKSPACE/app/build/outputs/apk/${{ env.product }}/${{ env.type }}"
+          if [ ! -d "$APK_PATH" ]; then
+            echo "::error::APK 输出目录不存在: $APK_PATH"
+            exit 1
+          fi
+
+          if [ -n "${ANDROID_HOME:-}" ] && [ -d "$ANDROID_HOME/build-tools" ]; then
+            APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
+          elif [ -n "${ANDROID_SDK_ROOT:-}" ] && [ -d "$ANDROID_SDK_ROOT/build-tools" ]; then
+            APKSIGNER=$(find "$ANDROID_SDK_ROOT/build-tools" -name apksigner -type f | sort -V | tail -n 1)
+          else
+            APKSIGNER=""
+          fi
+
+          if [ -z "$APKSIGNER" ]; then
+            echo "::error::未找到 apksigner，无法执行签名。"
+            exit 1
+          fi
+
+          find "$APK_PATH" -name "*.apk" -print0 | while IFS= read -r -d '' apk; do
+            if "$APKSIGNER" verify "$apk" >/dev/null 2>&1; then
+              echo "已签名: $(basename "$apk")"
+            else
+              echo "签名中: $(basename "$apk")"
+              "$APKSIGNER" sign \
+                --ks "$GITHUB_WORKSPACE/app/firefly.jks" \
+                --ks-key-alias "$KEY_ALIAS" \
+                --ks-pass "pass:$STORE_PASSWORD" \
+                --key-pass "pass:$KEY_PASSWORD" \
+                "$apk"
+            fi
+
+            "$APKSIGNER" verify --verbose "$apk"
+          done
 
       - name: Move Missing Rules Files
         if: matrix.type == 'release'
@@ -238,20 +290,17 @@ jobs:
     needs: [ prepare, build ]
     # 仅在所有者的 push 到 main 分支时执行发布
     if: |
-      github.event_name == 'push' &&
-      github.ref == 'refs/heads/main' &&
-      github.actor == 'HapeLee' &&
       (needs.prepare.outputs.build_number > 0 || needs.prepare.outputs.is_release == 'true') &&
       success()
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       # 1. 下载 build 任务上传的所有 APK
       - name: 下载所有 APK Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: '*-apk-*'
           path: artifacts
@@ -272,7 +321,7 @@ jobs:
 
           shopt -s nullglob
           for f in *.apk; do
-            out="legado-${VERSIONL}"
+            out="YueDu.MD3-${VERSIONL}"
             if [[ "$f" == *noR8* || "$f" == *nor8* ]]; then
               out="${out}-noR8"
             fi
@@ -342,6 +391,6 @@ jobs:
           body: ${{ steps.get_commits.outputs.release_body }}
           prerelease: ${{ needs.prepare.outputs.is_release != 'true' }}
           files: |
-            artifacts/legado-${{ needs.prepare.outputs.versionL }}*.apk
+            artifacts/YueDu.MD3-${{ needs.prepare.outputs.versionL }}*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
