@@ -1335,8 +1335,8 @@
     <string name="descending_order">Descending</string>
     <string name="checking_update">Checking for Updates…</string>
     <string name="search_empty">No content available</string>
-    <string name="firebase_enable_title">Anonymous Statistics</string>
-    <string name="firebase_enable_summary">Allow the app to use Google Firebase for crash and performance reports</string>
+    <!--string name="firebase_enable_title">Anonymous Statistics</string-->
+    <!--string name="firebase_enable_summary">Allow the app to use Google Firebase for crash and performance reports</string-->
     <string name="locate_current">Locate Current</string>
     <string name="padding_display_cutouts">Fill Display Cutout</string>
     <string name="system_media_control_compatibility_change">System Media Control Compatibility</string>
