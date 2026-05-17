@@ -11,17 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.repository == 'gedoor/legado' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Check Cronet Updates
         run: source .github/scripts/cronet.sh
 
-      - name: Set up JDK 17
+      - name: Set up JDK 24
         if: ${{ env.cronet == 'ok' }}
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
-          java-version: 17
+          java-version: 24
 
       - uses: gradle/actions/setup-gradle@v4
         if: ${{ env.cronet == 'ok' }}

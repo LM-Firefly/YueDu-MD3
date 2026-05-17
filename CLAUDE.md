@@ -68,7 +68,7 @@ Transform tasks into verifiable goals:
 ./gradlew app:downloadCronet
 ```
 
-The project uses JDK 21 for development (set in `build.gradle.kts` via `jvmToolchain`). CI uses JDK 17 for building.
+The project uses JDK 21 for development (set in `build.gradle.kts` via `jvmToolchain`). CI uses JDK 24 for building.
 
 Gradle properties: 8 GB heap, configuration cache disabled (`gradle.properties:31`), non-transitive R classes, precise resource shrinking enabled.
 
