@@ -152,7 +152,6 @@ Book sources, RSS sources, and HTTP TTS use JavaScript rules. `initRhino()` in `
 - Min SDK 26, target SDK 37, compile SDK 37
 - Release builds enable R8 minification + resource shrinking; `noR8` variant disables both for crash debugging
 - APK is split by ABI (`armeabi-v7a`, `arm64-v8a`, plus universal)
-- Firebase Analytics and Performance are included; `google-services` plugin applied
 
 ## Web Frontend
 
