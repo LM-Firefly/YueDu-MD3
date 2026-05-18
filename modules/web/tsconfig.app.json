@@ -5,11 +5,9 @@
   "compilerOptions": {
     "composite": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
-
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@api": ["./src/api"],
+      "@api": ["./src/api/index.ts"],
       "@utils/*": ["./src/utils/*"]
     },
     "target": "ES2021",
