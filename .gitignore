@@ -18,3 +18,4 @@ node_modules/
 .kotlin/
 /.vscode/settings.json
 /.codex/skills
+signing.properties
