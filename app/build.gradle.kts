@@ -8,7 +8,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.room)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.google.services)
+//    alias(libs.plugins.google.services)
     alias(libs.plugins.baselineprofile)
 }
 
@@ -30,18 +30,42 @@ val projectVersionName = "$versionMajor.$versionMinor.$versionPatch"
 val enableAbiSplits = providers.gradleProperty("enableAbiSplits")
     .map(String::toBoolean)
     .getOrElse(true)
+val signingPropsFile = rootProject.file("signing.properties")
+val signingProps = Properties().apply {
+    if (signingPropsFile.exists()) {
+        load(FileInputStream(signingPropsFile))
+    }
+}
+
+fun propOrSigning(project: Project, gradleKey: String, signingKey: String): String? {
+    val gradleValue = (project.findProperty(gradleKey) as String?)?.trim()
+    if (!gradleValue.isNullOrEmpty()) return gradleValue
+    val signingValue = signingProps.getProperty(signingKey)?.trim()
+    return signingValue?.takeIf { it.isNotEmpty() }
+}
+
+val releaseStoreFile = propOrSigning(project, "RELEASE_STORE_FILE", "keystore.path")
+val releaseStorePassword = propOrSigning(project, "RELEASE_STORE_PASSWORD", "keystore.password")
+val releaseKeyAlias = propOrSigning(project, "RELEASE_KEY_ALIAS", "key.alias")
+val releaseKeyPassword = propOrSigning(project, "RELEASE_KEY_PASSWORD", "key.password")
+val hasReleaseSigning = listOf(
+    releaseStoreFile,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword
+).all { !it.isNullOrEmpty() }
 
 android {
     compileSdk = 37
     namespace = "io.legado.app"
 
     signingConfigs {
-        if (project.hasProperty("RELEASE_STORE_FILE")) {
+        if (hasReleaseSigning) {
             create("myConfig") {
-                storeFile = file(project.property("RELEASE_STORE_FILE") as String)
-                storePassword = project.property("RELEASE_STORE_PASSWORD") as String
-                keyAlias = project.property("RELEASE_KEY_ALIAS") as String
-                keyPassword = project.property("RELEASE_KEY_PASSWORD") as String
+                storeFile = rootProject.file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
                 enableV1Signing = true
                 enableV2Signing = true
                 enableV3Signing = true
@@ -51,7 +75,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "io.legato.kazusa"
+        applicationId = "io.YueDu.MD3"
         minSdk = 26
         targetSdk = 37
         versionCode = System.getenv("COMMIT_NUMBER")?.toInt()?.let { 10000 + it } ?: 32640
@@ -84,7 +108,7 @@ android {
 
     buildTypes {
         getByName("release") {
-            if (project.hasProperty("RELEASE_STORE_FILE")) {
+            if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("myConfig")
             }
             manifestPlaceholders["app_name"] = "@string/app_name"
@@ -105,7 +129,7 @@ android {
         }
         getByName("debug") {
             applicationIdSuffix = ".debug"
-            if (project.hasProperty("RELEASE_STORE_FILE")) {
+            if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("myConfig")
             }
             manifestPlaceholders["app_name"] = "@string/app_name"
@@ -256,9 +280,9 @@ dependencies {
     implementation(libs.markwon.html)
     implementation(libs.quick.chinese.transfer.core)
     //noinspection GradleDependency
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.analytics)
-    implementation(libs.firebase.perf)
+//    implementation(platform(libs.firebase.bom))
+//    implementation(libs.firebase.analytics)
+//    implementation(libs.firebase.perf)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.palette)
     implementation(libs.androidx.core.splashscreen)

@@ -393,13 +393,9 @@ abstract class AbsCallBack(
             val requestBuilder = userResponse.request.newBuilder()
             if (HttpMethod.permitsRequestBody(method)) {
                 val responseCode = userResponse.code
-                val maintainBody = HttpMethod.redirectsWithBody(method) ||
-                        responseCode == HTTP_PERM_REDIRECT ||
+                val maintainBody = responseCode == HTTP_PERM_REDIRECT ||
                         responseCode == HTTP_TEMP_REDIRECT
-                if (HttpMethod.redirectsToGet(method)
-                    && responseCode != HTTP_PERM_REDIRECT
-                    && responseCode != HTTP_TEMP_REDIRECT
-                ) {
+                if (HttpMethod.redirectsToGet(method, responseCode)) {
                     requestBuilder.method("GET", null)
                 } else {
                     val requestBody = if (maintainBody) userResponse.request.body else null

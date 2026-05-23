@@ -190,7 +190,7 @@ abstract class VerifyConfigArchitectureTask : DefaultTask() {
 
 buildscript {
     extra.apply {
-        set("compile_sdk_version", 36)
+        set("compile_sdk_version", 37)
         set("build_tool_version", "34.0.0")
     }
 }
@@ -202,7 +202,7 @@ plugins {
     alias(libs.plugins.kotlin.parcelize) apply false
     alias(libs.plugins.kotlin.serialization) apply false
     alias(libs.plugins.ksp) apply false
-    alias(libs.plugins.google.services) apply false
+//    alias(libs.plugins.google.services) apply false
     alias(libs.plugins.room) apply false
     alias(libs.plugins.download) apply false
     alias(libs.plugins.android.test) apply false

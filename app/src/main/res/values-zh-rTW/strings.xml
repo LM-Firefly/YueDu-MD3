@@ -1812,8 +1812,8 @@
     <string name="descending_order">降序</string>
     <string name="checking_update">正在檢查更新…</string>
     <string name="search_empty">無可用內容</string>
-    <string name="firebase_enable_title">匿名統計</string>
-    <string name="firebase_enable_summary">允許應用使用 Google Firebase 進行崩潰和效能報告</string>
+    <!-- <string name="firebase_enable_title">匿名統計</string> -->
+    <!-- <string name="firebase_enable_summary">允許應用使用 Google Firebase 進行崩潰和效能報告</string> -->
     <string name="locate_current">定位目前位置</string>
     <string name="read_aloud_android_media_control">Android 媒體控制</string>
     <string name="read_aloud_android_media_control_summary">啟用後，以 Android 系統媒體控制取代預設朗讀通知</string>

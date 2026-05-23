@@ -153,6 +153,8 @@ class ConfigUpdateActionsInvariantTest {
             "MaxLengthWithNoToc",
             // 只写 DataStore 的 readingAnchorEnabled，锚点栏可见性由 readPreferences 反应式驱动
             "ReadingAnchorEnabled",
+            // 只写 DataStore 的 readAloudDetachReminderEnabled，由 readPreferences 反应式驱动
+            "ReadAloudDetachReminderEnabled",
         )
     }
 }

@@ -51,9 +51,6 @@ export default defineConfig(({ mode }) => {
         "@utils": fileURLToPath(new URL("./src/utils/", import.meta.url)),
       },
     },
-    esbuild: {
-      drop: mode === "development" ? undefined : ["console", "debugger"],
-    },
     build: {
       rollupOptions: {
         output: {
@@ -62,13 +59,6 @@ export default defineConfig(({ mode }) => {
               return "vendor";
             }
           },
-        },
-      },
-    },
-    css: {
-      preprocessorOptions: {
-        scss: {
-          api: 'modern-compiler', // or 'modern'
         },
       },
     },
