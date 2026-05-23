@@ -1,15 +1,15 @@
-# Legado with MD3
+# YueDu-MD3
 
 <p align="left">
-  <a href="https://github.com/HapeLee/legado-with-MD3">简体中文</a> ｜ 
-  <a href="https://github.com/HapeLee/legado-with-MD3/blob/main/English.md">English</a>
+  <a href="https://github.com/LM-Firefly/YueDu-MD3">简体中文</a> ｜
+  <a href="https://github.com/LM-Firefly/YueDu-MD3/blob/main/English.md">English</a>
 </p>
 
 ---
 
 ## 📖 Introduction
 
-**Legado with MD3** is a Material Design 3–styled refactor based on the open-source project
+**YueDu-MD3** is a Material Design 3–styled refactor based on the open-source project
 👉 [Legado (阅读)](https://github.com/gedoor/legado).
 
 In addition to a visual redesign of the UI, this project introduces multiple branch-specific
@@ -81,7 +81,7 @@ community.
 * **Community Channels:**
   [Telegram](https://t.me/legado_channels) ｜ [Discord](https://discord.gg/VtUfRyzRXn) ｜ [Yuque Wiki](https://www.yuque.com/legado/wiki/community)
 * **Related Documents:**
-  [Disclaimer](https://gedoor.github.io/Disclaimer) 
+  [Disclaimer](https://gedoor.github.io/Disclaimer)
 
 ---
 
@@ -109,4 +109,3 @@ support:
 
 This project is a **non-official fork** of Legado and is intended for learning,
 personal use, and experimentation only.
-
