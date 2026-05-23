@@ -63,7 +63,7 @@ import io.legado.app.model.BookCover
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.config.otherConfig.OtherConfig
 import io.legado.app.utils.ChineseUtils
-import io.legado.app.utils.FirebaseManager
+//import io.legado.app.utils.FirebaseManager
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.getPrefString
@@ -141,7 +141,7 @@ class App : Application(), ImageLoaderFactory {
             }
         }
         super.onCreate()
-        FirebaseManager.init(this)
+//        FirebaseManager.init(this)
         CrashHandler(this)
         if (isDebuggable) {
             ThreadUtils.setThreadAssertsDisabledForTesting(true)
@@ -171,7 +171,7 @@ class App : Application(), ImageLoaderFactory {
             AppFreezeMonitor.init(this@App)
             DispatchersMonitor.init()
             URL.setURLStreamHandlerFactory(ObsoleteUrlFactory(okHttpClient))
-            launch { installGmsTlsProvider(appCtx) }
+//            launch { installGmsTlsProvider(appCtx) }
             initRhino()
             //初始化封面
             BookCover.toString()
@@ -220,28 +220,28 @@ class App : Application(), ImageLoaderFactory {
      * @param context
      * @return
      */
-    private fun installGmsTlsProvider(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            return
-        }
-        try {
-            val gmsPackageName = "com.google.android.gms"
-            val appInfo = packageManager.getApplicationInfo(gmsPackageName, 0)
-            if ((appInfo.flags and ApplicationInfo.FLAG_SYSTEM) == 0) {
-                return
-            }
-            val gms = context.createPackageContext(
-                gmsPackageName,
-                CONTEXT_INCLUDE_CODE or CONTEXT_IGNORE_SECURITY
-            )
-            gms.classLoader
-                .loadClass("com.google.android.gms.common.security.ProviderInstallerImpl")
-                .getMethod("insertProvider", Context::class.java)
-                .invoke(null, gms)
-        } catch (e: java.lang.Exception) {
-            e.printStackTrace()
-        }
-    }
+//    private fun installGmsTlsProvider(context: Context) {
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+//            return
+//        }
+//        try {
+//            val gmsPackageName = "com.google.android.gms"
+//            val appInfo = packageManager.getApplicationInfo(gmsPackageName, 0)
+//            if ((appInfo.flags and ApplicationInfo.FLAG_SYSTEM) == 0) {
+//                return
+//            }
+//            val gms = context.createPackageContext(
+//                gmsPackageName,
+//                CONTEXT_INCLUDE_CODE or CONTEXT_IGNORE_SECURITY
+//            )
+//            gms.classLoader
+//                .loadClass("com.google.android.gms.common.security.ProviderInstallerImpl")
+//                .getMethod("insertProvider", Context::class.java)
+//                .invoke(null, gms)
+//        } catch (e: java.lang.Exception) {
+//            e.printStackTrace()
+//        }
+//    }
 
     /**
      * 创建通知ID

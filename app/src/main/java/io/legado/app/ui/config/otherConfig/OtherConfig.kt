@@ -46,10 +46,10 @@ object OtherConfig {
         true
     )
 
-    var firebaseEnable by prefDelegate(
-        PreferKey.firebaseEnable,
-        true
-    )
+//    var firebaseEnable by prefDelegate(
+//        PreferKey.firebaseEnable,
+//        true
+//    )
 
     var defaultBookTreeUri by prefDelegate(
         PreferKey.defaultBookTreeUri,

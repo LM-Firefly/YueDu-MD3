@@ -1717,8 +1717,8 @@
     <string name="filter_hide_same_name_author">隱藏書架中不同源書籍</string>
     <string name="filter_show_all">顯示全部</string>
     <string name="filter_show_not_in_shelf_only">僅顯示不在書架中的書籍</string>
-    <string name="firebase_enable_summary">允許應用使用 Google Firebase 進行崩潰和效能報告</string>
-    <string name="firebase_enable_title">匿名統計</string>
+    <!-- <string name="firebase_enable_summary">允許應用使用 Google Firebase 進行崩潰和效能報告</string> -->
+    <!-- <string name="firebase_enable_title">匿名統計</string> -->
     <string name="first_read">請先閱讀服務條款和用戶協議</string>
     <string name="fixed_book_type">鎖定書籍類型</string>
     <string name="fixed_book_type_summary">書籍更新時不覆蓋書籍類型</string>
