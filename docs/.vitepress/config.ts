@@ -2,14 +2,14 @@ import { defineConfig } from 'vitepress'
 
 export default defineConfig({
   title: '阅读',
-  description: 'Legado-with-MD3 使用文档',
-  base: '/legado-with-MD3/',
+  description: 'YueDu-MD3 使用文档',
+  base: '/YueDu-MD3/',
   head: [
-    ['link', { rel: 'icon', href: '/legado-with-MD3/favicon.ico' }]
+    ['link', { rel: 'icon', href: '/YueDu-MD3/favicon.ico' }]
   ],
   themeConfig: {
     logo: '/logo.png',
-    siteTitle: 'Legado Docs',
+    siteTitle: 'YueDu-MD3 Docs',
     nav: [
       { text: '首页', link: '/' },
       { text: '快速开始', link: '/guide/' },
@@ -136,7 +136,7 @@ export default defineConfig({
       ],
     },
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/HapeLee/legado-with-MD3' },
+      { icon: 'github', link: 'https://github.com/LM-Firefly/YueDu-MD3' },
     ],
     footer: {
       message: '基于 Apache-2.0 许可发布',
@@ -157,7 +157,7 @@ export default defineConfig({
       text: '最后更新于',
     },
     editLink: {
-      pattern: 'https://github.com/HapeLee/legado-with-MD3/edit/main/docs/:path',
+      pattern: 'https://github.com/LM-Firefly/YueDu-MD3/edit/main/docs/:path',
       text: '在 GitHub 上编辑此页面',
     },
   },

@@ -7,25 +7,25 @@ adaptiveNavigation = "1.3.0"
 animation = "1.12.0"
 biometric = "1.4.0-alpha07"
 coilCompose = "3.6.2"
-composeBom = "2026.08.00"
+composeBom = "2026.09.00"
 constraintlayoutCompose = "1.1.2"
 coreSplashscreen = "1.2.0"
 datastorePreferences = "1.2.1"
 foundation = "1.12.0"
-kotlin = "2.4.10"
+kotlin = "2.4.20"
 kotlinxSerialization = "1.11.0"
 kotlinxCoroutinesAndroid = "1.11.0"
 kotlinxSerializationJson = "1.11.0"
 kotlinxCollectionsImmutable = "0.5.2"
-ksp = "2.3.6"
-agp = "9.2.1"
+ksp = "2.3.12"
+agp = "9.5.0-alpha05"
 appcompat = "1.8.0"
 colorpicker = "1.1.0"
 colorpicker-compose = "1.2.0"
 commonsText = "1.15.0"
 constraintlayout = "2.2.2"
 core = "1.19.0"
-firebaseBom = "34.6.0"
+# firebaseBom = "34.6.0"
 flexbox = "3.0.0"
 fragment = "1.9.0"
 
@@ -49,24 +49,25 @@ navigation3 = "1.2.0-beta01"
 # 对已分离输入抛 IllegalStateException 的崩溃（1.1.2 仍会 checkNotNull 抛异常）。
 # 覆盖 navigation3 1.1.4 传递依赖的 1.1.2，等上游发布含该修复的稳定版后可移除。
 navigationevent = "1.2.0-alpha04"
+markdownRenderer = "0.41.0"
 markwon = "4.6.2"
 material = "1.14.0"
-material3 = "1.5.0-alpha27"
+material3 = "1.5.0-alpha28"
 material3IconsExtended = "1.7.8"
 materialKolor = "5.0.1"
 media = "1.8.0"
 media3 = "1.11.0"
-navigationCompose = "2.10.0"
+navigationCompose = "2.10.1"
 okhttp = "5.5.0"
 palette = "1.0.0"
 preference = "1.2.1"
-protobufJavalite = "4.26.1"
+protobufJavalite = "4.36.1"
 quickChineseTransfer = "0.2.17"
 # 书源 JS 通过 Packages.cn.hutool.* 直接调用，Hutool 作为书源运行时加密库保留在 classpath。
 # 应用代码不直接依赖它；加密走 JCA / help/crypto/CryptoUtils.kt。版本固定，勿升级（参考上游基线）。
 hutool = "5.8.22"
-room = "2.8.4"
-robolectric = "4.16.1"
+room = "2.8.5"
+robolectric = "4.17"
 splitties = "3.0.0"
 rhino = "1.8.1"
 desugar = "2.1.5"
@@ -78,7 +79,7 @@ swiperefreshlayout = "1.2.0"
 #noinspection GradleDependency
 recyclerview = "1.4.0"
 #noinspection GradleDependency
-uiViewbinding = "1.9.4"
+uiViewbinding = "1.11.2"
 viewpager2 = "1.1.0"
 webkit = "1.17.0"
 collection = "1.6.0"
@@ -97,8 +98,8 @@ backdrop = "2.0.1"
 capsule = "2.1.3"
 lyricViewx = "1.3.2"
 uiautomator = "2.4.0"
-benchmarkMacroJunit4 = "1.4.1"
-baselineprofile = "1.4.1"
+benchmarkMacroJunit4 = "1.5.0"
+baselineprofile = "1.5.0"
 profileinstaller = "1.4.1"
 [libraries]
 
@@ -155,9 +156,9 @@ core-ktx = { module = "androidx.core:core-ktx", version.ref = "core" }
 
 androidx-espresso-core = { module = "androidx.test.espresso:espresso-core", version = "3.7.0" }
 
-firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
-firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
-firebase-perf = { module = "com.google.firebase:firebase-perf" }
+# firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+# firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
+# firebase-perf = { module = "com.google.firebase:firebase-perf" }
 
 
 fragment-ktx = { module = "androidx.fragment:fragment-ktx", version.ref = "fragment" }
@@ -272,7 +273,7 @@ android-test = { id = "com.android.test", version.ref = "agp" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 kotlin-parcelize = { id = "org.jetbrains.kotlin.plugin.parcelize", version.ref = "kotlin" }
 
-google-services = { id = "com.google.gms.google-services", version = "4.4.4" }
+# google-services = { id = "com.google.gms.google-services", version = "4.4.4" }
 
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 room = { id = "androidx.room", version.ref = "room" }
