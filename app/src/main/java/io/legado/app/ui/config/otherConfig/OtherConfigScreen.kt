@@ -163,12 +163,12 @@ fun OtherConfigScreen(
                     }
                 )
 
-                SwitchSettingItem(
-                    title = stringResource(R.string.firebase_enable_title),
-                    description = stringResource(R.string.firebase_enable_summary),
-                    checked = OtherConfig.firebaseEnable,
-                    onCheckedChange = { OtherConfig.firebaseEnable = it }
-                )
+//                SwitchSettingItem(
+//                    title = stringResource(R.string.firebase_enable_title),
+//                    description = stringResource(R.string.firebase_enable_summary),
+//                    checked = OtherConfig.firebaseEnable,
+//                    onCheckedChange = { OtherConfig.firebaseEnable = it }
+//                )
 
                 ClickableSettingItem(
                     title = stringResource(R.string.set_local_password),
