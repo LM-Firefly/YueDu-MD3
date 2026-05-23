@@ -576,11 +576,11 @@
                 tools:node="remove" />
         </provider>
 
-        <provider
+        <!--provider
             android:name="com.google.firebase.provider.FirebaseInitProvider"
             android:authorities="${applicationId}.firebaseinitprovider"
             android:exported="false"
-            tools:node="remove" />
+            tools:node="remove" /-->
 
         <meta-data
             android:name="channel"

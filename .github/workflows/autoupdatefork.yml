@@ -1,24 +1,24 @@
 #更新fork
 name: update fork
 
-on: 
+on:
   schedule:
     - cron: '0 16 * * *' #0点定时任务
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: ${{ github.event.repository.owner.id == github.event.sender.id && github.actor != 'gedoor' }}
+    if: ${{ github.event.repository.owner.id == github.event.sender.id && github.actor != 'HapeLee' }}
     steps:
     - name: Checkout
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
     - name: Set env
       run: |
         git config --global user.email "github-actions@github.com"
         git config --global user.name "github-actions"
     - name: Update fork
       run: |
-        git remote add upstream https://github.com/gedoor/legado.git
+        git remote add upstream https://github.com/HapeLee/legado-with-MD3.git
         git remote -v
         git fetch upstream
         git checkout master

@@ -2,7 +2,7 @@
 layout: home
 
 hero:
-  name: Legado-with-MD3
+  name: YueDu-MD3
   text: 阅读
   tagline: 一款免费、开源的 Android 内容聚合阅读器，支持自定义内容源、RSS 订阅和本地书籍管理
   actions:
@@ -14,7 +14,7 @@ hero:
       link: /dev/
     - theme: alt
       text: GitHub
-      link: https://github.com/HapeLee/legado-with-MD3
+      link: https://github.com/LM-Firefly/YueDu-MD3
 
 features:
   - icon: 📖
@@ -36,4 +36,3 @@ features:
     title: 灵活的规则引擎
     details: 支持 JS、XPath、正则表达式等多种规则语法，灵活解析网页内容
 ---
-
