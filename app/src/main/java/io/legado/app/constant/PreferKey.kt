@@ -181,7 +181,7 @@ object PreferKey {
     const val readAloudByMediaButton = "readAloudByMediaButton"
     const val showMangaUi = "showMangaUi"
     const val disableMangaScale = "disableMangaScale"
-    const val firebaseEnable = "firebaseEnable"
+//    const val firebaseEnable = "firebaseEnable"
     const val cPrimary = "colorPrimary"
     const val customContrast = "customContrast"
     const val cAccent = "colorAccent"
