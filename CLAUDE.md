@@ -68,7 +68,7 @@ Transform tasks into verifiable goals:
 ./gradlew app:downloadCronet
 ```
 
-The project uses JDK 21 for development (set in `build.gradle.kts` via `jvmToolchain`). CI uses JDK 17 for building.
+The project uses JDK 21 for development (set in `build.gradle.kts` via `jvmToolchain`). CI uses JDK 24 for building.
 
 Gradle properties: 8 GB heap, configuration cache disabled (`gradle.properties:31`), non-transitive R classes, precise resource shrinking enabled.
 
@@ -374,10 +374,9 @@ Book sources, RSS sources, and HTTP TTS use JavaScript rules. `initRhino()` in `
   `kotlin.io.encoding.Base64` is strict about `=` padding). App crypto otherwise uses JCA (
   `javax.crypto`/`java.security`); new internal tools live in `help/crypto/CryptoUtils.kt`
 - Package name discrepancy: code namespace is `io.legado.app` but `applicationId` is `io.legato.kazusa`
-- Min SDK 26, target SDK 37, compile SDK 37
+- Min SDK 26, target SDK 37, `:app` compile SDK 37.2 (libarchive 1.1.7 AAR requirement; `modules/book`/`modules/rhino` still 37)
 - Release builds enable R8 minification + resource shrinking; `noR8` variant disables both for crash debugging
 - APK is split by ABI (`armeabi-v7a`, `arm64-v8a`, plus universal)
-- Firebase Analytics and Performance are included; `google-services` plugin applied
 
 ## Web Frontend
 

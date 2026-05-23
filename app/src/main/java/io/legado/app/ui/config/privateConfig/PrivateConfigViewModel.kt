@@ -46,11 +46,11 @@ class PrivateConfigViewModel(
                 _uiState.update { it.copy(settings = settings) }
             }
         }
-        viewModelScope.launch {
-            otherSettingsGateway.settings.collect { settings ->
-                _uiState.update { it.copy(firebaseEnable = settings.firebaseEnable) }
-            }
-        }
+//        viewModelScope.launch {
+//            otherSettingsGateway.settings.collect { settings ->
+//                _uiState.update { it.copy(firebaseEnable = settings.firebaseEnable) }
+//            }
+//        }
         privateAccessGateway.refreshBiometricStatus()
     }
 
@@ -95,9 +95,9 @@ class PrivateConfigViewModel(
             PrivateConfigIntent.RequestBatteryPermission ->
                 _effects.tryEmit(PrivateConfigEffect.RequestBatteryPermission)
 
-            is PrivateConfigIntent.SetFirebaseEnabled -> updateOtherSettings {
-                it.copy(firebaseEnable = intent.enabled)
-            }
+//            is PrivateConfigIntent.SetFirebaseEnabled -> updateOtherSettings {
+//                it.copy(firebaseEnable = intent.enabled)
+//            }
         }
     }
 
