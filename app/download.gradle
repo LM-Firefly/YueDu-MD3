@@ -1,29 +1,9 @@
-import java.security.MessageDigest
-
 apply plugin: 'de.undercouch.download'
 
 def BASE_PATH = "https://storage.googleapis.com/chromium-cronet/android/" + CronetVersion + "/Release/cronet/"
 def assetsDir = projectDir.toString() + "/src/main/assets"
 def libPath = projectDir.toString() + "/cronetlib"
 def soPath = projectDir.toString() + "/so"
-
-/**
- * 从文件生成MD5
- * @param file
- * @return
- */
-static def generateMD5(final file) {
-    MessageDigest digest = MessageDigest.getInstance("MD5")
-    file.withInputStream() { is ->
-        byte[] buffer = new byte[1024]
-        //noinspection GroovyUnusedAssignment
-        int numRead = 0
-        while ((numRead = is.read(buffer)) > 0) {
-            digest.update(buffer, 0, numRead)
-        }
-    }
-    return String.format("%032x", new BigInteger(1, digest.digest())).toLowerCase()
-}
 
 /**
  * 下载Cronet相关的jar
@@ -82,22 +62,37 @@ tasks.register('downloadX86', Download) {
  * 先更改gradle.properties 里面的版本号，然后再执行
  * gradlew app:downloadCronet
  */
+def cronetVersion = CronetVersion
+def cronetSoPath = soPath
+def cronetAssetsDir = assetsDir
+
 tasks.register('downloadCronet') {
     dependsOn downloadJar, downloadARM64, downloadARMv7, downloadX86_64, downloadX86
 
     doLast {
+        def md5 = { File f ->
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("MD5")
+            f.withInputStream() { is ->
+                byte[] buffer = new byte[1024]
+                int numRead
+                while ((numRead = is.read(buffer)) > 0) {
+                    digest.update(buffer, 0, numRead)
+                }
+            }
+            String.format("%032x", new BigInteger(1, digest.digest())).toLowerCase()
+        }
         StringBuilder sb = new StringBuilder("{")
-        def files = new File(soPath).listFiles()
+        def files = new File(cronetSoPath).listFiles()
         for (File file : files) {
             println file.name.replace(".so", "")
-            sb.append("\"").append(file.name.replace(".so", "")).append("\":\"").append(generateMD5(file)).append("\",")
+            sb.append("\"").append(file.name.replace(".so", "")).append("\":\"").append(md5(file)).append("\",")
         }
-        sb.append("\"version\":\"").append(CronetVersion).append("\"}")
+        sb.append("\"version\":\"").append(cronetVersion).append("\"}")
 
         println sb.toString()
 
-        println assetsDir
-        def f1 = new File(assetsDir + "/cronet.json")
+        println cronetAssetsDir
+        def f1 = new File(cronetAssetsDir + "/cronet.json")
         if (!f1.exists()) {
             f1.parentFile.mkdirs()
             f1.createNewFile()
@@ -108,5 +103,3 @@ tasks.register('downloadCronet') {
 
 
 }
-
-

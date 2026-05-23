@@ -57,5 +57,5 @@
 
 ## 外部资源
 
-- [Legado GitHub](https://github.com/HapeLee/legado-with-MD3) — 项目源码和 Issue 跟踪
+- [YueDu GitHub](https://github.com/LM-Firefly/YueDu-MD3) — 项目源码和 Issue 跟踪
 - [legado-with-MD3 Wiki](https://github.com/HapeLee/legado-with-MD3/wiki) — 社区维护的文档
