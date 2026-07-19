@@ -139,10 +139,18 @@ cn.hutool.core.util.**{*;}
 -keep class io.legado.app.api.ReturnData{*;}
 
 # Cronet
--keepclassmembers class org.chromium.net.X509Util {
-    *** sDefaultTrustManager;
-    *** sTestTrustManager;
-}
+# NativeCronetEngineBuilderImpl and parent classes used via reflection in CronetHelper
+-keep class org.chromium.net.impl.NativeCronetEngineBuilderImpl { *; }
+-keep class org.chromium.net.impl.CronetEngineBuilderImpl { *; }
+-keep class org.chromium.net.impl.CronetUrlRequestContext { *; }
+-keep class org.chromium.net.impl.CronetLibraryLoader { *; }
+-keep class org.chromium.net.impl.NativeCronetProvider { *; }
+# NativeCronetProvider is loaded via ServiceLoader — prevent R8 from stripping
+-keep class org.chromium.net.CronetProvider { *; }
+-keep class * extends org.chromium.net.CronetProvider { *; }
+-dontwarn org.chromium.net.**
+-dontwarn org.chromium.net.impl.**
+-dontwarn org.chromium.base.**
 
 # Throwable
 -keepnames class * extends java.lang.Throwable
