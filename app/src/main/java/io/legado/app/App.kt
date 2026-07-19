@@ -71,7 +71,6 @@ import io.legado.app.utils.isDebuggable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import org.chromium.base.ThreadUtils
 import org.koin.android.ext.android.get
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.GlobalContext.startKoin
@@ -143,9 +142,6 @@ class App : Application(), ImageLoaderFactory {
         super.onCreate()
 //        FirebaseManager.init(this)
         CrashHandler(this)
-        if (isDebuggable) {
-            ThreadUtils.setThreadAssertsDisabledForTesting(true)
-        }
         registerActivityLifecycleCallbacks(LifecycleHelp)
         Coroutine.async {
             get<BackupSettingsGateway>().settings

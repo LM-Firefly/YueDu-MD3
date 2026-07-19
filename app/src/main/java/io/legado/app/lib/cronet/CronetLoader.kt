@@ -77,6 +77,35 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
         return cacheInstall
     }
 
+    /**
+     * 同步安装 so 库 — 在 CronetEngine 构造前确保 so 文件就绪
+     */
+    @SuppressLint("UnsafeDynamicallyLoadedCode")
+    fun installSync() {
+        if (install()) {
+            // SO 已就绪，预加载到内存
+            runCatching { System.load(soFile.absolutePath) }
+            return
+        }
+        if (md5.length != 32 || soUrl.isEmpty()) return
+        try {
+            deleteHistoryFile(soFile.parentFile ?: return, soFile)
+            if (!soFile.exists() || md5 != getFileMD5(soFile)) {
+                download(soUrl, md5, downloadFile, soFile)
+                // 同步等待下载完成
+                var waitCount = 0
+                while (!install() && waitCount < 100) {
+                    Thread.sleep(200)
+                    waitCount++
+                }
+            }
+            if (install()) {
+                System.load(soFile.absolutePath)
+            }
+        } catch (e: Throwable) {
+            DebugLog.d(javaClass.simpleName, "installSync failed: ${e.message}")
+        }
+    }
 
     /**
      * 预加载Cronet
@@ -212,14 +241,14 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
      * 下载文件
      */
     private fun downloadFileIfNotExist(url: String, destFile: File): Boolean {
+        if (destFile.exists()) {
+            return true
+        }
         var inputStream: InputStream? = null
         var outputStream: OutputStream? = null
         try {
             val connection = URL(url).openConnection() as HttpURLConnection
             inputStream = connection.inputStream
-            if (destFile.exists()) {
-                return true
-            }
             destFile.parentFile!!.mkdirs()
             destFile.createNewFile()
             outputStream = FileOutputStream(destFile)

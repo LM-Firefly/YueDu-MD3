@@ -13,12 +13,12 @@ tasks.register('downloadJar', Download) {
             BASE_PATH + "cronet_api.jar",
             BASE_PATH + "cronet_impl_common_java.jar",
             BASE_PATH + "cronet_impl_native_java.jar",
-            BASE_PATH + "cronet_impl_platform_java.jar",
             BASE_PATH + "cronet_shared_java.jar"
     ])
     dest libPath
     overwrite true
     onlyIfModified false
+    notCompatibleWithConfigurationCache()
 }
 /**
  * 下载Cronet的arm64-v8a so
@@ -28,6 +28,7 @@ tasks.register('downloadARM64', Download) {
     dest soPath + "/arm64-v8a.so"
     overwrite true
     onlyIfModified true
+    notCompatibleWithConfigurationCache()
 }
 /**
  * 下载Cronet的armeabi-v7a so
@@ -37,6 +38,7 @@ tasks.register('downloadARMv7', Download) {
     dest soPath + "/armeabi-v7a.so"
     overwrite true
     onlyIfModified true
+    notCompatibleWithConfigurationCache()
 }
 /**
  * 下载Cronet的x86_64 so
@@ -46,6 +48,7 @@ tasks.register('downloadX86_64', Download) {
     dest soPath + "/x86_64.so"
     overwrite true
     onlyIfModified true
+    notCompatibleWithConfigurationCache()
 }
 /**
  * 下载Cronet的x86 so
@@ -55,6 +58,7 @@ tasks.register('downloadX86', Download) {
     dest soPath + "/x86.so"
     overwrite true
     onlyIfModified true
+    notCompatibleWithConfigurationCache()
 }
 
 /**
@@ -68,8 +72,15 @@ def cronetAssetsDir = assetsDir
 
 tasks.register('downloadCronet') {
     dependsOn downloadJar, downloadARM64, downloadARMv7, downloadX86_64, downloadX86
+    notCompatibleWithConfigurationCache()
 
     doLast {
+        // 删除已弃用的平台实现 jar
+        def platformJar = new File(libPath, "cronet_impl_platform_java.jar")
+        if (platformJar.exists()) {
+            platformJar.delete()
+            println "Deleted deprecated Cronet platform jar: ${platformJar.path}"
+        }
         def md5 = { File f ->
             java.security.MessageDigest digest = java.security.MessageDigest.getInstance("MD5")
             f.withInputStream() { is ->
