@@ -164,9 +164,6 @@ class App : Application(), SingletonImageLoader.Factory {
         super.onCreate()
 //        FirebaseManager.init(this)
         CrashHandler(this)
-        if (isDebuggable) {
-            ThreadUtils.setThreadAssertsDisabledForTesting(true)
-        }
         registerActivityLifecycleCallbacks(LifecycleHelp)
         Coroutine.async {
             get<BackupSettingsGateway>().settings
