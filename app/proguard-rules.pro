@@ -128,10 +128,28 @@
 -keep class io.legado.app.api.ReturnData{*;}
 
 # Cronet
--keepclassmembers class org.chromium.net.X509Util {
-    *** sDefaultTrustManager;
-    *** sTestTrustManager;
-}
+# NativeCronetEngineBuilderImpl and parent classes used via reflection in CronetHelper
+-keep class org.chromium.net.impl.NativeCronetEngineBuilderImpl { *; }
+-keep class org.chromium.net.impl.CronetEngineBuilderImpl { *; }
+-keep class org.chromium.net.impl.CronetUrlRequestContext { *; }
+-keep class org.chromium.net.impl.CronetLibraryLoader { *; }
+-keep class org.chromium.net.impl.NativeCronetProvider { *; }
+# NativeCronetProvider is loaded via ServiceLoader — prevent R8 from stripping
+-keep class org.chromium.net.CronetProvider { *; }
+-keep class * extends org.chromium.net.CronetProvider { *; }
+# Cronet bundles its own protobuf — keep all classes, members, and package names
+# to prevent R8 flattenpackagehierarchy from repackaging and field renaming
+-keep class org.chromium.net.internal.** { *; }
+-keepclassmembers class org.chromium.net.internal.** { *; }
+-keeppackagenames org.chromium.net.internal.**
+# Keep all protobuf message subclasses by inheritance — R8's flattenpackagehierarchy
+# repackages them to m20.*, p20.* etc., breaking reflection-based field access
+-keep class * extends org.chromium.net.internal.com.google.protobuf.GeneratedMessageLite { *; }
+-keep class * extends org.chromium.net.internal.com.google.protobuf.GeneratedMessageLite$Builder { *; }
+-dontwarn org.chromium.net.**
+-dontwarn org.chromium.net.impl.**
+-dontwarn org.chromium.net.internal.**
+-dontwarn org.chromium.base.**
 
 # Throwable
 -keepnames class * extends java.lang.Throwable

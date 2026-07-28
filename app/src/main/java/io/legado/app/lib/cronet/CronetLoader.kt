@@ -31,7 +31,7 @@ import java.util.Objects
 @Suppress("ConstPropertyName")
 @Keep
 object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterface {
-    //https://storage.googleapis.com/chromium-cronet/android/92.0.4515.159/Release/cronet/libs/arm64-v8a/libcronet.92.0.4515.159.so
+    //https://storage.googleapis.com/chromium-cronet/android/151.0.7922.173/Release/cronet/libs/arm64-v8a/libcronet.151.0.7922.173.so
 
     private const val soVersion = BuildConfig.Cronet_Version
     private const val soName = "libcronet.$soVersion.so"
@@ -44,6 +44,7 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
 
     @Volatile
     private var cacheInstall = false
+    private var downloadLatch: java.util.concurrent.CountDownLatch? = null
 
     init {
         soUrl = ("https://storage.googleapis.com/chromium-cronet/android/"
@@ -64,19 +65,44 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
      */
     override fun install(): Boolean {
         synchronized(this) {
-            if (cacheInstall) {
-                return true
+            if (cacheInstall) return true
+            if (md5.length != 32 || !soFile.exists()) {
+                cacheInstall = false
+                return false
             }
-        }
-
-        if (md5.length != 32 || !soFile.exists() || md5 != getFileMD5(soFile)) {
-            cacheInstall = false
+            cacheInstall = md5.equals(getFileMD5(soFile), ignoreCase = true)
             return cacheInstall
         }
-        cacheInstall = soFile.exists()
-        return cacheInstall
     }
 
+    /**
+     * 同步安装 so 库 — 在 CronetEngine 构造前确保 so 文件就绪
+     */
+    @SuppressLint("UnsafeDynamicallyLoadedCode")
+    fun installSync() {
+        if (install()) {
+            // SO 已就绪，预加载到内存
+            runCatching { System.load(soFile.absolutePath) }
+            return
+        }
+        if (md5.length != 32 || soUrl.isEmpty()) return
+        try {
+            deleteHistoryFile(soFile.parentFile ?: return, soFile)
+            if (!soFile.exists() || md5 != getFileMD5(soFile)) {
+                val latch = java.util.concurrent.CountDownLatch(1)
+                downloadLatch = latch
+                download(soUrl, md5, downloadFile, soFile)
+                // 等待下载完成，最多 30 秒
+                latch.await(30, java.util.concurrent.TimeUnit.SECONDS)
+                downloadLatch = null
+            }
+            if (install()) {
+                System.load(soFile.absolutePath)
+            }
+        } catch (e: Throwable) {
+            DebugLog.d(javaClass.simpleName, "installSync failed: ${e.message}")
+        }
+    }
 
     /**
      * 预加载Cronet
@@ -212,14 +238,14 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
      * 下载文件
      */
     private fun downloadFileIfNotExist(url: String, destFile: File): Boolean {
+        if (destFile.exists()) {
+            return true
+        }
         var inputStream: InputStream? = null
         var outputStream: OutputStream? = null
         try {
             val connection = URL(url).openConnection() as HttpURLConnection
             inputStream = connection.inputStream
-            if (destFile.exists()) {
-                return true
-            }
             destFile.parentFile!!.mkdirs()
             destFile.createNewFile()
             outputStream = FileOutputStream(destFile)
@@ -281,6 +307,7 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
                     downloadTempFile.deleteOnExit()
                 }
                 download = false
+                downloadLatch?.countDown()
                 return@async
             }
             DebugLog.d(javaClass.simpleName, "download success, copy to $destSuccessFile")
@@ -290,6 +317,7 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
             val parentFile = downloadTempFile.parentFile
             @Suppress("SameParameterValue")
             (deleteHistoryFile(parentFile!!, null))
+            downloadLatch?.countDown()
         }
     }
 

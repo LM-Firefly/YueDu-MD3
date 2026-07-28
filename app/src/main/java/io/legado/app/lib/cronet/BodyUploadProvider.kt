@@ -1,6 +1,7 @@
 package io.legado.app.lib.cronet
 
 import androidx.annotation.Keep
+import io.legado.app.utils.DebugLog
 import okhttp3.RequestBody
 import okio.Buffer
 import org.chromium.net.UploadDataProvider
@@ -26,8 +27,8 @@ class BodyUploadProvider(private val body: RequestBody) : UploadDataProvider(), 
             filled = true
             body.writeTo(buffer)
             buffer.flush()
-        } catch (e: IOException) {
-            e.printStackTrace()
+        } catch (e: Exception) {
+            DebugLog.e("BodyUploadProvider", "fillBuffer failed", e)
         }
     }
 
@@ -42,18 +43,17 @@ class BodyUploadProvider(private val body: RequestBody) : UploadDataProvider(), 
             fillBuffer()
         }
         check(byteBuffer.hasRemaining()) { "Cronet passed a buffer with no bytes remaining" }
-        var read: Int
-        var bytesRead = 0
-        while (bytesRead == 0) {
-            read = buffer.read(byteBuffer)
-            bytesRead += read
+        val read = buffer.read(byteBuffer)
+        if (read == -1) {
+            uploadDataSink.onReadSucceeded(true)
+        } else {
+            uploadDataSink.onReadSucceeded(false)
         }
-        uploadDataSink.onReadSucceeded(false)
     }
 
     @Throws(IOException::class)
     override fun rewind(uploadDataSink: UploadDataSink) {
-        check(body.isOneShot()) { "Okhttp RequestBody is oneShot" }
+        check(!body.isOneShot()) { "Cannot rewind one-shot RequestBody" }
         filled = false
         fillBuffer()
         uploadDataSink.onRewindSucceeded()
