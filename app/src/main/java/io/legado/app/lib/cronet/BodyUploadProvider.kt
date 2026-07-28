@@ -42,18 +42,16 @@ class BodyUploadProvider(private val body: RequestBody) : UploadDataProvider(), 
             fillBuffer()
         }
         check(byteBuffer.hasRemaining()) { "Cronet passed a buffer with no bytes remaining" }
-        var read: Int
-        var bytesRead = 0
-        while (bytesRead == 0) {
-            read = buffer.read(byteBuffer)
-            bytesRead += read
+        val read = buffer.read(byteBuffer)
+        if (read == -1) {
+            throw IOException("Unexpected end of upload body")
         }
         uploadDataSink.onReadSucceeded(false)
     }
 
     @Throws(IOException::class)
     override fun rewind(uploadDataSink: UploadDataSink) {
-        check(body.isOneShot()) { "Okhttp RequestBody is oneShot" }
+        check(!body.isOneShot()) { "Okhttp RequestBody is oneShot" }
         filled = false
         fillBuffer()
         uploadDataSink.onRewindSucceeded()

@@ -36,11 +36,9 @@ class LargeBodyUploadProvider(
             fillBuffer()
         }
         check(byteBuffer.hasRemaining()) { "Cronet passed a buffer with no bytes remaining" }
-        var read: Int
-        var bytesRead = 0
-        while (bytesRead <= 0) {
-            read = source.read(byteBuffer)
-            bytesRead += read
+        val read = source.read(byteBuffer)
+        if (read == -1) {
+            throw IOException("Unexpected end of upload body")
         }
         uploadDataSink.onReadSucceeded(false)
     }
@@ -62,7 +60,7 @@ class LargeBodyUploadProvider(
     }
 
     override fun rewind(p0: UploadDataSink?) {
-        check(body.isOneShot()) { "Okhttp RequestBody is OneShot" }
+        check(!body.isOneShot()) { "Okhttp RequestBody is OneShot" }
         filled = false
         fillBuffer()
     }
