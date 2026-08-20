@@ -155,7 +155,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Set up JDK 24
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
           java-version: 24
@@ -323,8 +323,8 @@ jobs:
 
   create_release:
     needs: [ prepare, build ]
-    # 只有 publish=true 且在 main 分支时才发布
-    if: inputs.publish && github.ref == 'refs/heads/main'
+    # push 到 main 自动发布；workflow_dispatch/workflow_call 需显式开启 publish
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || inputs.publish)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

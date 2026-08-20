@@ -537,7 +537,7 @@ fun SearchScreen(
                                     ) {
                                         itemsIndexed(
                                             items = state.results,
-                                            key = { _, item -> "${item.book.origin}:${item.book.bookUrl}" }
+                                            key = { index, item -> "${item.book.origin}:${item.book.bookUrl}:$index" }
                                         ) { index, item ->
                                             val sharedCoverKey = bookCoverSharedElementKey(
                                                 item.book.bookUrl,
