@@ -381,10 +381,22 @@ abstract class BaseReadAloudService : BaseService(),
 
     private fun newReadAloud(
         play: Boolean,
-        requestedPageIndex: Int,
-        requestedStartPos: Int,
-        requestedChapterPosition: Int?,
+        pageIndex: Int,
+        startPos: Int,
+        chapterPosition: Int? = null,
     ) {
+        val requestedPageIndex = pageIndex
+        val requestedStartPos = startPos
+        val requestedChapterPosition = chapterPosition
+        // 同章节同页 startPos=0 时跳过重启——避免朗读驱动翻页后异步回调触发的多余 newReadAloud 重算 nowSpeak 导致跨页段落截断重读。
+        if (isRun && startPos == 0
+            && this.pageIndex == pageIndex
+            && readerReadAloudChapter?.chapterIndex == ReadBook.durChapterIndex
+        ) {
+            upMediaMetadata()
+            pageChanged = true
+            return
+        }
         // 每次"从指定位置开始朗读"都是新会话：恢复页面跟随朗读（手动脱离后点"从此处朗读"等）
         sessionStore.restoreReadAloudFollow()
         clearFinishChapterTimerIfChapterChanged(ReadBook.durChapterIndex)
@@ -392,7 +404,18 @@ abstract class BaseReadAloudService : BaseService(),
         prepareReadAloudJob?.cancel()
         prepareReadAloudJob = execute(executeContext = IO) {
             val input = ReadBook.readerChapterInputWindow.current ?: return@execute
-            val pagination = ReadBook.readerPagination(input.chapter.index) ?: run {
+            // 分页快照可能尚未从 Compose 渲染层落地，短暂等待而非直接放弃
+            var pagination = ReadBook.readerPagination(input.chapter.index)
+            if (pagination == null) {
+                AppLog.putDebug("朗读等待分页：chapterIndex=${input.chapter.index}")
+                repeat(20) { // 最多等2秒（20 × 100ms）
+                    delay(100)
+                    if (generation != prepareReadAloudGeneration) return@execute
+                    pagination = ReadBook.readerPagination(input.chapter.index)
+                    if (pagination != null) return@repeat
+                }
+            }
+            if (pagination == null) {
                 AppLog.put("启动朗读失败：章节分页未完成 chapterIndex=${input.chapter.index}")
                 return@execute
             }
@@ -650,10 +673,19 @@ abstract class BaseReadAloudService : BaseService(),
         if (targetPageIndex == pageIndex) return false
         // 页面脱离朗读位置（用户手动翻页）后不再驱动可见页面，仅推进朗读内部页游标
         val follow = sessionStore.state.value.followReadAloudPosition
-        repeat(targetPageIndex - pageIndex) {
-            pageIndex++
-            if (follow) {
-                withSpeechNavigation { ReadBook.moveToNextPage() }
+        if (targetPageIndex > pageIndex) {
+            repeat(targetPageIndex - pageIndex) {
+                pageIndex++
+                if (follow) {
+                    withSpeechNavigation { ReadBook.moveToNextPage() }
+                }
+            }
+        } else {
+            repeat(pageIndex - targetPageIndex) {
+                pageIndex--
+                if (follow) {
+                    withSpeechNavigation { ReadBook.moveToPrevPage() }
+                }
             }
         }
         return true
@@ -1343,6 +1375,8 @@ abstract class BaseReadAloudService : BaseService(),
         toLast = false
         resumeReadAloudInternal()
         withSpeechNavigation { ReadBook.moveToPrevChapter(true, toLast = false) }
+        // curPageChanged 内 shouldRestartReadAloudAfterContentLoad 因章节索引不匹配返回 false，不会触发 readAloud；必须显式重启朗读以加载新章节内容。
+        newReadAloud(play = !pause, pageIndex = ReadBook.durPageIndex, startPos = 0)
     }
 
     open fun nextChapter() {
@@ -1351,8 +1385,10 @@ abstract class BaseReadAloudService : BaseService(),
         AppLog.putDebug("${readerReadAloudChapter?.title} 朗读结束跳转下一章并朗读")
         resumeReadAloudInternal()
         if (!withSpeechNavigation { ReadBook.moveToNextChapter(true) }) {
-            stopReadAloudService()
+            stopSelf()
+            return
         }
+        newReadAloud(play = !pause, pageIndex = ReadBook.durPageIndex, startPos = 0)
     }
 
     /** Handles a playback engine's natural chapter boundary atomically with timer expiry. */

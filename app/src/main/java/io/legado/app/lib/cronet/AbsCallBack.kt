@@ -200,6 +200,10 @@ abstract class AbsCallBack(
     override fun onCanceled(request: UrlRequest?, info: UrlResponseInfo?) {
         if (followRedirect) {
             followRedirect = false
+            // 清空旧请求残留的回调数据，防止新请求读到脏数据
+            callbackResults.clear()
+            finished.set(false)
+            canceled.set(false)
             if (enableCookieJar) {
                 val newRequest = CookieManager.loadRequest(redirectRequest!!)
                 buildRequest(newRequest, this)?.start()
@@ -393,15 +397,9 @@ abstract class AbsCallBack(
             val requestBuilder = userResponse.request.newBuilder()
             if (HttpMethod.permitsRequestBody(method)) {
                 val responseCode = userResponse.code
-                // OkHttp 5.5 folds redirect status handling into redirectsToGet().
-                // PROPFIND is the only method whose body is retained for 301/302/303.
-                val maintainBody = method == "PROPFIND" ||
-                        responseCode == HTTP_PERM_REDIRECT ||
+                val maintainBody = responseCode == HTTP_PERM_REDIRECT ||
                         responseCode == HTTP_TEMP_REDIRECT
-                if (HttpMethod.redirectsToGet(method, responseCode)
-                    && responseCode != HTTP_PERM_REDIRECT
-                    && responseCode != HTTP_TEMP_REDIRECT
-                ) {
+                if (HttpMethod.redirectsToGet(method, responseCode)) {
                     requestBuilder.method("GET", null)
                 } else {
                     val requestBody = if (maintainBody) userResponse.request.body else null
@@ -462,11 +460,9 @@ abstract class AbsCallBack(
                 return -1
             }
 
-            if (byteCount < buffer!!.limit()) {
-                buffer!!.limit(byteCount.toInt())
-            }
-
-            request?.read(buffer)
+            // 分配具有请求容量的临时缓冲区，以避免在Cronet可能正在使用共享缓冲区时修改其限制。
+            val readBuf = ByteBuffer.allocateDirect(byteCount.coerceAtMost(BUFFER_SIZE.toLong()).toInt())
+            request?.read(readBuf)
 
             val result = callbackResults.poll(timeout, TimeUnit.MILLISECONDS)
             if (result == null) {
@@ -477,18 +473,15 @@ abstract class AbsCallBack(
             return when (result.callbackStep) {
                 CallbackStep.ON_FAILED -> {
                     finished.set(true)
-                    buffer = null
                     throw IOException(result.exception)
                 }
 
                 CallbackStep.ON_SUCCESS -> {
                     finished.set(true)
-                    buffer = null
                     -1
                 }
 
                 CallbackStep.ON_CANCELED -> {
-                    buffer = null
                     throw IOException("Request Canceled")
                 }
 

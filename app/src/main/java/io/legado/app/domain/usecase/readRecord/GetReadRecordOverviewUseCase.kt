@@ -1,6 +1,6 @@
 package io.legado.app.domain.usecase.readRecord
 
-import io.legado.app.data.entities.Book
+import io.legado.app.data.dao.BookSummary
 import io.legado.app.data.entities.readRecord.ReadRecord
 import io.legado.app.data.entities.readRecord.ReadRecordDetail
 import io.legado.app.ui.book.readRecord.ReadBookRanking
@@ -18,7 +18,7 @@ class GetReadRecordOverviewUseCase {
         refDate: LocalDate,
         details: List<ReadRecordDetail>,
         latestRecords: List<ReadRecord>,
-        allBooks: List<Book>
+        allBooks: List<BookSummary>
     ): ReadRecordOverviewUiState {
         val (startDate, endDate) = getPeriodRange(period, refDate)
 

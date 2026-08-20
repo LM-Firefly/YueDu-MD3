@@ -37,6 +37,7 @@ import io.legado.app.utils.isUri
 import io.legado.app.utils.normalizeFileName
 import io.legado.app.utils.splitNotBlank
 import io.legado.app.utils.toastOnUi
+import kotlin.time.ExperimentalTime
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.daysUntil
@@ -699,6 +700,7 @@ fun Book.getExportFileName(
 }
 
 // 根据当前日期计算章节总数
+@OptIn(ExperimentalTime::class)
 fun Book.simulatedTotalChapterNum(): Int {
     return if (readSimulating()) {
         val currentDate = Clock.System.todayIn(TimeZone.currentSystemDefault())

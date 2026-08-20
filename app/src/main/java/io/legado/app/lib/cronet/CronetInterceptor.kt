@@ -25,7 +25,7 @@ class CronetInterceptor(private val cookieJar: CookieJar) : Interceptor {
         if (!CronetLoader.install() || cronetEngine == null) {
             return chain.proceed(original)
         }
-        val cronetException: Exception
+        var cronetException: Exception? = null
         try {
             val builder: Request.Builder = original.newBuilder()
             //移除Keep-Alive,手动设置会导致400 BadRequest
@@ -48,7 +48,8 @@ class CronetInterceptor(private val cookieJar: CookieJar) : Interceptor {
                 newReq = CookieManager.loadRequest(newReq)
             }
 
-            return proceedWithCronet(newReq, chain.call(), chain.readTimeoutMillis())!!
+            val cronetResponse = proceedWithCronet(newReq, chain.call(), chain.readTimeoutMillis())
+            if (cronetResponse != null) return cronetResponse
         } catch (e: Exception) {
             cronetException = e
             //不能抛出错误,抛出错误会导致应用崩溃
@@ -62,7 +63,7 @@ class CronetInterceptor(private val cookieJar: CookieJar) : Interceptor {
         try {
             return chain.proceed(original)
         } catch (e: Exception) {
-            e.addSuppressed(cronetException)
+            cronetException?.let { e.addSuppressed(it) }
             throw e
         }
     }
