@@ -14,15 +14,14 @@ import io.legado.app.constant.PreferKey
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookProgress
-import io.legado.app.data.local.preferences.LocalPreferencesKeys
 import io.legado.app.data.repository.BookRepository
-import io.legado.app.data.repository.ReadRecordRepository
 import io.legado.app.data.repository.BookSourceRepository
 import io.legado.app.data.repository.BookmarkRepository
 import io.legado.app.data.repository.HighlightRuleRepository
 import io.legado.app.data.repository.HttpTtsRepository
 import io.legado.app.data.repository.ReadAloudSettingsRepository
 import io.legado.app.data.repository.ReadPreferences
+import io.legado.app.data.repository.ReadRecordRepository
 import io.legado.app.data.repository.ReadSettingsRepository
 import io.legado.app.data.repository.ReplaceRuleRepository
 import io.legado.app.data.repository.SettingsRepository
@@ -743,7 +742,10 @@ class ReadBookViewModel(
             is ReadBookIntent.PrevPage -> ReadBook.moveToPrevPage()
             is ReadBookIntent.NextChapter -> ReadBook.moveToNextChapter(upContent = true)
             is ReadBookIntent.PrevChapter -> ReadBook.moveToPrevChapter(upContent = true, toLast = false)
-            is ReadBookIntent.OpenChapter -> openChapter(intent.index, intent.pos)
+            is ReadBookIntent.OpenChapter -> {
+                ReadBook.saveReadingAnchorBeforeChapterJump(intent.index, intent.pos)
+                openChapter(intent.index, intent.pos)
+            }
             is ReadBookIntent.SkipToPage -> ReadBook.skipToPage(intent.pageIndex)
             is ReadBookIntent.ToggleMenu -> _uiState.update {
                 if (it.menuVisible) {
@@ -852,13 +854,17 @@ class ReadBookViewModel(
             }
 
             is ReadBookIntent.RestoreLastBookProgress -> {
-                _uiState.update { it.copy(activeDialog = null) }
                 ReadBook.restoreLastBookProgress()
+                _uiState.update {
+                    syncFromReadBook(it).copy(activeDialog = null)
+                }
             }
 
             is ReadBookIntent.KeepCurrentBookProgress -> {
-                ReadBook.lastBookProgress = null
-                _uiState.update { it.copy(activeDialog = null) }
+                ReadBook.discardReadingAnchor()
+                _uiState.update {
+                    syncFromReadBook(it).copy(activeDialog = null)
+                }
             }
 
             is ReadBookIntent.ToggleReadAloud -> {
@@ -929,7 +935,10 @@ class ReadBookViewModel(
             is ReadBookIntent.ChangeSourceBook -> changeTo(intent.book)
             is ReadBookIntent.ChangeSource -> changeTo(intent.book, intent.toc)
             is ReadBookIntent.AddSourceAsNewBook -> addToBookshelf(intent.book, intent.toc)
-            is ReadBookIntent.OpenChapterResult -> openChapter(intent.index, intent.chapterPos)
+            is ReadBookIntent.OpenChapterResult -> {
+                ReadBook.saveReadingAnchorBeforeChapterJump(intent.index, intent.chapterPos)
+                openChapter(intent.index, intent.chapterPos)
+            }
             is ReadBookIntent.SourceEditResult -> upBookSource()
             is ReadBookIntent.ReplaceRuleResult -> replaceRuleDelegate.rulesChanged()
             is ReadBookIntent.BookInfoResult -> {
@@ -974,7 +983,7 @@ class ReadBookViewModel(
                 )
             }
             is ReadBookIntent.SeekToChapter -> {
-                ReadBook.saveCurrentBookProgress()
+                ReadBook.saveReadingAnchorBeforeChapterJump(intent.index)
                 openChapter(intent.index)
             }
 
@@ -1336,6 +1345,8 @@ class ReadBookViewModel(
             is ReadBookIntent.ReadAloudNextParagraph -> readAloudDelegate.nextParagraph()
             is ReadBookIntent.ReadAloudPrevChapter -> readAloudDelegate.prevChapter()
             is ReadBookIntent.ReadAloudNextChapter -> readAloudDelegate.nextChapter()
+            ReadBookIntent.BackToSpeakingPosition -> readAloudDelegate.backToSpeakingPosition()
+            ReadBookIntent.ReadAloudFromHere -> ReadBook.readAloud()
             is ReadBookIntent.SetReadAloudTtsTimer -> readAloudDelegate.setTtsTimer(intent.value)
             is ReadBookIntent.SetFinishCurrentChapterAfterTimer ->
                 readAloudDelegate.setFinishCurrentChapterAfterTimer(intent.value)
@@ -1759,6 +1770,7 @@ class ReadBookViewModel(
                     state.copy(
                         isReadAloudRunning = status != ReadAloudSessionStatus.Idle,
                         isReadAloudPaused = status == ReadAloudSessionStatus.Paused,
+                        readAloudFollow = session.followReadAloudPosition,
                         readAloudEngineName = info.engineName,
                         readAloudCharacterName = info.characterName,
                         readAloudRoleType = info.roleType,
@@ -1773,13 +1785,6 @@ class ReadBookViewModel(
                 ) {
                     _readAloudProgress.value = null
                     _effects.tryEmit(ReadBookEffect.UpAloudState)
-                }
-                if (previousStatus != ReadAloudSessionStatus.Paused &&
-                    status == ReadAloudSessionStatus.Paused
-                ) {
-                    _effects.tryEmit(
-                        ReadBookEffect.ShowToast(context.getString(R.string.read_aloud_pause))
-                    )
                 }
                 previousStatus = status
             }
@@ -2001,6 +2006,7 @@ class ReadBookViewModel(
             curTextChapter = textChapter,
             seekProgress = calculateSeekProgress(),
             seekMax = calculateSeekMax(),
+            readingAnchorAvailable = ReadBook.hasReadingAnchor(),
             replaceRuleEnabled = book?.getUseReplaceRule(
                 otherSettingsGateway.currentSettings.replaceEnableDefault
             ) ?: false,
