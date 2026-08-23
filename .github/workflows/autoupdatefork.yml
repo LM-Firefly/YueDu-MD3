@@ -3,7 +3,7 @@ name: update fork
 
 on:
   schedule:
-    - cron: '0 0 * * *' #0点定时任务
+    - cron: '0 16 * * *' #0点定时任务
 
 jobs:
   build:
@@ -14,6 +14,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
     - name: Set env
       run: |
         git config --global user.email "github-actions@github.com"
@@ -21,7 +23,6 @@ jobs:
     - name: Update fork
       run: |
         git remote add upstream https://github.com/HapeLee/legado-with-MD3.git
-        git remote -v
         git fetch upstream
         git checkout main
         git merge upstream/main
