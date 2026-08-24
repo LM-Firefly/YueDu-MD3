@@ -209,12 +209,11 @@ class AnalyzeRule(
                 val sourceRule = ruleList.first()
                 putRule(sourceRule.putMap)
                 sourceRule.makeUpRule(result)
-                result = if (sourceRule.getParamSize() > 1) {
-                    // get {{}}
-                    sourceRule.rule
-                } else {
-                    // 键值直接访问
-                    result[sourceRule.rule]
+                result = when {
+                    sourceRule.mode == Mode.Js -> evalJS(sourceRule.rule, result)
+                    sourceRule.mode == Mode.Json -> getAnalyzeByJSonPath(result).getStringList(sourceRule.rule)
+                    sourceRule.getParamSize() > 1 -> sourceRule.rule
+                    else -> result[sourceRule.rule]
                 }
                 result?.let {
                     if (sourceRule.replaceRegex.isNotEmpty() && it is List<*>) {
@@ -308,12 +307,11 @@ class AnalyzeRule(
                 val sourceRule = ruleList.first()
                 putRule(sourceRule.putMap)
                 sourceRule.makeUpRule(result)
-                result = if (sourceRule.getParamSize() > 1) {
-                    // get {{}}
-                    sourceRule.rule
-                } else {
-                    // 键值直接访问
-                    result[sourceRule.rule]?.toString()
+                result = when {
+                    sourceRule.mode == Mode.Js -> evalJS(sourceRule.rule, result)?.toString()
+                    sourceRule.mode == Mode.Json -> getAnalyzeByJSonPath(result).getString(sourceRule.rule)
+                    sourceRule.getParamSize() > 1 -> sourceRule.rule
+                    else -> result[sourceRule.rule]?.toString()
                 }?.let {
                     replaceRegex(it, sourceRule)
                 }

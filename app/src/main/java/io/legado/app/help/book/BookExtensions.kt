@@ -38,7 +38,8 @@ import io.legado.app.utils.toastOnUi
 import splitties.init.appCtx
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.daysUntil
@@ -692,6 +693,7 @@ fun Book.getExportFileName(
 }
 
 // 根据当前日期计算章节总数
+@OptIn(ExperimentalTime::class)
 fun Book.simulatedTotalChapterNum(): Int {
     return if (readSimulating()) {
         val currentDate = Clock.System.todayIn(TimeZone.currentSystemDefault())

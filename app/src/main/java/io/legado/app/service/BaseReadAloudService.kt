@@ -337,6 +337,15 @@ abstract class BaseReadAloudService : BaseService(),
     }
 
     private fun newReadAloud(play: Boolean, pageIndex: Int, startPos: Int) {
+        // 同章节同页 startPos=0 时跳过重启——避免朗读驱动翻页后异步回调触发的多余 newReadAloud 重算 nowSpeak 导致跨页段落截断重读。
+        if (isRun && startPos == 0
+            && this.pageIndex == pageIndex
+            && textChapter?.chapter?.index == ReadBook.durChapterIndex
+        ) {
+            upMediaMetadata()
+            pageChanged = true
+            return
+        }
         // 每次"从指定位置开始朗读"都是新会话：恢复页面跟随朗读（手动脱离后点"从此处朗读"等）
         sessionStore.restoreReadAloudFollow()
         clearFinishChapterTimerIfChapterChanged(ReadBook.durChapterIndex)
@@ -1241,6 +1250,8 @@ abstract class BaseReadAloudService : BaseService(),
         toLast = false
         resumeReadAloudInternal()
         withSpeechNavigation { ReadBook.moveToPrevChapter(true, toLast = false) }
+        // curPageChanged 内 shouldRestartReadAloudAfterContentLoad 因章节索引不匹配返回 false，不会触发 readAloud；必须显式重启朗读以加载新章节内容。
+        newReadAloud(play = !pause, pageIndex = ReadBook.durPageIndex, startPos = 0)
     }
 
     open fun nextChapter() {
@@ -1250,7 +1261,9 @@ abstract class BaseReadAloudService : BaseService(),
         resumeReadAloudInternal()
         if (!withSpeechNavigation { ReadBook.moveToNextChapter(true) }) {
             stopSelf()
+            return
         }
+        newReadAloud(play = !pause, pageIndex = ReadBook.durPageIndex, startPos = 0)
     }
 
     /** Handles a playback engine's natural chapter boundary atomically with timer expiry. */

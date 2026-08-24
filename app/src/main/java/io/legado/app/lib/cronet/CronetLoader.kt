@@ -31,7 +31,7 @@ import java.util.Objects
 @Suppress("ConstPropertyName")
 @Keep
 object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterface {
-    //https://storage.googleapis.com/chromium-cronet/android/92.0.4515.159/Release/cronet/libs/arm64-v8a/libcronet.92.0.4515.159.so
+    //https://storage.googleapis.com/chromium-cronet/android/151.0.7922.173/Release/cronet/libs/arm64-v8a/libcronet.151.0.7922.173.so
 
     private const val soVersion = BuildConfig.Cronet_Version
     private const val soName = "libcronet.$soVersion.so"
@@ -44,6 +44,7 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
 
     @Volatile
     private var cacheInstall = false
+    private var downloadLatch: java.util.concurrent.CountDownLatch? = null
 
     init {
         soUrl = ("https://storage.googleapis.com/chromium-cronet/android/"
@@ -64,17 +65,14 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
      */
     override fun install(): Boolean {
         synchronized(this) {
-            if (cacheInstall) {
-                return true
+            if (cacheInstall) return true
+            if (md5.length != 32 || !soFile.exists()) {
+                cacheInstall = false
+                return false
             }
-        }
-
-        if (md5.length != 32 || !soFile.exists() || md5 != getFileMD5(soFile)) {
-            cacheInstall = false
+            cacheInstall = md5.equals(getFileMD5(soFile), ignoreCase = true)
             return cacheInstall
         }
-        cacheInstall = soFile.exists()
-        return cacheInstall
     }
 
     /**
@@ -91,13 +89,12 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
         try {
             deleteHistoryFile(soFile.parentFile ?: return, soFile)
             if (!soFile.exists() || md5 != getFileMD5(soFile)) {
+                val latch = java.util.concurrent.CountDownLatch(1)
+                downloadLatch = latch
                 download(soUrl, md5, downloadFile, soFile)
-                // 同步等待下载完成
-                var waitCount = 0
-                while (!install() && waitCount < 100) {
-                    Thread.sleep(200)
-                    waitCount++
-                }
+                // 等待下载完成，最多 30 秒
+                latch.await(30, java.util.concurrent.TimeUnit.SECONDS)
+                downloadLatch = null
             }
             if (install()) {
                 System.load(soFile.absolutePath)
@@ -310,6 +307,7 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
                     downloadTempFile.deleteOnExit()
                 }
                 download = false
+                downloadLatch?.countDown()
                 return@async
             }
             DebugLog.d(javaClass.simpleName, "download success, copy to $destSuccessFile")
@@ -319,6 +317,7 @@ object CronetLoader : CronetEngine.Builder.LibraryLoader(), Cronet.LoaderInterfa
             val parentFile = downloadTempFile.parentFile
             @Suppress("SameParameterValue")
             (deleteHistoryFile(parentFile!!, null))
+            downloadLatch?.countDown()
         }
     }
 
