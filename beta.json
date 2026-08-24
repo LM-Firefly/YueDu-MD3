@@ -1,49 +1,49 @@
 {
-  "tag_name": "3.26.16-beta.5",
-  "name": "Pre-release 3.26.16-beta.5",
-  "body": "**此版本为测试版，会存在不稳定问题。**\n### [发布页](https://t.me/materado)\n### [反馈群组](https://t.me/+Yn1_v5PZqddmMjQ1)\n\n### 更新内容\n\n* try\n* fix OkHttp\n* Bump cronet from 150.0.7871.186 to 151.0.7922.173 - Changes in the [Git log](https://chromium.googlesource.com/chromium/src/+log/150.0.7871.186..151.0.7922.173)\n* feat: 阅读设置相关\n* feat: 有声书封面比例设置\n* feat: 朗读脱离提示开关改为双态语义，默认关闭\n* feat: 简介更多渲染\n* feat: 阅读记录相关\n* feat: 朗读脱离提示增加启用开关",
+  "tag_name": "3.26.16-beta.6",
+  "name": "Pre-release 3.26.16-beta.6",
+  "body": "**此版本为测试版，会存在不稳定问题。**\n### [发布页](https://t.me/materado)\n### [反馈群组](https://t.me/+Yn1_v5PZqddmMjQ1)\n\n### 更新内容\n\n* fix",
   "prerelease": true,
-  "created_at": "2026-08-24T02:38:25Z",
+  "created_at": "2026-08-24T03:22:51Z",
   "assets": [
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.5/mapping.txt",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.6/mapping.txt",
       "content_type": "text/plain",
-      "created_at": "2026-08-24T02:58:05Z",
+      "created_at": "2026-08-24T03:37:29Z",
       "download_count": 0,
-      "id": 526979963,
+      "id": 527024010,
       "name": "mapping.txt",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/526979963"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/527024010"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.5/YueDu.MD3-3.26.16-beta.5-arm64-v8a.apk",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.6/YueDu.MD3-3.26.16-beta.6-arm64-v8a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-08-24T02:58:05Z",
+      "created_at": "2026-08-24T03:37:29Z",
       "download_count": 0,
-      "id": 526979962,
-      "name": "YueDu.MD3-3.26.16-beta.5-arm64-v8a.apk",
+      "id": 527024011,
+      "name": "YueDu.MD3-3.26.16-beta.6-arm64-v8a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/526979962"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/527024011"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.5/YueDu.MD3-3.26.16-beta.5-armeabi-v7a.apk",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.6/YueDu.MD3-3.26.16-beta.6-armeabi-v7a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-08-24T02:58:05Z",
+      "created_at": "2026-08-24T03:37:29Z",
       "download_count": 0,
-      "id": 526979961,
-      "name": "YueDu.MD3-3.26.16-beta.5-armeabi-v7a.apk",
+      "id": 527024009,
+      "name": "YueDu.MD3-3.26.16-beta.6-armeabi-v7a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/526979961"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/527024009"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.5/YueDu.MD3-3.26.16-beta.5.apk",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.6/YueDu.MD3-3.26.16-beta.6.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-08-24T02:58:05Z",
+      "created_at": "2026-08-24T03:37:29Z",
       "download_count": 0,
-      "id": 526979964,
-      "name": "YueDu.MD3-3.26.16-beta.5.apk",
+      "id": 527024008,
+      "name": "YueDu.MD3-3.26.16-beta.6.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/526979964"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/527024008"
     }
   ]
 }
