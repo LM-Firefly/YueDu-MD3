@@ -161,6 +161,11 @@
     <string name="audio_play_open_credits">片頭</string>
     <string name="audio_play_close_credits">片尾</string>
     <string name="audio_play_gain">音頻增益</string>
+    <string name="audio_play_cover_ratio">封面比例</string>
+    <string name="cover_ratio_square">正方形</string>
+    <string name="cover_ratio_circle">圓形</string>
+    <string name="cover_ratio_book">書籍比例</string>
+    <string name="cover_ratio_unrestricted">不限制</string>
     <string name="seconds_m">%d 秒</string>
     <string name="more">更多</string>
     <string name="book_add_failed">添加書籍失敗</string>
@@ -2425,6 +2430,8 @@
     <string name="auto_switch_theme_reminder_desc">根據環境光提醒切換淺色/深色模式</string>
     <string name="reading_anchor">閱讀錨點</string>
     <string name="reading_anchor_summary">跳轉章節兩次或以上後，顯示返回原閱讀位置的懸浮按鈕</string>
+    <string name="read_aloud_detach_reminder">朗讀脫離提示</string>
+    <string name="read_aloud_detach_reminder_summary">開啟時朗讀位置離開目前頁面會顯示「回到朗讀位置」懸浮按鈕；關閉時手動翻頁後朗讀跟隨新頁面</string>
     <string name="switch_to_dark_mode_tip">目前環境光較暗，是否切換至深色模式？</string>
     <string name="switch_to_light_mode_tip">目前環境光較亮，是否切換至淺色模式？</string>
     <string name="switch_to_dark_mode_action">切換至深色模式</string>
@@ -2557,7 +2564,6 @@
     <string name="total_read_books">累計讀過</string>
     <string name="finished_books">讀完書籍</string>
     <string name="reading_books">在讀書籍</string>
-    <string name="reading_words">閱讀字數</string>
     <string name="reading_data">閱讀資料</string>
     <string name="reading_heatmap">閱讀熱力圖</string>
     <string name="reading_time_ranking">閱讀時長榜</string>

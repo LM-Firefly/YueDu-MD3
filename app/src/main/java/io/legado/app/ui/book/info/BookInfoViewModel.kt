@@ -66,7 +66,6 @@ import io.legado.app.ui.main.MainIntent
 import io.legado.app.ui.widget.components.image.cover.buildCoverImageRequest
 import io.legado.app.utils.ArchiveUtils
 import io.legado.app.utils.GSON
-import io.legado.app.utils.HtmlFormatter
 import io.legado.app.utils.ImageSaveUtils
 import io.legado.app.utils.UrlUtil
 import io.legado.app.utils.fromJsonArray
@@ -1439,7 +1438,8 @@ class BookInfoViewModel(
                 readRecordTotalTime = currentReadRecordTotalTime,
                 readRecordTimelineDays = currentReadRecordTimelineDays,
                 inBookshelf = inBookshelf,
-                bookSource = bookSource?.toBookInfoSourceUi(),
+                bookSource = bookSource,
+                bookSourceUi = bookSource?.toBookInfoSourceUi(),
                 isTocLoading = isTocLoading,
                 deleteAlertEnabled = LocalConfig.bookInfoDeleteAlert,
                 deleteOriginal = LocalConfig.deleteBookOriginal,
@@ -1722,7 +1722,7 @@ class BookInfoViewModel(
             durChapterIndex = durChapterIndex,
             durChapterPos = durChapterPos,
             remark = remark,
-            displayIntro = HtmlFormatter.formatDisplayText(getDisplayIntro()),
+            intro = getDisplayIntro(),
         )
     }
 

@@ -1,6 +1,7 @@
 package io.legado.app.ui.book.audio
 
 import androidx.compose.runtime.Stable
+import io.legado.app.constant.CoverRatio
 import io.legado.app.constant.ReadAloudBgMode
 import io.legado.app.constant.Status
 import io.legado.app.model.AudioPlay
@@ -26,6 +27,7 @@ data class AudioPlayUiState(
     val timerMinutes: Int = 0,
     val playMode: AudioPlay.PlayMode = AudioPlay.PlayMode.LIST_END_STOP,
     val bgMode: Int = ReadAloudBgMode.Blur,
+    val coverRatio: Int = CoverRatio.Unrestricted,
     val canLogin: Boolean = false,
     val wakeLockEnabled: Boolean = false,
     val mediaControlEnabled: Boolean = false,
@@ -44,6 +46,9 @@ sealed interface AudioPlaySheet {
     data object SkipCredits : AudioPlaySheet
     data object Gain : AudioPlaySheet
     data object Log : AudioPlaySheet
+    data object CoverRatioOptions : AudioPlaySheet
+    data object Speed : AudioPlaySheet
+    data object Timer : AudioPlaySheet
 }
 
 sealed interface AudioPlayIntent {
@@ -62,6 +67,7 @@ sealed interface AudioPlayIntent {
     data class SetCloseCredits(val seconds: Int) : AudioPlayIntent
     data class SetAudioGain(val gainMb: Int) : AudioPlayIntent
     data object CycleBgMode : AudioPlayIntent
+    data class SetCoverRatio(val value: Int) : AudioPlayIntent
     data class OpenSheet(val sheet: AudioPlaySheet) : AudioPlayIntent
     data object DismissSheet : AudioPlayIntent
     data object ChangeSource : AudioPlayIntent

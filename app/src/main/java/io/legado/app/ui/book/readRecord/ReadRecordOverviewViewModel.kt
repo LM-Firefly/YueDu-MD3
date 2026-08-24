@@ -1,7 +1,7 @@
 package io.legado.app.ui.book.readRecord
 
-import androidx.lifecycle.ViewModel
 import androidx.compose.runtime.Stable
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.data.repository.BookRepository
 import io.legado.app.data.repository.ReadRecordRepository
@@ -22,7 +22,6 @@ data class ReadRecordOverviewUiState(
     val totalBooks: Int = 0,
     val finishedBooks: Int = 0,
     val readingBooks: Int = 0,
-    val totalWords: Long = 0,
     val dailyTimeData: List<Pair<LocalDate, Long>> = emptyList(),
     val topBooks: List<ReadBookRanking> = emptyList(),
     val dailyTopBook: Map<LocalDate, Pair<String, String>> = emptyMap(),

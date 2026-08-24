@@ -234,6 +234,11 @@
     <string name="audio_play_open_credits">Intro</string>
     <string name="audio_play_close_credits">Outro</string>
     <string name="audio_play_gain">Audio gain</string>
+    <string name="audio_play_cover_ratio">Cover ratio</string>
+    <string name="cover_ratio_square">Square</string>
+    <string name="cover_ratio_circle">Circle</string>
+    <string name="cover_ratio_book">Book ratio</string>
+    <string name="cover_ratio_unrestricted">Unrestricted</string>
     <string name="seconds_m">%d s</string>
     <string name="more">More</string>
     <string name="book_add_failed">Failed to add book</string>
@@ -2542,6 +2547,8 @@
     <string name="auto_switch_theme_reminder_desc">Remind to switch light/dark mode based on ambient light</string>
     <string name="reading_anchor">Reading anchor</string>
     <string name="reading_anchor_summary">Show a floating button to return to the original reading position after jumping chapters twice or more</string>
+    <string name="read_aloud_detach_reminder">Read-aloud detach reminder</string>
+    <string name="read_aloud_detach_reminder_summary">When enabled, shows a button to return to the speaking position after the page leaves it; when disabled, read-aloud follows manual page turns</string>
     <string name="switch_to_dark_mode_tip">Ambient light is low. Switch to dark mode?</string>
     <string name="switch_to_light_mode_tip">Ambient light is bright. Switch to light mode?</string>
     <string name="switch_to_dark_mode_action">Switch to dark mode</string>
@@ -2688,7 +2695,6 @@
     <string name="total_read_books">Books read</string>
     <string name="finished_books">Finished books</string>
     <string name="reading_books">Reading books</string>
-    <string name="reading_words">Words read</string>
     <string name="reading_data">Reading data</string>
     <string name="reading_heatmap">Reading heatmap</string>
     <string name="reading_time_ranking">Reading time ranking</string>

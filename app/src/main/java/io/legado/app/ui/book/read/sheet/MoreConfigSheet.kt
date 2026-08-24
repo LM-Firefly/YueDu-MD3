@@ -147,6 +147,9 @@ fun MoreConfigSheet(
                 onReadingAnchorEnabledChange = {
                     onIntent(ReadBookIntent.UpdateConfig(ConfigUpdate.ReadingAnchorEnabled(it)))
                 },
+                onReadAloudDetachReminderEnabledChange = {
+                    onIntent(ReadBookIntent.UpdateConfig(ConfigUpdate.ReadAloudDetachReminderEnabled(it)))
+                },
                 onSelectTextChange = {
                     onIntent(ReadBookIntent.UpdateConfig(ConfigUpdate.SelectText(it)))
                 },
@@ -337,6 +340,7 @@ private fun OtherSettings(
     onDefaultSourceChangeAllChange: (Boolean) -> Unit,
     onAutoSuggestDayNightChange: (Boolean) -> Unit,
     onReadingAnchorEnabledChange: (Boolean) -> Unit,
+    onReadAloudDetachReminderEnabledChange: (Boolean) -> Unit,
     onSelectTextChange: (Boolean) -> Unit,
     onNoAnimScrollPageChange: (Boolean) -> Unit,
     onOptimizeRenderChange: (Boolean) -> Unit,
@@ -403,6 +407,12 @@ private fun OtherSettings(
         description = stringResource(R.string.reading_anchor_summary),
         checked = preferences.readingAnchorEnabled,
         onCheckedChange = onReadingAnchorEnabledChange,
+    )
+    TinySwitchSettingItem(
+        title = stringResource(R.string.read_aloud_detach_reminder),
+        description = stringResource(R.string.read_aloud_detach_reminder_summary),
+        checked = preferences.readAloudDetachReminderEnabled,
+        onCheckedChange = onReadAloudDetachReminderEnabledChange,
     )
     TinySwitchSettingItem(
         title = stringResource(R.string.selectText),

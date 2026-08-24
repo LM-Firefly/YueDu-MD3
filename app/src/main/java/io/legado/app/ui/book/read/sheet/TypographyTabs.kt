@@ -127,6 +127,8 @@ private fun FontWeightSetting(
         TinyDropdownSettingItem(
             title = stringResource(R.string.font_weight_text),
             selectedValue = if (isCustom) "-1" else value.toString(),
+            // 自定义时直接显示当前字重数值，而不是笼统的“自定义”
+            selectedDisplay = if (isCustom) sliderValue.toInt().toString() else null,
             displayEntries = arrayOf(
                 weightEntries[2],
                 weightEntries[0],
@@ -212,6 +214,7 @@ private fun PaddingSliders(
     bottom: Float,
     left: Float,
     right: Float,
+    maxValue: Float = 200f,
     onTopChange: (Float) -> Unit,
     onBottomChange: (Float) -> Unit,
     onLeftChange: (Float) -> Unit,
@@ -220,28 +223,28 @@ private fun PaddingSliders(
     TinySliderSettingItem(
         title = stringResource(R.string.padding_top),
         value = top,
-        valueRange = 0f..200f,
+        valueRange = 0f..maxValue,
         imageVector = Icons.Default.VerticalAlignTop,
         onValueChange = onTopChange,
     )
     TinySliderSettingItem(
         title = stringResource(R.string.padding_bottom),
         value = bottom,
-        valueRange = 0f..200f,
+        valueRange = 0f..maxValue,
         imageVector = Icons.Default.VerticalAlignBottom,
         onValueChange = onBottomChange,
     )
     TinySliderSettingItem(
         title = stringResource(R.string.padding_left),
         value = left,
-        valueRange = 0f..200f,
+        valueRange = 0f..maxValue,
         imageVector = Icons.Default.AlignHorizontalLeft,
         onValueChange = onLeftChange,
     )
     TinySliderSettingItem(
         title = stringResource(R.string.padding_right),
         value = right,
-        valueRange = 0f..200f,
+        valueRange = 0f..maxValue,
         imageVector = Icons.Default.AlignHorizontalRight,
         onValueChange = onRightChange,
     )
@@ -946,6 +949,7 @@ internal fun TypographyMarginTab(
             1 -> PaddingSliders(
                 top = headerPaddingTop, bottom = headerPaddingBottom,
                 left = headerPaddingLeft, right = headerPaddingRight,
+                maxValue = 500f,
                 onTopChange = {
                     headerPaddingTop = it
                     onIntent(ReadBookIntent.UpdateConfig(ConfigUpdate.HeaderPaddingTop(it.toInt())))
@@ -967,6 +971,7 @@ internal fun TypographyMarginTab(
             else -> PaddingSliders(
                 top = footerPaddingTop, bottom = footerPaddingBottom,
                 left = footerPaddingLeft, right = footerPaddingRight,
+                maxValue = 500f,
                 onTopChange = {
                     footerPaddingTop = it
                     onIntent(ReadBookIntent.UpdateConfig(ConfigUpdate.FooterPaddingTop(it.toInt())))

@@ -686,6 +686,11 @@ class ReadConfigUpdateDelegate(
                     readSettingsRepository.setReadingAnchorEnabled(update.value)
                 }
             }
+            is ConfigUpdate.ReadAloudDetachReminderEnabled -> {
+                scope.launch {
+                    readSettingsRepository.setReadAloudDetachReminderEnabled(update.value)
+                }
+            }
             is ConfigUpdate.SelectText -> {
                 scope.launch {
                     readSettingsRepository.setSelectText(update.value)

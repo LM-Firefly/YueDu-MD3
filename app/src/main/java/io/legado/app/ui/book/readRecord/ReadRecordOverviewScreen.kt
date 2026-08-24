@@ -167,8 +167,10 @@ fun ReadRecordOverviewScreen(
                         StatItem(stringResource(R.string.reading_days), stringResource(R.string.days_format, state.readingDays)),
                         StatItem(stringResource(R.string.total_read_books), stringResource(R.string.books_format, state.totalBooks)),
                         StatItem(stringResource(R.string.finished_books), stringResource(R.string.books_format, state.finishedBooks)),
-                        StatItem(stringResource(R.string.reading_books), stringResource(R.string.books_format, state.readingBooks)),
-                        StatItem(stringResource(R.string.reading_words), ReadRecordFormatter.formatWords(state.totalWords))
+                        StatItem(
+                            stringResource(R.string.reading_books),
+                            stringResource(R.string.books_format, state.readingBooks)
+                        )
                     )
                     StatsGridCard(title = stringResource(R.string.reading_data), items = stats)
                 }

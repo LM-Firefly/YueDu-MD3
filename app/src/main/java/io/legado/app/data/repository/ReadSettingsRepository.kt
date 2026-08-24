@@ -140,6 +140,9 @@ class ReadSettingsRepository(
     suspend fun setReadingAnchorEnabled(value: Boolean) =
         settingsRepository.putBoolean(PreferKey.readingAnchorEnabled, value)
 
+    suspend fun setReadAloudDetachReminderEnabled(value: Boolean) =
+        settingsRepository.putBoolean(PreferKey.readAloudDetachReminderEnabled, value)
+
     suspend fun setSelectText(value: Boolean) =
         settingsRepository.putBoolean(PreferKey.selectText, value)
 
@@ -379,6 +382,7 @@ class ReadSettingsRepository(
             autoChangeSource = compatDsValue(Keys.AutoChangeSource, true),
             autoSuggestDayNight = compatDsValue(Keys.AutoSuggestDayNight, false),
             readingAnchorEnabled = compatDsValue(Keys.ReadingAnchorEnabled, true),
+            readAloudDetachReminderEnabled = compatDsValue(Keys.ReadAloudDetachReminderEnabled, false),
             selectText = compatDsValue(Keys.SelectText, true),
             noAnimScrollPage = compatDsValue(Keys.NoAnimScrollPage, false),
             clickImgWay = compatDsValue(Keys.ClickImgWay, "2"),
@@ -499,6 +503,7 @@ class ReadSettingsRepository(
         val AutoChangeSource = booleanPreferencesKey(PreferKey.autoChangeSource)
         val AutoSuggestDayNight = booleanPreferencesKey(PreferKey.autoSuggestDayNight)
         val ReadingAnchorEnabled = booleanPreferencesKey(PreferKey.readingAnchorEnabled)
+        val ReadAloudDetachReminderEnabled = booleanPreferencesKey(PreferKey.readAloudDetachReminderEnabled)
         val SelectText = booleanPreferencesKey(PreferKey.selectText)
         val NoAnimScrollPage = booleanPreferencesKey(PreferKey.noAnimScrollPage)
         val ClickImgWay = stringPreferencesKey(PreferKey.clickImgWay)
@@ -629,6 +634,7 @@ internal fun ReadSettings.toGatewayPrefMap(): Map<String, Any?> = mapOf(
     PreferKey.autoChangeSource to autoChangeSource,
     PreferKey.autoSuggestDayNight to autoSuggestDayNight,
     PreferKey.readingAnchorEnabled to readingAnchorEnabled,
+    PreferKey.readAloudDetachReminderEnabled to readAloudDetachReminderEnabled,
     PreferKey.selectText to selectText,
     PreferKey.noAnimScrollPage to noAnimScrollPage,
     PreferKey.clickImgWay to clickImgWay,

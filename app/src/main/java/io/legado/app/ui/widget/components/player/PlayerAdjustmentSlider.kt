@@ -34,7 +34,7 @@ fun PlayerAdjustmentSlider(
     NormalCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .padding(vertical = 4.dp),
         cornerRadius = 24.dp,
         containerColor = LegadoTheme.colorScheme.surfaceContainerHigh,
     ) {

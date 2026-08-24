@@ -1,5 +1,11 @@
 package io.legado.app.ui.book.info
 
+import android.content.Intent
+import android.graphics.Bitmap
+import android.net.Uri
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.EnterExitState
@@ -48,13 +54,18 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MediumFlexibleTopAppBar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -67,6 +78,8 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -75,14 +88,20 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import coil3.size.Size
 import io.legado.app.R
 import io.legado.app.constant.BookType
+import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.BookGroup
+import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.SearchBook
+import io.legado.app.help.WebCacheManager
 import io.legado.app.help.coil.CoverExtras
+import io.legado.app.help.webView.WebJsExtensions
+import io.legado.app.ui.association.OnLineImportActivity
 import io.legado.app.ui.main.homepage.modules.BannerModule
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.theme.LocalHazeState
@@ -115,6 +134,8 @@ import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenuItem
 import io.legado.app.ui.widget.components.progressIndicator.AppCircularProgressIndicator
 import io.legado.app.ui.widget.components.text.AnimatedTextLine
 import io.legado.app.ui.widget.components.text.AppText
+import io.legado.app.ui.widget.components.text.HtmlContent
+import io.legado.app.ui.widget.components.text.MarkdownBlock
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBarDefaults
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBarScrollBehavior
 import io.legado.app.ui.widget.components.topbar.M3GlassScrollBehavior
@@ -125,9 +146,12 @@ import io.legado.app.ui.widget.components.topbar.TopBarNavigationButton
 import io.legado.app.ui.widget.components.topbar.miuixTopBarActionsEndPadding
 import io.legado.app.ui.widget.components.topbar.miuixTopBarSlotPadding
 import io.legado.app.ui.widget.components.variable.VariableEditorSheet
+import io.legado.app.utils.HtmlFormatter
+import io.legado.app.utils.openUrl
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import io.legado.app.model.BookCover as BookCoverModel
@@ -235,6 +259,20 @@ private fun BookInfoScreenContent(
         M3GlassScrollBehavior(TopAppBarDefaults.exitUntilCollapsedScrollBehavior())
     }
     val listState = rememberLazyListState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val jumpToAnotherApp: (Uri) -> Unit = { uri ->
+        scope.launch {
+            val result = snackbarHostState.showSnackbar(
+                message = context.getString(R.string.jump_to_another_app),
+                actionLabel = context.getString(R.string.confirm),
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                context.openUrl(uri)
+            }
+        }
+    }
 
     AppScaffold(
         modifier = Modifier
@@ -248,6 +286,7 @@ private fun BookInfoScreenContent(
                 scrollBehavior = scrollBehavior,
             )
         },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { onIntent(BookInfoIntent.ReadClick) },
@@ -364,6 +403,8 @@ private fun BookInfoScreenContent(
                                     book = book,
                                     tocLoadFailed = state.tocLoadFailed,
                                     onRemarkClick = { onIntent(BookInfoIntent.RemarkClick) },
+                                    bookSource = state.bookSource,
+                                    onJumpToAnotherApp = jumpToAnotherApp,
                                 )
                             }
                         }
@@ -797,7 +838,7 @@ private fun BookInfoOverflowMenu(
 ) {
     val book = state.book
     RoundDropdownMenu(expanded = expanded, onDismissRequest = onDismissRequest) {
-        if (state.bookSource?.hasCustomButton == true) {
+        if (state.bookSourceUi?.hasCustomButton == true) {
             RoundDropdownMenuItem(
                 text = stringResource(R.string.custom_button),
                 onClick = { onMenuAction(BookInfoMenuAction.CustomButton) }
@@ -827,13 +868,13 @@ private fun BookInfoOverflowMenu(
                 onClick = { onMenuAction(BookInfoMenuAction.Upload) }
             )
         }
-        if (state.bookSource?.hasLogin == true) {
+        if (state.bookSourceUi?.hasLogin == true) {
             RoundDropdownMenuItem(
                 text = stringResource(R.string.login),
                 onClick = { onMenuAction(BookInfoMenuAction.Login) }
             )
         }
-        if (state.bookSource != null) {
+        if (state.bookSourceUi != null) {
             RoundDropdownMenuItem(
                 text = stringResource(R.string.set_source_variable),
                 onClick = { onMenuAction(BookInfoMenuAction.SetSourceVariable) }
@@ -1173,6 +1214,8 @@ private fun BookInfoSummary(
     book: BookInfoBookUi,
     tocLoadFailed: Boolean,
     onRemarkClick: () -> Unit,
+    bookSource: BookSource?,
+    onJumpToAnotherApp: (Uri) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -1243,11 +1286,194 @@ private fun BookInfoSummary(
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
+        BookInfoIntro(
+            intro = book.intro,
+            baseUrl = book.bookUrl
+                .takeIf { it.startsWith("http", true) }
+                ?.substringBefore(","),
+            bookSource = bookSource,
+            onJumpToAnotherApp = onJumpToAnotherApp,
+        )
+    }
+}
+
+/**
+ * 上游书籍详情页的简介渲染：
+ * - `<useweb>...<` 用 WebView 渲染（注入缓存/书源/Java 桥接 JS，处理 legado/yuedu 等 scheme）
+ * - `<usehtml>...<` 用 HTML 渲染（含行内图片/链接/样式）
+ * - `<md>...<` 用 Markdown 渲染
+ * - 其余纯文本
+ */
+@Composable
+private fun BookInfoIntro(
+    intro: String?,
+    baseUrl: String?,
+    bookSource: BookSource?,
+    onJumpToAnotherApp: (Uri) -> Unit,
+) {
+    val content = remember(intro) { parseBookInfoIntro(intro) }
+    if (content == null) {
         AnimatedTextLine(
-            text = book.displayIntro.orEmpty().ifBlank { stringResource(R.string.intro_show_null) },
+            text = stringResource(R.string.intro_show_null),
+            style = LegadoTheme.typography.bodyMedium,
+        )
+        return
+    }
+    when (val c = content) {
+        is BookInfoIntroContent.Web -> BookInfoWebIntro(
+            html = c.html,
+            baseUrl = baseUrl,
+            bookSource = bookSource,
+            onJumpToAnotherApp = onJumpToAnotherApp,
+        )
+
+        is BookInfoIntroContent.Html -> HtmlContent(html = c.html)
+
+        is BookInfoIntroContent.Markdown -> MarkdownBlock(content = c.markdown)
+
+        is BookInfoIntroContent.Plain -> AnimatedTextLine(
+            text = c.text,
             style = LegadoTheme.typography.bodyMedium,
         )
     }
+}
+
+private sealed interface BookInfoIntroContent {
+    data class Web(val html: String) : BookInfoIntroContent
+    data class Html(val html: String) : BookInfoIntroContent
+    data class Markdown(val markdown: String) : BookInfoIntroContent
+    data class Plain(val text: String) : BookInfoIntroContent
+}
+
+/**
+ * 解析简介前缀，与上游 showBookIntro 一致：
+ * 前缀 `<useweb>`/`<usehtml>`/`<md>` 后直到最后一个 `<` 之间的内容为待渲染文本；
+ * 前缀残缺时按纯文本回退。
+ */
+private fun parseBookInfoIntro(intro: String?): BookInfoIntroContent? {
+    if (intro.isNullOrBlank()) return null
+    return when {
+        intro.startsWith("<useweb>") -> {
+            val lastIndex = intro.lastIndexOf("<")
+            if (lastIndex < 8) {
+                BookInfoIntroContent.Plain(HtmlFormatter.formatDisplayText(intro))
+            } else {
+                BookInfoIntroContent.Web(intro.substring(8, lastIndex))
+            }
+        }
+
+        intro.startsWith("<usehtml>") -> {
+            val lastIndex = intro.lastIndexOf("<")
+            if (lastIndex < 9) {
+                BookInfoIntroContent.Plain(HtmlFormatter.formatDisplayText(intro))
+            } else {
+                BookInfoIntroContent.Html(intro.substring(9, lastIndex))
+            }
+        }
+
+        intro.startsWith("<md>") -> {
+            val lastIndex = intro.lastIndexOf("<")
+            if (lastIndex < 4) {
+                BookInfoIntroContent.Plain(HtmlFormatter.formatDisplayText(intro))
+            } else {
+                BookInfoIntroContent.Markdown(intro.substring(4, lastIndex))
+            }
+        }
+
+        else -> BookInfoIntroContent.Plain(HtmlFormatter.formatDisplayText(intro))
+    }
+}
+
+/**
+ * `<useweb>` 简介：用 WebView 渲染，注入与上游一致的 JS 桥接
+ * （WebCacheManager 缓存、书源对象、WebJsExtensions），
+ * 并处理 legado/yuedu scheme（导入）与其他 scheme（确认后跳转）。
+ */
+@Composable
+private fun BookInfoWebIntro(
+    html: String,
+    baseUrl: String?,
+    bookSource: BookSource?,
+    onJumpToAnotherApp: (Uri) -> Unit,
+) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    var contentHeight by remember { mutableStateOf(0) }
+    val webView = remember {
+        WebView(context).apply {
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            settings.apply {
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                useWideViewPort = true
+                loadWithOverviewMode = true
+            }
+            webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(
+                    view: WebView?,
+                    request: WebResourceRequest?,
+                ): Boolean {
+                    request?.url?.let { url ->
+                        return when (url.scheme) {
+                            "http", "https" -> false
+                            "legado", "yuedu" -> {
+                                context.startActivity(
+                                    Intent(context, OnLineImportActivity::class.java).apply {
+                                        data = url
+                                    }
+                                )
+                                true
+                            }
+
+                            else -> {
+                                onJumpToAnotherApp(url)
+                                true
+                            }
+                        }
+                    }
+                    return super.shouldOverrideUrlLoading(view, request)
+                }
+
+                override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                    super.onPageStarted(view, url, favicon)
+                    view?.evaluateJavascript(WebJsExtensions.getInjectionString, null)
+                }
+
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    view?.post {
+                        contentHeight = view.contentHeight
+                    }
+                }
+            }
+            addJavascriptInterface(WebCacheManager, WebJsExtensions.nameCache)
+            bookSource?.let { source ->
+                addJavascriptInterface(source as BaseSource, WebJsExtensions.nameSource)
+                addJavascriptInterface(
+                    WebJsExtensions(source, null, this),
+                    WebJsExtensions.nameJava
+                )
+            }
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            webView.destroy()
+        }
+    }
+    AndroidView(
+        factory = { webView },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(with(density) { contentHeight.toDp() }),
+        update = { view ->
+            val loadedHtml = view.tag as? String
+            if (loadedHtml != html) {
+                view.tag = html
+                view.loadDataWithBaseURL(baseUrl, html, "text/html", "utf-8", baseUrl)
+            }
+        },
+    )
 }
 @Composable
 private fun BookInfoDialogs(

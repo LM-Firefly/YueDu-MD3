@@ -607,7 +607,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
     }
 
     fun setProgress(progress: BookProgress) {
-        detachReadAloudFollowIfManual()
+        prepareManualNavigation()
         if (progress.durChapterIndex < chapterSize &&
             (durChapterIndex != progress.durChapterIndex
                     || durChapterPos != progress.durChapterPos)
@@ -862,17 +862,31 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
     }
 
     /**
-     * 用户手动导航（翻页/跳章/拖动进度/滚动）时，页面脱离朗读位置。
-     * 朗读服务自身驱动的页面移动（[BaseReadAloudService.speechDrivingNavigation]）不计入。
+     * 用户手动导航（翻页/跳章/拖动进度/滚动）前的朗读处理：
+     * - 脱离提示开启：页面脱离朗读位置（显示"回到朗读位置"悬浮条）；
+     * - 脱离提示关闭：朗读跟随页面，保持跟随状态（翻页后从新页面重新朗读）。
+     * 朗读服务自身驱动的页面移动（[BaseReadAloudService.speechDrivingNavigation]）不参与。
      */
-    private fun detachReadAloudFollowIfManual() {
-        if (BaseReadAloudService.isRun && !BaseReadAloudService.speechDrivingNavigation) {
+    private fun prepareManualNavigation() {
+        if (!BaseReadAloudService.isRun || BaseReadAloudService.speechDrivingNavigation) return
+        if (ReadBookConfig.readAloudDetachReminderEnabled) {
             readAloudSessionStore.detachReadAloudFollow()
+        } else {
+            readAloudSessionStore.restoreReadAloudFollow()
         }
     }
 
+    /**
+     * 手动导航后：脱离提示关闭时，朗读从新页面重新开始（跟随页面）；开启时保持脱离状态，不重启朗读。
+     */
+    private fun followReadAloudAfterManualNavigation() {
+        if (!BaseReadAloudService.isRun || BaseReadAloudService.speechDrivingNavigation) return
+        if (ReadBookConfig.readAloudDetachReminderEnabled) return
+        readAloud(play = !BaseReadAloudService.pause)
+    }
+
     fun moveToNextPage(): Boolean {
-        detachReadAloudFollowIfManual()
+        prepareManualNavigation()
         var hasNextPage = false
         curTextChapter?.let {
             val nextPagePos = it.getNextPageLength(durChapterPos)
@@ -886,11 +900,12 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
                 publishSnapshot()
             }
         }
+        followReadAloudAfterManualNavigation()
         return hasNextPage
     }
 
     fun moveToPrevPage(): Boolean {
-        detachReadAloudFollowIfManual()
+        prepareManualNavigation()
         var hasPrevPage = false
         curTextChapter?.let {
             val prevPagePos = it.getPrevPageLength(durChapterPos)
@@ -902,11 +917,12 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
                 publishSnapshot()
             }
         }
+        followReadAloudAfterManualNavigation()
         return hasPrevPage
     }
 
     fun moveToNextChapter(upContent: Boolean, upContentInPlace: Boolean = true): Boolean {
-        detachReadAloudFollowIfManual()
+        prepareManualNavigation()
         if (durChapterIndex < simulatedChapterSize - 1) {
             durChapterPos = 0
             durChapterIndex++
@@ -972,7 +988,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
         toLast: Boolean = true,
         upContentInPlace: Boolean = true
     ): Boolean {
-        detachReadAloudFollowIfManual()
+        prepareManualNavigation()
         if (durChapterIndex > 0) {
             durChapterPos = if (toLast) prevTextChapter?.lastReadLength ?: Int.MAX_VALUE else 0
             durChapterIndex--
@@ -998,7 +1014,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
     }
 
     fun skipToPage(index: Int, success: (() -> Unit)? = null) {
-        detachReadAloudFollowIfManual()
+        prepareManualNavigation()
         durChapterPos = curTextChapter?.getReadLength(index) ?: index
         renderCallBack?.upContent {
             success?.invoke()
@@ -1009,7 +1025,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
     }
 
     fun setPageIndex(index: Int) {
-        detachReadAloudFollowIfManual()
+        prepareManualNavigation()
         recycleRecorders(durPageIndex, index)
         durChapterPos = curTextChapter?.getReadLength(index) ?: index
         saveRead(true)
@@ -1038,7 +1054,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
         upContent: Boolean = true,
         success: (() -> Unit)? = null
     ) {
-        detachReadAloudFollowIfManual()
+        prepareManualNavigation()
         // 实时读取章节数而不是依赖缓存 chapterSize：更新目录后 chapterSize 若未同步，
         // 新增章节的 index 会超出旧值而被下方守卫静默吞掉，表现为「点击新章节无法跳转」。
         val chapterCount = book?.bookUrl?.let { appDb.bookChapterDao.getChapterCount(it) }

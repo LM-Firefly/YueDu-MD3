@@ -34,6 +34,7 @@ import io.legado.app.ui.widget.components.pager.pagerHeight
 import io.legado.app.ui.widget.components.pager.rememberPagerAnimatedHeight
 import io.legado.app.ui.widget.components.progressIndicator.AppCircularProgressIndicator
 import io.legado.app.ui.widget.components.tabRow.AppTabRow
+import io.legado.app.ui.widget.components.text.HtmlContent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -250,9 +251,11 @@ private fun DictPageContent(
             }
 
             state.htmlContent.isNotBlank() -> {
-                DictHtmlContent(
-                    htmlContent = state.htmlContent,
-                    modifier = Modifier.fillMaxWidth(),
+                HtmlContent(
+                    html = state.htmlContent,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 32.dp, vertical = 16.dp),
                 )
             }
         }

@@ -18,7 +18,7 @@ data class ReadRecordSession(
     val startTime: Long = 0,
     val endTime: Long = 0,
 
-    // 本次阅读的字数
+    // 本次阅读时所在的章节序号（durChapterIndex），用于时间线定位章节标题；不是字数
     val words: Long = 0
 ) {
     /** 跨设备稳定身份，不依赖 Room 自动生成的数据库行 ID。 */

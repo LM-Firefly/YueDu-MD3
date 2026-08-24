@@ -42,6 +42,7 @@ fun ReadBookFloatingActionBar(
         !state.menuVisible && !state.isShowingSearchResult
     val reminder = state.activeReminder?.takeIf { !state.menuVisible }
     val readAloudDetached = state.isReadAloudRunning && !state.readAloudFollow &&
+        state.readAloudDetachReminderEnabled &&
         !state.menuVisible && !state.isShowingSearchResult
     Box(Modifier.fillMaxSize()) {
         AnimatedVisibility(

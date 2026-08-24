@@ -8,6 +8,7 @@ import com.jeremyliao.liveeventbus.LiveEventBus
 import io.legado.app.R
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.BookType
+import io.legado.app.constant.CoverRatio
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.constant.ReadAloudBgMode
@@ -52,13 +53,25 @@ class AudioPlayViewModel(
     val uiState = combine(
         coordinator.state,
         AppConfigStore.observeInt(PreferKey.audioPlayBgMode),
+        AppConfigStore.observeInt(PreferKey.audioPlayCoverRatio),
         activeSheet,
-    ) { source, bgMode, sheet ->
-        toUiState(source, bgMode ?: ReadAloudBgMode.Blur, sheet)
+    ) { source, bgMode, coverRatio, sheet ->
+        toUiState(
+            source,
+            bgMode ?: ReadAloudBgMode.Blur,
+            coverRatio ?: CoverRatio.Unrestricted,
+            sheet,
+        )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = toUiState(coordinator.snapshot(), readBgMode(), null),
+        initialValue = toUiState(
+            coordinator.snapshot(),
+            readBgMode(),
+            AppConfigStore.preferences.compatDsInt(PreferKey.audioPlayCoverRatio)
+                ?: CoverRatio.Unrestricted,
+            null,
+        ),
     )
 
     private val _effects = MutableSharedFlow<AudioPlayEffect>(extraBufferCapacity = 8)
@@ -117,6 +130,8 @@ class AudioPlayViewModel(
             is AudioPlayIntent.SetCloseCredits -> coordinator.setCloseCredits(intent.seconds)
             is AudioPlayIntent.SetAudioGain -> coordinator.setAudioGain(intent.gainMb)
             AudioPlayIntent.CycleBgMode -> cycleBgMode()
+            is AudioPlayIntent.SetCoverRatio ->
+                AppConfigStore.putInt(PreferKey.audioPlayCoverRatio, intent.value)
             is AudioPlayIntent.OpenSheet -> activeSheet.value = intent.sheet
             AudioPlayIntent.DismissSheet -> activeSheet.value = null
             AudioPlayIntent.ChangeSource -> {
@@ -271,6 +286,7 @@ class AudioPlayViewModel(
     private fun toUiState(
         source: AudioPlaySourceState,
         bgMode: Int,
+        coverRatio: Int,
         sheet: AudioPlaySheet?,
     ): AudioPlayUiState = AudioPlayUiState(
         bookUrl = source.bookUrl,
@@ -289,6 +305,7 @@ class AudioPlayViewModel(
         timerMinutes = source.timerMinutes,
         playMode = source.playMode,
         bgMode = bgMode,
+        coverRatio = coverRatio,
         canLogin = source.canLogin,
         wakeLockEnabled = source.wakeLockEnabled,
         mediaControlEnabled = source.mediaControlEnabled,

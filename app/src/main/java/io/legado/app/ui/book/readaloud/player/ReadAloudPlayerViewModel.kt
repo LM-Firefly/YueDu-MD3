@@ -9,6 +9,7 @@ import io.legado.app.help.config.compatDsInt
 import io.legado.app.ui.widget.components.player.PlayerChapterUi
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
@@ -19,15 +20,18 @@ class ReadAloudPlayerViewModel(
     private val coordinator: ReadAloudPlayerCoordinator,
 ) : ViewModel() {
 
+    private val activeSheet = MutableStateFlow<ReadAloudPlayerSheet?>(null)
+
     val uiState = combine(
         coordinator.state,
         AppConfigStore.observeInt(PreferKey.readAloudPlayerBgMode),
-    ) { source, bgMode ->
-        toUiState(source, bgMode ?: ReadAloudBgMode.Blur)
+        activeSheet,
+    ) { source, bgMode, sheet ->
+        toUiState(source, bgMode ?: ReadAloudBgMode.Blur, sheet)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = toUiState(coordinator.snapshot(), readBgMode()),
+        initialValue = toUiState(coordinator.snapshot(), readBgMode(), null),
     )
 
     private val _effects = MutableSharedFlow<ReadAloudPlayerEffect>(extraBufferCapacity = 8)
@@ -59,6 +63,8 @@ class ReadAloudPlayerViewModel(
                 viewModelScope.launch {
                     coordinator.setFinishCurrentChapterAfterTimer(intent.value)
                 }
+            is ReadAloudPlayerIntent.OpenSheet -> activeSheet.value = intent.sheet
+            ReadAloudPlayerIntent.DismissSheet -> activeSheet.value = null
             is ReadAloudPlayerIntent.SeekTo -> coordinator.seekTo(
                 chapterPosition = intent.chapterPosition,
                 chapterLength = uiState.value.chapterLength,
@@ -79,6 +85,7 @@ class ReadAloudPlayerViewModel(
     private fun toUiState(
         source: ReadAloudPlayerSourceState,
         bgMode: Int,
+        sheet: ReadAloudPlayerSheet?,
     ): ReadAloudPlayerUiState {
         val activeIndex = source.textLines.indexOfLast {
             it.chapterPosition <= source.chapterPosition
@@ -114,6 +121,7 @@ class ReadAloudPlayerViewModel(
             timerMinutes = source.timerMinutes,
             finishCurrentChapterAfterTimer = source.finishCurrentChapterAfterTimer,
             bgMode = bgMode,
+            activeSheet = sheet,
         )
     }
 

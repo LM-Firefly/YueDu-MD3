@@ -2007,6 +2007,7 @@ class ReadBookViewModel(
             seekProgress = calculateSeekProgress(),
             seekMax = calculateSeekMax(),
             readingAnchorAvailable = ReadBook.hasReadingAnchor(),
+            readAloudDetachReminderEnabled = ReadBookConfig.readAloudDetachReminderEnabled,
             replaceRuleEnabled = book?.getUseReplaceRule(
                 otherSettingsGateway.currentSettings.replaceEnableDefault
             ) ?: false,
