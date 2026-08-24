@@ -1081,7 +1081,8 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
     ) {
         renderCallBack?.pageChanged()
         curTextChapter?.let {
-            if (BaseReadAloudService.isRun && it.isCompleted) {
+            // 朗读服务自身驱动的页面移动不参与重启朗读，避免跨页段落被截断重读
+            if (BaseReadAloudService.isRun && !BaseReadAloudService.speechDrivingNavigation && it.isCompleted) {
                 // 页面已脱离朗读位置（用户手动导航）：既不重启朗读到当前页，也不把页面拉回朗读位置
                 if (readAloudSessionStore.state.value.followReadAloudPosition) {
                     if (shouldRestartReadAloudAfterContentLoad(
