@@ -6,6 +6,7 @@ import io.legado.app.help.http.CookieManager.cookieJarHeader
 import io.legado.app.utils.printOnDebug
 import okhttp3.Call
 import okhttp3.CookieJar
+import okhttp3.HttpUrl
 import okhttp3.Interceptor
 import okhttp3.Request
 import okhttp3.Response
@@ -74,6 +75,15 @@ class CronetInterceptor(private val cookieJar: CookieJar) : Interceptor {
             return callBack.waitForDone(it)
         }
         return null
+    }
+
+    /** Returns a 'Cookie' HTTP request header with all cookies, like `a=b; c=d`. */
+    private fun getCookie(url: HttpUrl): String = buildString {
+        val cookies = cookieJar.loadForRequest(url)
+        cookies.forEachIndexed { index, cookie ->
+            if (index > 0) append("; ")
+            append(cookie.name).append('=').append(cookie.value)
+        }
     }
 
 }

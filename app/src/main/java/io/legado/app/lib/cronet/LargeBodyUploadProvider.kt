@@ -26,48 +26,53 @@ class LargeBodyUploadProvider(
     private var source: BufferedSource = pipe.source.buffer()
 
     @Volatile
-    private var filled: Boolean = false
+    private var writeSubmitted: Boolean = false
+    @Volatile
+    private var writeFailed: Boolean = false
     override fun getLength(): Long {
         return body.contentLength()
     }
 
     override fun read(uploadDataSink: UploadDataSink, byteBuffer: ByteBuffer) {
-        if (!filled) {
+        check(byteBuffer.hasRemaining()) { "Cronet passed a buffer with no bytes remaining" }
+        if (!writeSubmitted) {
             fillBuffer()
         }
-        check(byteBuffer.hasRemaining()) { "Cronet passed a buffer with no bytes remaining" }
+        if (writeFailed) {
+            throw IOException("Upload body write failed")
+        }
         val read = source.read(byteBuffer)
         if (read == -1) {
-            throw IOException("Unexpected end of upload body")
+            uploadDataSink.onReadSucceeded(true)
+        } else {
+            uploadDataSink.onReadSucceeded(false)
         }
-        uploadDataSink.onReadSucceeded(false)
     }
 
     @Synchronized
     private fun fillBuffer() {
+        writeSubmitted = true
         executorService.submit {
             try {
-                val writeSink = pipe.sink.buffer()
-                filled = true
-                body.writeTo(writeSink)
-                writeSink.flush()
-            } catch (e: IOException) {
+                pipe.sink.buffer().use { writeSink ->
+                    body.writeTo(writeSink)
+                }
+            } catch (e: Exception) {
+                writeFailed = true
                 e.printStackTrace()
             }
-
         }
-
     }
 
     override fun rewind(p0: UploadDataSink?) {
-        check(!body.isOneShot()) { "Okhttp RequestBody is OneShot" }
-        filled = false
+        check(!body.isOneShot()) { "Cannot rewind one-shot RequestBody" }
+        writeSubmitted = false
+        writeFailed = false
         fillBuffer()
     }
 
     override fun close() {
-//        pipe.cancel()
-//        source.close()
+        source.close()
         super.close()
     }
 }
