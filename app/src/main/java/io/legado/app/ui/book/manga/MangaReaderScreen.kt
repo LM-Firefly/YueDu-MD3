@@ -472,12 +472,17 @@ private fun WebtoonMangaList(
     LaunchedEffect(listState, state.pages, state.navigationId) {
         snapshotFlow {
             val visibleItems = listState.layoutInfo.visibleItemsInfo
+            val visibleItemIndices = visibleItems.map { it.index }
             val currentChapterVisible = visibleItems.any { visibleItem ->
                 (state.pages.getOrNull(visibleItem.index) as? MangaReaderItemUi.Page)
                     ?.chapterIndex == state.chapterIndex
             }
             val firstItemIndex = visibleItems.firstOrNull()?.index
-            val focusedItemIndex = visibleItems.lastOrNull()?.index
+            val focusedItemIndex = mangaWebtoonFocusedPageIndex(
+                items = state.pages,
+                visibleItemIndices = visibleItemIndices,
+                currentChapterIndex = state.chapterIndex,
+            )
             if (firstItemIndex == null || focusedItemIndex == null) null
             else Triple(focusedItemIndex, firstItemIndex, currentChapterVisible)
         }

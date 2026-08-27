@@ -59,6 +59,41 @@ internal fun nextPageItemIndex(
     return null
 }
 
+/**
+ * Chooses the page that represents a Webtoon viewport.
+ *
+ * Normally the last visible page is a useful reading-progress anchor. At a chapter boundary it
+ * is not: a number of short pages from the adjacent chapter can be visible at once, so using the
+ * last one promotes the session directly to that chapter's final visible page. Once the current
+ * chapter has left the viewport, use the first visible page when entering a later chapter and
+ * the last visible page when entering an earlier one. Those are the pages adjacent to the
+ * boundary in reading order.
+ */
+internal fun mangaWebtoonFocusedPageIndex(
+    items: List<MangaReaderItemUi>,
+    visibleItemIndices: List<Int>,
+    currentChapterIndex: Int,
+): Int? {
+    val visiblePages = visibleItemIndices.mapNotNull { index ->
+        (items.getOrNull(index) as? MangaReaderItemUi.Page)?.let { index to it }
+    }
+    if (visiblePages.isEmpty()) return null
+    if (visiblePages.any { (_, page) -> page.chapterIndex == currentChapterIndex }) {
+        return visiblePages.last().first
+    }
+    return when {
+        visiblePages.first().second.chapterIndex > currentChapterIndex -> visiblePages.first().first
+        visiblePages.last().second.chapterIndex < currentChapterIndex -> visiblePages.last().first
+        else -> visiblePages.last().first
+    }
+}
+
+/** A programmatic position restore must not be overwritten by the old viewport's first callback. */
+internal fun acceptsMangaVisibleItem(
+    requestedItemIndex: Int?,
+    reportedItemIndex: Int,
+): Boolean = requestedItemIndex == null || requestedItemIndex == reportedItemIndex
+
 internal fun shouldExposeMangaPages(currentChapterFinished: Boolean): Boolean =
     currentChapterFinished
 

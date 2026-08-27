@@ -1,17 +1,27 @@
 package io.legado.app.ui.widget.components.text
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -28,20 +38,26 @@ import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
 import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
 import io.legado.app.ui.theme.LegadoTheme
+import io.legado.app.utils.GSON
+import io.legado.app.utils.fromJsonObject
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.Node
 import org.jsoup.nodes.TextNode
 
 /**
- * 通用 HTML 渲染组件：把不可信 HTML 解析为段落 + 行内样式/链接/图片，供 Compose 展示。
+ * 通用 HTML 渲染组件：把不可信 HTML 解析为段落 + 行内样式/链接/图片/按钮，供 Compose 展示。
  * 最初为词典内容(ui/dict)提取，书籍详情简介等纯文本 UI 复用同一实现。
+ *
+ * @param interactive 为 true 时启用 legado 交互约定（<button>名称@onclick:脚本</button>、
+ *                   图片 src 后缀 {...,"click":"脚本"} 的点击、图片长按），并把回调暴露给调用方。
  */
 @Composable
 fun HtmlContent(
@@ -50,6 +66,11 @@ fun HtmlContent(
     style: TextStyle = LegadoTheme.typography.bodyMedium.merge(
         color = LegadoTheme.colorScheme.onSurface
     ),
+    interactive: Boolean = false,
+    onButtonClick: (name: String, click: String) -> Unit = { _, _ -> },
+    onImageClick: (click: String) -> Unit = {},
+    onImageLongClick: (source: String) -> Unit = {},
+    imageModel: (String) -> Any? = { it },
 ) {
     val document = remember(html) { HtmlParser.parse(html) }
     val linkColor = LegadoTheme.colorScheme.primary
@@ -64,6 +85,11 @@ fun HtmlContent(
                     maxWidthPx = availableWidthPx,
                     baseStyle = style,
                     linkColor = linkColor,
+                    interactive = interactive,
+                    onButtonClick = onButtonClick,
+                    onImageClick = onImageClick,
+                    onImageLongClick = onImageLongClick,
+                    imageModel = imageModel,
                 )
             }
         }
@@ -77,15 +103,87 @@ private fun HtmlParagraphContent(
     maxWidthPx: Int,
     baseStyle: TextStyle,
     linkColor: Color,
+    interactive: Boolean,
+    onButtonClick: (name: String, click: String) -> Unit,
+    onImageClick: (click: String) -> Unit,
+    onImageLongClick: (source: String) -> Unit,
+    imageModel: (String) -> Any?,
+) {
+    if (paragraph.content.size == 1 && paragraph.content[0] is HtmlInline.HorizontalRule) {
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 8.dp),
+            color = LegadoTheme.colorScheme.outlineVariant,
+            thickness = 1.dp,
+        )
+        return
+    }
+    Column {
+        var runStart = 0
+        paragraph.content.forEachIndexed { index, inline ->
+            if (inline is HtmlInline.Button) {
+                if (index > runStart) {
+                    HtmlTextRun(
+                        inlines = paragraph.content.subList(runStart, index),
+                        paragraphIndex = paragraphIndex,
+                        maxWidthPx = maxWidthPx,
+                        baseStyle = baseStyle,
+                        linkColor = linkColor,
+                        interactive = interactive,
+                        onImageClick = onImageClick,
+                        onImageLongClick = onImageLongClick,
+                        imageModel = imageModel,
+                    )
+                }
+                HtmlButtonChip(
+                    button = inline,
+                    baseStyle = baseStyle,
+                    interactive = interactive,
+                    onButtonClick = onButtonClick,
+                )
+                runStart = index + 1
+            }
+        }
+        if (runStart < paragraph.content.size) {
+            HtmlTextRun(
+                inlines = paragraph.content.subList(runStart, paragraph.content.size),
+                paragraphIndex = paragraphIndex,
+                maxWidthPx = maxWidthPx,
+                baseStyle = baseStyle,
+                linkColor = linkColor,
+                interactive = interactive,
+                onImageClick = onImageClick,
+                onImageLongClick = onImageLongClick,
+                imageModel = imageModel,
+            )
+        }
+    }
+}
+
+/**
+ * 渲染一段不含按钮的行内内容（文本/图片/换行），按钮由调用方拆出。
+ */
+@Composable
+private fun HtmlTextRun(
+    inlines: List<HtmlInline>,
+    paragraphIndex: Int,
+    maxWidthPx: Int,
+    baseStyle: TextStyle,
+    linkColor: Color,
+    interactive: Boolean,
+    onImageClick: (click: String) -> Unit,
+    onImageLongClick: (source: String) -> Unit,
+    imageModel: (String) -> Any?,
 ) {
     val density = LocalDensity.current
     val inlineContent = mutableMapOf<String, InlineTextContent>()
     var imageIndex = 0
 
-    paragraph.content.forEach { inline ->
+    inlines.forEach { inline ->
         if (inline !is HtmlInline.Image) return@forEach
         val id = "html-image-$paragraphIndex-${imageIndex++}"
-        val painter = rememberAsyncImagePainter(model = inline.source)
+        // The trailing JSON is a Legado image option, not part of the URL.
+        // Passing the raw value to Coil makes otherwise valid book-source images fail to load.
+        val painter = rememberAsyncImagePainter(model = imageModel(inline.loadSource))
         val painterState by painter.state.collectAsState()
         val image = (painterState as? AsyncImagePainter.State.Success)?.result?.image
         val drawableWidth = image?.width?.coerceAtLeast(1) ?: 1
@@ -97,6 +195,14 @@ private fun HtmlParagraphContent(
         }
         val width = with(density) { (drawableWidth * scale).toDp().toSp() }
         val height = with(density) { (drawableHeight * scale).toDp().toSp() }
+        val imageModifier = if (interactive) {
+            Modifier.combinedClickable(
+                onClick = { if (inline.click != null) onImageClick(inline.click) },
+                onLongClick = { onImageLongClick(inline.source) },
+            )
+        } else {
+            Modifier
+        }
         inlineContent[id] = InlineTextContent(
             placeholder = Placeholder(
                 width = width.value.coerceAtLeast(1f).sp,
@@ -107,7 +213,9 @@ private fun HtmlParagraphContent(
             Image(
                 painter = painter,
                 contentDescription = inline.description,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(imageModifier),
                 contentScale = ContentScale.Fit,
             )
         }
@@ -115,12 +223,14 @@ private fun HtmlParagraphContent(
 
     val annotatedText = buildAnnotatedString {
         imageIndex = 0
-        paragraph.content.forEach { inline ->
+        inlines.forEach { inline ->
             when (inline) {
                 is HtmlInline.Text -> appendStyledText(inline, linkColor)
                 is HtmlInline.Image -> {
                     val id = "html-image-$paragraphIndex-${imageIndex++}"
-                    if (inline.link != null) {
+                    if (interactive && inline.click != null) {
+                        appendInlineContent(id, inline.description ?: "image")
+                    } else if (inline.link != null) {
                         withLink(LinkAnnotation.Url(inline.link)) {
                             appendInlineContent(id, inline.description ?: "image")
                         }
@@ -130,6 +240,8 @@ private fun HtmlParagraphContent(
                 }
 
                 HtmlInline.LineBreak -> append('\n')
+                HtmlInline.HorizontalRule -> append('\n')
+                is HtmlInline.Button -> Unit
             }
         }
     }
@@ -139,6 +251,50 @@ private fun HtmlParagraphContent(
         inlineContent = inlineContent,
         style = baseStyle,
     )
+}
+
+/**
+ * 独立渲染的书源交互按钮 chip，不依赖行内占位测量，保证可见。
+ */
+@Composable
+private fun HtmlButtonChip(
+    button: HtmlInline.Button,
+    baseStyle: TextStyle,
+    interactive: Boolean,
+    onButtonClick: (name: String, click: String) -> Unit,
+) {
+    val baseSize = if (baseStyle.fontSize.value.isNaN()) 14.sp else baseStyle.fontSize
+    val scaledSize = baseSize * 0.9f
+    val buttonFontSize = if (!scaledSize.value.isNaN() && scaledSize.value < 11f) {
+        11.sp
+    } else {
+        scaledSize
+    }
+    val buttonStyle = baseStyle.copy(
+        fontWeight = FontWeight.SemiBold,
+        fontSize = buttonFontSize,
+    )
+    val clickModifier = if (interactive) {
+        Modifier.clickable { onButtonClick(button.name, button.click) }
+    } else {
+        Modifier
+    }
+    Box(
+        modifier = Modifier
+            .padding(vertical = 2.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(LegadoTheme.colorScheme.surfaceContainer)
+            .then(clickModifier)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = button.name,
+            style = buttonStyle,
+            color = LegadoTheme.colorScheme.onSurface,
+            maxLines = 1,
+        )
+    }
 }
 
 private fun AnnotatedString.Builder.appendStyledText(
@@ -227,11 +383,21 @@ internal sealed interface HtmlInline {
 
     data class Image(
         val source: String,
+        val loadSource: String,
         val description: String?,
         val link: String? = null,
+        val click: String? = null,
+    ) : HtmlInline
+
+    /** `<button>名称@onclick:脚本</button>`，legado 书源交互约定。 */
+    data class Button(
+        val name: String,
+        val click: String,
     ) : HtmlInline
 
     data object LineBreak : HtmlInline
+
+    data object HorizontalRule : HtmlInline
 }
 
 internal data class HtmlTextStyle(
@@ -254,6 +420,32 @@ internal object HtmlParser {
         "figure", "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "header",
         "hr", "main", "nav", "ol", "p", "pre", "section", "table", "ul",
     )
+
+    private const val BUTTON_SPLIT = "@onclick:"
+
+    // 与上游 AnalyzeUrl.paramPattern 一致：图片 src 后的 JSON 参数，例如 ",{"width":"80%","click":"showCmt(...)"}"
+    private val imageParamPattern = Regex("\\s*,\\s*(?=\\{)")
+
+    private fun parseImageOptions(source: String): Pair<String, String?> {
+        val urlMatcher = imageParamPattern.find(source) ?: return source to null
+        val urlOptionStr = source.substring(urlMatcher.range.last + 1)
+        val click = GSON.fromJsonObject<Map<String, String>>(urlOptionStr).getOrNull()?.get("click")
+        return source.substring(0, urlMatcher.range.first) to click
+    }
+
+    private fun collectButtonText(element: Element): String {
+        val sb = StringBuilder()
+        collectText(element, sb)
+        return sb.toString()
+    }
+
+    private fun collectText(node: Node, sb: StringBuilder) {
+        when (node) {
+            is TextNode -> sb.append(normalizeWhitespace(node.wholeText))
+            is Element -> node.childNodes().forEach { collectText(it, sb) }
+            else -> Unit
+        }
+    }
 
     fun parse(html: String): HtmlDocument {
         val paragraphs = mutableListOf<HtmlParagraph>()
@@ -314,9 +506,7 @@ internal object HtmlParser {
                 addParagraph(content, paragraphs)
             }
 
-            "hr" -> paragraphs += HtmlParagraph(
-                listOf(HtmlInline.Text("────────", style, inheritedLink))
-            )
+            "hr" -> paragraphs += HtmlParagraph(listOf(HtmlInline.HorizontalRule))
 
             else -> {
                 val content = mutableListOf<HtmlInline>()
@@ -362,12 +552,31 @@ internal object HtmlParser {
                     .ifBlank { inheritedLink } else inheritedLink
                 when (node.normalName()) {
                     "br" -> output += HtmlInline.LineBreak
+                    "hr" -> {
+                        output += HtmlInline.LineBreak
+                        output += HtmlInline.HorizontalRule
+                        output += HtmlInline.LineBreak
+                    }
+
                     "img" -> node.attr("src").takeIf(String::isNotBlank)?.let { source ->
+                        val (loadSource, click) = parseImageOptions(source)
                         output += HtmlInline.Image(
                             source,
+                            loadSource,
                             node.attr("alt").ifBlank { null },
-                            link
+                            link,
+                            click,
                         )
+                    }
+
+                    "button" -> {
+                        val buttonText = collectButtonText(node)
+                        val parts = buttonText.split(BUTTON_SPLIT, limit = 2)
+                        if (parts.size == 2) {
+                            output += HtmlInline.Button(parts[0].trim(), parts[1].trim())
+                        } else {
+                            appendText(output, buttonText, style, inheritedLink)
+                        }
                     }
 
                     in blockTags -> {

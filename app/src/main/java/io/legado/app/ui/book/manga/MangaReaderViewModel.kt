@@ -600,13 +600,18 @@ class MangaReaderViewModel(
                     } else old.scrollRequest,
                 )
             }
-            if (positionChanged && pendingExplicitChapterIndex != session.chapterIndex) updateVisibleItem(
-                itemIndex = targetIndex,
-                firstItemIndex = targetIndex,
-                lastItemIndex = targetIndex,
-                currentChapterVisible = true,
-                navigationId = _uiState.value.navigationId,
-            )
+            if (positionChanged && pendingExplicitChapterIndex != session.chapterIndex) {
+                // The session already owns this restored page. Notify it for adjacent-chapter
+                // loading without pretending the LazyColumn has reached the target: doing the
+                // latter clears scrollRequest and lets its stale page-0 callback overwrite the
+                // persisted progress before the restoration scroll runs.
+                executeSession(
+                    MangaSessionCommand.VisiblePageChanged(
+                        session.chapterIndex,
+                        session.pageIndex,
+                    )
+                )
+            }
         }
     }
 
@@ -1116,9 +1121,11 @@ class MangaReaderViewModel(
             }
             return
         }
-        val requestedItem = state.scrollRequest?.itemIndex
-            ?.let(state.pages::getOrNull) as? MangaReaderItemUi.Page
-        if (requestedItem != null && item.chapterIndex != requestedItem.chapterIndex) return
+        val requestedItemIndex = state.scrollRequest?.itemIndex
+        // LazyColumn first reports its retained/pre-scroll viewport. During a restore that page is
+        // commonly page 0, and accepting it overwrites the persisted target before scrollToItem
+        // reaches it. Only the requested item may complete a pending programmatic navigation.
+        if (!acceptsMangaVisibleItem(requestedItemIndex, itemIndex)) return
         if (pendingExplicitChapterIndex != null &&
             item.chapterIndex != readerSession.state.value.chapterIndex
         ) return

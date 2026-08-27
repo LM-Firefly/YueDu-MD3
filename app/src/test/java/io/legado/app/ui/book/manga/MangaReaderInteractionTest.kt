@@ -133,6 +133,66 @@ class MangaReaderInteractionTest {
     }
 
     @Test
+    fun `webtoon enters later chapter at its first visible page not its last`() {
+        val items = listOf(
+            page(8, chapter = 20),
+            MangaReaderItemUi.ChapterTransition(
+                key = "transition",
+                direction = MangaChapterTransitionDirection.NEXT,
+                targetChapterIndex = 21,
+                currentChapterName = "20",
+                targetChapterName = "21",
+                targetStatus = MangaChapterTransitionStatus.READY,
+            ),
+            page(0, chapter = 21),
+            page(1, chapter = 21),
+            page(2, chapter = 21),
+        )
+
+        assertEquals(
+            2,
+            mangaWebtoonFocusedPageIndex(
+                items = items,
+                visibleItemIndices = listOf(1, 2, 3, 4),
+                currentChapterIndex = 20,
+            ),
+        )
+    }
+
+    @Test
+    fun `webtoon enters earlier chapter at its last visible page`() {
+        val items = listOf(
+            page(7, chapter = 20),
+            page(8, chapter = 20),
+            MangaReaderItemUi.ChapterTransition(
+                key = "transition",
+                direction = MangaChapterTransitionDirection.NEXT,
+                targetChapterIndex = 21,
+                currentChapterName = "20",
+                targetChapterName = "21",
+                targetStatus = MangaChapterTransitionStatus.READY,
+            ),
+            page(0, chapter = 21),
+        )
+
+        assertEquals(
+            1,
+            mangaWebtoonFocusedPageIndex(
+                items = items,
+                visibleItemIndices = listOf(0, 1, 2),
+                currentChapterIndex = 21,
+            ),
+        )
+    }
+
+    @Test
+    fun `pending restored position rejects old viewport callback`() {
+        assertFalse(acceptsMangaVisibleItem(requestedItemIndex = 14, reportedItemIndex = 0))
+        assertTrue(acceptsMangaVisibleItem(requestedItemIndex = 14, reportedItemIndex = 14))
+        assertTrue(acceptsMangaVisibleItem(requestedItemIndex = null, reportedItemIndex = 0))
+    }
+
+    @Test
     fun `adjacent chapter callbacks stay hidden until target chapter finishes`() {
         assertFalse(shouldExposeMangaPages(currentChapterFinished = false))
         assertTrue(shouldExposeMangaPages(currentChapterFinished = true))

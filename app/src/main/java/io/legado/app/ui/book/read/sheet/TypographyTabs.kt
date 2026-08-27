@@ -949,7 +949,7 @@ internal fun TypographyMarginTab(
             1 -> PaddingSliders(
                 top = headerPaddingTop, bottom = headerPaddingBottom,
                 left = headerPaddingLeft, right = headerPaddingRight,
-                maxValue = 500f,
+                maxValue = 300f,
                 onTopChange = {
                     headerPaddingTop = it
                     onIntent(ReadBookIntent.UpdateConfig(ConfigUpdate.HeaderPaddingTop(it.toInt())))
@@ -971,7 +971,7 @@ internal fun TypographyMarginTab(
             else -> PaddingSliders(
                 top = footerPaddingTop, bottom = footerPaddingBottom,
                 left = footerPaddingLeft, right = footerPaddingRight,
-                maxValue = 500f,
+                maxValue = 300f,
                 onTopChange = {
                     footerPaddingTop = it
                     onIntent(ReadBookIntent.UpdateConfig(ConfigUpdate.FooterPaddingTop(it.toInt())))

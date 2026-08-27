@@ -127,6 +127,7 @@ import io.legado.app.ui.widget.components.icon.AppIcon
 import io.legado.app.ui.widget.components.icon.AppIcons
 import io.legado.app.ui.widget.components.image.cover.BookCoverImage
 import io.legado.app.ui.widget.components.image.cover.CoilBookCover
+import io.legado.app.ui.widget.components.image.cover.buildCoverImageRequest
 import io.legado.app.ui.widget.components.image.cover.usesDefaultBookCover
 import io.legado.app.ui.widget.components.log.AppLogSheet
 import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenu
@@ -407,6 +408,15 @@ private fun BookInfoScreenContent(
                                     onRemarkClick = { onIntent(BookInfoIntent.RemarkClick) },
                                     bookSource = state.bookSource,
                                     onJumpToAnotherApp = jumpToAnotherApp,
+                                    onIntroButtonClick = { name, click ->
+                                        onIntent(BookInfoIntent.IntroButtonClick(name, click))
+                                    },
+                                    onIntroImageClick = { click ->
+                                        onIntent(BookInfoIntent.IntroImageClick(click))
+                                    },
+                                    onIntroImageLongClick = { source ->
+                                        onIntent(BookInfoIntent.IntroImageLongClick(source))
+                                    },
                                 )
                             }
                         }
@@ -1218,6 +1228,9 @@ private fun BookInfoSummary(
     onRemarkClick: () -> Unit,
     bookSource: BookSource?,
     onJumpToAnotherApp: (Uri) -> Unit,
+    onIntroButtonClick: (name: String, click: String) -> Unit,
+    onIntroImageClick: (click: String) -> Unit,
+    onIntroImageLongClick: (source: String) -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -1295,6 +1308,9 @@ private fun BookInfoSummary(
                 ?.substringBefore(","),
             bookSource = bookSource,
             onJumpToAnotherApp = onJumpToAnotherApp,
+            onButtonClick = onIntroButtonClick,
+            onImageClick = onIntroImageClick,
+            onImageLongClick = onIntroImageLongClick,
         )
     }
 }
@@ -1312,7 +1328,11 @@ private fun BookInfoIntro(
     baseUrl: String?,
     bookSource: BookSource?,
     onJumpToAnotherApp: (Uri) -> Unit,
+    onButtonClick: (name: String, click: String) -> Unit,
+    onImageClick: (click: String) -> Unit,
+    onImageLongClick: (source: String) -> Unit,
 ) {
+    val context = LocalContext.current
     val content = remember(intro) { parseBookInfoIntro(intro) }
     if (content == null) {
         AnimatedTextLine(
@@ -1329,9 +1349,35 @@ private fun BookInfoIntro(
             onJumpToAnotherApp = onJumpToAnotherApp,
         )
 
-        is BookInfoIntroContent.Html -> HtmlContent(html = c.html)
+        is BookInfoIntroContent.Html -> HtmlContent(
+            html = c.html,
+            interactive = true,
+            onButtonClick = onButtonClick,
+            onImageClick = onImageClick,
+            onImageLongClick = onImageLongClick,
+            imageModel = { imageUrl ->
+                buildCoverImageRequest(
+                    context = context,
+                    data = imageUrl,
+                    sourceOrigin = bookSource?.bookSourceUrl,
+                    loadOnlyWifi = false,
+                )
+            },
+        )
 
-        is BookInfoIntroContent.Markdown -> MarkdownBlock(content = c.markdown)
+        is BookInfoIntroContent.Markdown -> MarkdownBlock(
+            content = c.markdown,
+            imageModel = { imageUrl ->
+                buildCoverImageRequest(
+                    context = context,
+                    data = imageUrl,
+                    sourceOrigin = bookSource?.bookSourceUrl,
+                    loadOnlyWifi = false,
+                )
+            },
+            onImageClick = onImageClick,
+            onImageLongClick = onImageLongClick,
+        )
 
         is BookInfoIntroContent.Plain -> AnimatedTextLine(
             text = c.text,
@@ -1401,7 +1447,7 @@ private fun BookInfoWebIntro(
     val context = LocalContext.current
     val density = LocalDensity.current
     var contentHeight by remember { mutableStateOf(0) }
-    val webView = remember {
+    val webView = remember(bookSource?.bookSourceUrl) {
         WebView(context).apply {
             setBackgroundColor(android.graphics.Color.TRANSPARENT)
             settings.apply {

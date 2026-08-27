@@ -100,6 +100,7 @@ import io.legado.app.ui.widget.components.divider.PillDivider
 import io.legado.app.ui.widget.components.filePicker.FilePickerSheet
 import io.legado.app.ui.widget.components.icon.AppIcons
 import io.legado.app.ui.widget.components.image.cover.CoilBookCover
+import io.legado.app.ui.widget.components.lazylist.FastScrollLazyColumn
 import io.legado.app.ui.widget.components.list.ListScaffold
 import io.legado.app.ui.widget.components.list.ListUiState
 import io.legado.app.ui.widget.components.log.AppLogSheet
@@ -535,7 +536,7 @@ private fun BookshelfManageScreen(
         }
     ) { paddingValues ->
         val renderVersion by rememberUpdatedState(state.cacheVersion)
-        LazyColumn(
+        FastScrollLazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = adaptiveContentPadding(

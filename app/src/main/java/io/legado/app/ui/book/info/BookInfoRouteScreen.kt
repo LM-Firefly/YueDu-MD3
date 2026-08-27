@@ -17,7 +17,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import com.script.rhino.runScriptWithContext
 import io.legado.app.R
+import io.legado.app.constant.AppLog
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isImage
@@ -26,12 +29,15 @@ import io.legado.app.model.SourceCallBack
 import io.legado.app.ui.book.info.edit.BookInfoEditActivity
 import io.legado.app.ui.book.toc.TocActivityResult
 import io.legado.app.ui.file.HandleFileContract
+import io.legado.app.ui.login.SourceLoginJsExtensions
 import io.legado.app.utils.StartActivityContract
 import io.legado.app.utils.openFileUri
 import io.legado.app.utils.sendToClip
 import io.legado.app.utils.toastOnUi
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -162,6 +168,10 @@ fun BookInfoRouteScreen(
                     runSourceCallback(activity, effect, viewModel, onOpenSearch)
                 }
 
+                is BookInfoEffect.RunIntroJs -> {
+                    runIntroJs(activity, effect)
+                }
+
 
                 is BookInfoEffect.NavigateToBookInfo -> {
                     onNavigateToBookInfo(effect.name, effect.author, effect.bookUrl, effect.origin, effect.coverPath)
@@ -241,6 +251,25 @@ private fun runSourceCallback(
             }
 
             BookInfoCallbackAction.None -> Unit
+        }
+    }
+}
+
+private fun runIntroJs(activity: AppCompatActivity, effect: BookInfoEffect.RunIntroJs) {
+    val source = effect.source ?: return
+    activity.lifecycleScope.launch(IO) {
+        try {
+            val java = SourceLoginJsExtensions(activity, source)
+            runScriptWithContext {
+                source.evalJS(effect.click) {
+                    put("result", null)
+                    put("java", java)
+                    put("book", effect.book)
+                }
+            }
+        } catch (e: Throwable) {
+            AppLog.put("${source.bookSourceName}: ${e.localizedMessage}", e)
+            activity.toastOnUi("${effect.name} click error\n${e.localizedMessage}")
         }
     }
 }
