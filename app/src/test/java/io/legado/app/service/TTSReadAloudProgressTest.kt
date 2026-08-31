@@ -1,9 +1,22 @@
 package io.legado.app.service
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TTSReadAloudProgressTest {
+
+    @Test
+    fun speechDrivenPageNavigationIsMarkedOnlyForItsNavigationBlock() {
+        assertFalse(BaseReadAloudService.speechDrivingNavigation)
+
+        BaseReadAloudService.withSpeechNavigation {
+            assertTrue(BaseReadAloudService.speechDrivingNavigation)
+        }
+
+        assertFalse(BaseReadAloudService.speechDrivingNavigation)
+    }
 
     @Test
     fun nextParagraphAdvancesFromCurrentRangePosition() {

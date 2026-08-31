@@ -66,12 +66,12 @@ import io.legado.app.ui.association.OnLineImportActivity
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.utils.ACache
 import io.legado.app.utils.GSON
+import io.legado.app.utils.applyDayNight
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.invisible
 import io.legado.app.utils.longSnackbar
 import io.legado.app.utils.openUrl
 import io.legado.app.utils.setLayout
-import io.legado.app.utils.applyDayNight
 import io.legado.app.utils.startActivity
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
@@ -83,10 +83,10 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import org.koin.android.ext.android.inject
 import java.io.ByteArrayInputStream
 import java.lang.ref.WeakReference
 import java.util.Date
-import org.koin.android.ext.android.inject
 
 class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view),
     WebJsExtensions.Callback {
@@ -631,7 +631,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         }
     }
 
-    override fun onNavigateToArticles(sortUrl: String?) {
+    override fun onNavigateToArticles(sortUrl: String?, origin: String?) {
     }
 
     @Suppress("unused")

@@ -22,7 +22,15 @@ object MainNavigator {
     }
     private var backNavigationResetJob: Job? = null
 
-    fun navigateToRoute(backStack: MutableList<NavKey>, route: NavKey) {
+    fun navigateToRoute(
+        backStack: MutableList<NavKey>,
+        route: NavKey,
+        resetToHome: Boolean = false,
+    ) {
+        if (resetToHome) {
+            backStack.clear()
+            backStack.add(MainRouteHome)
+        }
         val currentRoute = backStack.lastOrNull()
         if (currentRoute == route) return
 

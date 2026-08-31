@@ -47,6 +47,8 @@ object Rss {
         val analyzeUrl = AnalyzeUrl(
             sortUrl,
             page = page,
+            key = searchKey,
+            baseUrl = rssSource.sourceUrl,
             source = rssSource,
             ruleData = ruleData,
             coroutineContext = coroutineContext,
@@ -78,6 +80,7 @@ object Rss {
             }
         }
         checkRedirect(rssSource, res)
+        Debug.log(rssSource.sourceUrl, "≡获取成功:${analyzeUrl.ruleUrl}")
         return RssParserByRule.parseXML(sortName, sortUrl, res.url, res.body, rssSource, ruleData)
     }
 

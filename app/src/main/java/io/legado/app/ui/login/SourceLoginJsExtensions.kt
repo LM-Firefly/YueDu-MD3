@@ -7,6 +7,7 @@ import io.legado.app.constant.EventBus
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.HttpTTS
 import io.legado.app.model.ReadAloud
+import io.legado.app.ui.main.MainActivity
 import io.legado.app.ui.rss.read.RssJsExtensions
 import io.legado.app.ui.widget.dialog.BottomWebViewDialog
 import io.legado.app.utils.FileUtils
@@ -46,7 +47,11 @@ class SourceLoginJsExtensions(
 
     override fun open(name: String, url: String?, title: String?, origin: String?) {
         if (name == "login") {
-            activityRef.get()?.toastOnUi("已在登录界面")
+            if (activityRef.get() is MainActivity && MainActivity.hasActiveSourceLoginRoute) {
+                activityRef.get()?.toastOnUi("已在登录界面")
+            } else {
+                super.open(name, url, title, origin)
+            }
             return
         }
         super.open(name, url, title, origin)

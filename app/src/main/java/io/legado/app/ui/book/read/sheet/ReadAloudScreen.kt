@@ -323,6 +323,7 @@ fun ReadAloudContent(
 
         TinySliderSettingItem(
             title = stringResource(R.string.read_aloud_speed),
+            description = stringResource(R.string.read_aloud_speed_summary),
             value = ttsSpeechRate.toFloat(),
             valueRange = 0f..80f,
             steps = 79,

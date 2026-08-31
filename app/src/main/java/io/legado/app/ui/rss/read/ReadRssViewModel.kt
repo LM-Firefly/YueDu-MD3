@@ -9,7 +9,6 @@ import com.script.rhino.runScriptWithContext
 import io.legado.app.base.BaseViewModel
 import io.legado.app.data.entities.RssArticle
 import io.legado.app.data.entities.RssSource
-import io.legado.app.help.config.AppConfig
 import io.legado.app.data.entities.RssStar
 import io.legado.app.data.repository.RssArticleRepository
 import io.legado.app.data.repository.RssFavoriteRepository
@@ -18,6 +17,7 @@ import io.legado.app.domain.gateway.AppShellSettingsGateway
 import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.TTS
+import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.webView.WebJsExtensions
@@ -27,10 +27,10 @@ import io.legado.app.utils.ImageSaveUtils
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import splitties.init.appCtx
 import kotlin.coroutines.coroutineContext
@@ -42,6 +42,11 @@ data class ReadRssArgs(
     val openUrl: String? = null,
     val startPage: Boolean = false
 )
+
+internal fun shouldPreserveRssArticleOnRefresh(
+    ruleDescription: String?,
+    ruleContent: String?,
+) = ruleContent.isNullOrBlank() || !ruleDescription.isNullOrBlank()
 
 data class ReadRssSettings(
     val showStatusBar: Boolean = true,
@@ -68,6 +73,7 @@ class ReadRssViewModel(
     var rssSource: RssSource? = null
     var rssArticle: RssArticle? = null
     var tts: TTS? = null
+    var hasPreloadJs = false
     var headerMap: Map<String, String> = emptyMap()
     private var isStartPage = false
 
@@ -98,6 +104,7 @@ class ReadRssViewModel(
     fun initData(args: ReadRssArgs) {
         execute {
             rssSource = rssRepository.getByKey(args.origin)
+            hasPreloadJs = !rssSource?.preloadJs.isNullOrBlank()
             headerMap = runScriptWithContext {
                 rssSource?.getHeaderMap(AppConfig.userAgent) ?: emptyMap()
             }
@@ -195,16 +202,24 @@ class ReadRssViewModel(
     }
 
     fun refresh(finish: () -> Unit) {
+        val source = rssSource ?: run {
+            appCtx.toastOnUi("订阅源不存在")
+            finish.invoke()
+            return
+        }
+        if (source.singleUrl == true) {
+            finish.invoke()
+            return
+        }
         rssArticle?.let { article ->
-            rssSource?.let {
-                val ruleContent = it.ruleContent
+            val ruleContent = source.ruleContent
+            if (shouldPreserveRssArticleOnRefresh(source.ruleDescription, ruleContent)) {
                 if (!ruleContent.isNullOrBlank()) {
                     loadContent(article, ruleContent)
                 } else {
                     finish.invoke()
                 }
-            } ?: let {
-                appCtx.toastOnUi("订阅源不存在")
+            } else {
                 finish.invoke()
             }
         } ?: finish.invoke()

@@ -63,6 +63,9 @@ palette = "1.0.0"
 preference = "1.2.1"
 protobufJavalite = "4.36.0"
 quickChineseTransfer = "0.2.17"
+# 书源 JS 通过 Packages.cn.hutool.* 直接调用，Hutool 作为书源运行时加密库保留在 classpath。
+# 应用代码不直接依赖它；加密走 JCA / help/crypto/CryptoUtils.kt。版本固定，勿升级（参考上游基线）。
+hutool = "5.8.22"
 room = "2.8.4"
 robolectric = "4.16.1"
 splitties = "3.0.0"
@@ -137,6 +140,7 @@ androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayo
 
 haze-core = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
 haze-materials = { module = "dev.chrisbanes.haze:haze-materials", version.ref = "haze" }
+hutool-crypto = { module = "cn.hutool:hutool-crypto", version.ref = "hutool" }
 koin-bom = { module = "io.insert-koin:koin-bom", version.ref = "koin-bom" }
 koin-core = { module = "io.insert-koin:koin-core" }
 koin-android = { group = "io.insert-koin", name = "koin-android" }

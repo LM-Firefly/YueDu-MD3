@@ -55,6 +55,7 @@ import io.legado.app.ui.book.read.pageestimate.RoomExactChapterPageCountStore
 import io.legado.app.ui.book.read.pageestimate.WholeBookPageCoordinator
 import io.legado.app.ui.book.read.pageestimate.WholeBookPageState
 import io.legado.app.ui.config.readConfig.ReadConfig
+import io.legado.app.utils.buildMainHandler
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.stackTraceStr
@@ -1713,6 +1714,30 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
         saveRead()
     }
 
+    // 页内翻页进度窄更新的防抖窗口：窗口内的写入合并，尾随任务保证最终位置落库
+    private const val PROGRESS_SAVE_DEBOUNCE_MS = 300L
+
+    private var lastProgressSaveAt = 0L
+    private var pendingProgressSave = false
+    private val progressSaveHandler by lazy { buildMainHandler() }
+
+    private val pendingProgressSaveRunnable = Runnable {
+        executor.execute {
+            if (!pendingProgressSave) return@execute
+            pendingProgressSave = false
+            val book = book ?: return@execute
+            // 期间已发生全量保存(切章等)或进度再次变化，交由后续 saveRead 落库
+            if (book.durChapterIndex != durChapterIndex) return@execute
+            appDb.bookDao.upReadProgress(
+                bookUrl = book.bookUrl,
+                durChapterIndex = book.durChapterIndex,
+                durChapterPos = book.durChapterPos,
+                durChapterTime = book.durChapterTime,
+            )
+            lastProgressSaveAt = book.durChapterTime
+        }
+    }
+
     fun saveRead(pageChanged: Boolean = false) {
         val book = book ?: return
         executor.execute {
@@ -1723,6 +1748,8 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
                 book.durChapterIndex = durChapterIndex
                 book.durChapterPos = durChapterPos
                 if (!pageChanged || chapterChanged) {
+                    pendingProgressSave = false
+                    progressSaveHandler.removeCallbacks(pendingProgressSaveRunnable)
                     appDb.bookChapterDao.getChapter(book.bookUrl, durChapterIndex)?.let {
                         book.durChapterTitle = it.getDisplayTitle(
                             ContentProcessor.get(book.name, book.origin).getTitleReplaceRules(),
@@ -1731,8 +1758,25 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
                         )
                         SourceCallBack.callBackBook(SourceCallBack.SAVE_READ, bookSource, book, it)
                     }
+                    book.update()
+                    lastProgressSaveAt = book.durChapterTime
+                } else if (book.durChapterTime - lastProgressSaveAt < PROGRESS_SAVE_DEBOUNCE_MS) {
+                    // 快速翻页：窗口内合并窄更新，尾随任务写入最终位置
+                    if (!pendingProgressSave) {
+                        pendingProgressSave = true
+                        progressSaveHandler.postDelayed(
+                            pendingProgressSaveRunnable, PROGRESS_SAVE_DEBOUNCE_MS
+                        )
+                    }
+                } else {
+                    appDb.bookDao.upReadProgress(
+                        bookUrl = book.bookUrl,
+                        durChapterIndex = book.durChapterIndex,
+                        durChapterPos = book.durChapterPos,
+                        durChapterTime = book.durChapterTime,
+                    )
+                    lastProgressSaveAt = book.durChapterTime
                 }
-                book.update()
             }.onFailure {
                 AppLog.put("保存书籍阅读进度信息出错\n$it", it)
             }

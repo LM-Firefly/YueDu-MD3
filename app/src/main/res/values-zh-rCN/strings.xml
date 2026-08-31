@@ -460,6 +460,8 @@
     <string name="default_expand_first">默认展开第一组发现</string>
     <string name="threads_num">当前线程数 %s</string>
     <string name="read_aloud_speed">朗读语速</string>
+    <string name="read_aloud_speed_summary">全局播放倍速，本地变速对所有 TTS 音频生效</string>
+    <string name="tts_source_speed_summary">音色合成语速，源接口支持语速参数时生效；与全局语速叠加</string>
     <string name="auto_next_page">自动翻页</string>
     <string name="auto_next_page_stop">停止自动翻页</string>
     <string name="auto_next_page_speed">自动翻页间隔</string>

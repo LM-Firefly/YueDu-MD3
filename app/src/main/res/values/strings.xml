@@ -490,6 +490,8 @@
     <string name="default_expand_first">Default expand the first Discovery.</string>
     <string name="threads_num">Current threads %s</string>
     <string name="read_aloud_speed">Speech rate</string>
+    <string name="read_aloud_speed_summary">Global playback speed, applied locally to all TTS audio</string>
+    <string name="tts_source_speed_summary">Synthesis speed of this voice, effective when the source supports a speed parameter; combined with the global speed</string>
     <string name="auto_next_page">Auto scroll</string>
     <string name="auto_next_page_stop">Stop Auto Scroll</string>
     <string name="auto_next_page_speed">Auto scroll speed</string>

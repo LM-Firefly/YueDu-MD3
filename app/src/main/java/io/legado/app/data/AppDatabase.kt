@@ -112,7 +112,7 @@ val appDb by lazy {
 }
 
 @Database(
-    version = 103,
+    version = 104,
     exportSchema = true,
     entities = [Book::class, BookGroup::class, BookSource::class, BookChapter::class,
         ReplaceRule::class, SearchBook::class, SearchKeyword::class, Cookie::class,
@@ -189,7 +189,9 @@ val appDb by lazy {
         AutoMigration(from = 97, to = 98),
         AutoMigration(from = 100, to = 101, spec = DatabaseMigrations.Migration_100_101::class),
         // book_marks 新表：Room AutoMigration 支持新增表，自动 CREATE TABLE
-        AutoMigration(from = 101, to = 102)
+        AutoMigration(from = 101, to = 102),
+        // httpTTS 新增可空列 speed（源级语速）
+        AutoMigration(from = 103, to = 104)
     ]
 )
 abstract class AppDatabase : RoomDatabase() {

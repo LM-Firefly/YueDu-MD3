@@ -136,7 +136,7 @@ class SourceLoginViewModel(
                     _effects.tryEmit(SourceLoginEffect.Finish)
                     return@onSuccess
                 }
-                loginInfo = loaded.getLoginInfoMap()
+                loginInfo = withContext(Dispatchers.IO) { loaded.getLoginInfoMap() }
                 val headers = withContext(Dispatchers.IO) {
                     runScriptWithContext {
                         loaded.getHeaderMap(
@@ -291,7 +291,18 @@ class SourceLoginViewModel(
             runCatching {
                 if (loginInfo.isEmpty()) currentSource.removeLoginInfo()
                 else if (currentSource.putLoginInfo(GSON.toJson(loginInfo))) {
-                    runScriptWithContext { currentSource.login() }
+                    val loginJs = currentSource.getLoginJs() ?: return@launch
+                    val buttonFunctionJS =
+                        "if (typeof login=='function'){ login.apply(this); } else { throw('Function login not implements!!!') }"
+                    runScriptWithContext {
+                        currentSource.evalJS("$loginJs\n$buttonFunctionJS") {
+                            put("java", jsExtensions)
+                            put("result", loginInfo.toMutableMap())
+                            put("book", book)
+                            put("chapter", chapter)
+                            put("isLongClick", false)
+                        }
+                    }
                 }
             }.onSuccess {
                 submitted = true

@@ -27,6 +27,8 @@ import io.legado.app.help.config.compatDsInt
 import io.legado.app.model.AudioPlay
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.utils.postEvent
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -111,6 +113,11 @@ class AudioPlayViewModel(
 
     fun onLoadingChanged(loading: Boolean) {
         coordinator.setLoading(loading)
+    }
+
+    /** [AudioPlay] 的歌词回调不携带 UI 状态，重新快照即可读取最新歌词。 */
+    fun onLyricChanged() {
+        coordinator.refresh()
     }
 
     fun onIntent(intent: AudioPlayIntent) {
@@ -297,6 +304,7 @@ class AudioPlayViewModel(
         chapterIndex = source.chapterIndex,
         chapterTitle = source.chapterTitle,
         chapters = source.chapters,
+        lyricLines = parseAudioLyrics(source.lyric),
         status = source.status,
         isLoading = source.isLoading,
         position = source.position,
@@ -320,4 +328,28 @@ class AudioPlayViewModel(
     private fun effect(value: AudioPlayEffect) {
         _effects.tryEmit(value)
     }
+}
+
+private val lyricTimestampPattern = Regex("\\[(\\d{1,3}):(\\d{2})(?:[.:](\\d{1,3}))?]")
+
+private fun parseAudioLyrics(lyric: String?): kotlinx.collections.immutable.ImmutableList<AudioLyricLine> {
+    if (lyric.isNullOrBlank()) return persistentListOf()
+    return lyric.lineSequence().flatMap { line ->
+        val matches = lyricTimestampPattern.findAll(line).toList()
+        val text = line.substring(matches.lastOrNull()?.range?.last?.plus(1) ?: 0).trim()
+        matches.asSequence().mapNotNull { match ->
+            text.takeIf { it.isNotEmpty() }?.let {
+                val minutes = match.groupValues[1].toIntOrNull() ?: return@let null
+                val seconds = match.groupValues[2].toIntOrNull() ?: return@let null
+                val fraction = match.groupValues[3]
+                val millis = when (fraction.length) {
+                    0 -> 0
+                    1 -> fraction.toInt() * 100
+                    2 -> fraction.toInt() * 10
+                    else -> fraction.take(3).toInt()
+                }
+                AudioLyricLine((minutes * 60 + seconds) * 1_000 + millis, it)
+            }
+        }
+    }.sortedBy(AudioLyricLine::timestampMs).toImmutableList()
 }

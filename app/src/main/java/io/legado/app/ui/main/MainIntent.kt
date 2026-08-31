@@ -6,6 +6,7 @@ import io.legado.app.ui.config.ConfigTag
 
 object MainIntent {
     const val EXTRA_START_ROUTE = "startRoute"
+    internal const val EXTRA_ROUTE_HOME_AS_PARENT = "routeHomeAsParent"
     const val EXTRA_CACHE_GROUP_ID = "extra_cache_group_id"
     const val EXTRA_SEARCH_KEY = "extra_search_key"
     const val EXTRA_SEARCH_SCOPE = "extra_search_scope"
@@ -212,6 +213,21 @@ object MainIntent {
             putExtra(EXTRA_CHAPTER_CHANGED, chapterChanged)
         }
     }
+
+    fun createReadBookMediaControlIntent(context: Context): Intent =
+        createReadBookIntent(context, readAloud = true).apply {
+            // 复用 launcher Activity 并移除其上层的旧 Activity；Nav3 父栈另行重建，
+            // 让阅读页返回时始终落到主页。
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+            )
+            putExtra(EXTRA_ROUTE_HOME_AS_PARENT, true)
+        }
+
+    internal fun shouldOpenRouteWithHomeParent(intent: Intent?): Boolean =
+        intent?.getBooleanExtra(EXTRA_ROUTE_HOME_AS_PARENT, false) == true
 
     fun createReadMangaIntent(
         context: Context,

@@ -84,6 +84,12 @@
 # markwon
 -dontwarn org.commonmark.ext.gfm.**
 
+# hutool-core hutool-crypto（书源 JS 通过 Packages.cn.hutool.* 反射调用，需整体保留）
+-keep class cn.hutool.crypto.**{*;}
+-keep class cn.hutool.core.codec.**{*;}
+-keep class cn.hutool.core.util.**{*;}
+-dontwarn cn.hutool.**
+
 -keep class okhttp3.*{*;}
 -keep class okio.*{*;}
 -keep class com.jayway.jsonpath.*{*;}

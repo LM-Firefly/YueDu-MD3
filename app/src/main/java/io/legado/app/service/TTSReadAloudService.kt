@@ -4,18 +4,18 @@ package io.legado.app.service
 import android.app.PendingIntent
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern
-import androidx.lifecycle.lifecycleScope
 import io.legado.app.domain.gateway.ReadAloudSettingsGateway
-import io.legado.app.exception.NoStackTraceException
 import io.legado.app.domain.model.readaloud.ReadAloudPlaybackCursor
 import io.legado.app.domain.model.readaloud.ReadAloudVoice
 import io.legado.app.domain.model.readaloud.SpeechEngineRoute
 import io.legado.app.domain.model.readaloud.SpeechVoiceRouter
 import io.legado.app.domain.model.readaloud.SystemTtsVoiceConfig
+import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.MediaHelp
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.lib.dialogs.SelectItem
@@ -353,7 +353,9 @@ class TTSReadAloudService : BaseReadAloudService(), KoinComponent {
                     && readAloudNumber + 1 > it.getReadLength(pageIndex + 1)
                 ) {
                     pageIndex++
-                    ReadBook.moveToNextPage()
+                    // This is the TTS engine advancing across a page boundary, not a user turn.
+                    // Mark it so ReadBook neither detaches the session nor restarts TTS at page two.
+                    withSpeechNavigation { ReadBook.moveToNextPage() }
                 }
                 upTtsProgress(readAloudNumber + 1)
                 upMediaMetadata(showContent = true)

@@ -7,6 +7,7 @@ import com.jayway.jsonpath.DocumentContext
 import io.legado.app.utils.GSON
 import io.legado.app.utils.jsonPath
 import io.legado.app.utils.readBool
+import io.legado.app.utils.readInt
 import io.legado.app.utils.readLong
 import io.legado.app.utils.readString
 
@@ -29,6 +30,11 @@ data class HttpTTS(
     @ColumnInfo(defaultValue = "0")
     override var enabledCookieJar: Boolean? = false,
     var loginCheckJs: String? = null,
+    /**
+     * 源级语速, 0..80, 实际倍速为 (speed + 5) / 10, null 时使用默认值 5 (1 倍速)。
+     * 仅当源接口支持语速参数 ({{speakSpeed}}) 时影响合成结果。
+     */
+    var speed: Int? = null,
     @ColumnInfo(defaultValue = "0")
     var lastUpdateTime: Long = System.currentTimeMillis()
 ) : BaseSource {
@@ -59,6 +65,7 @@ data class HttpTTS(
                     jsLib = doc.readString("$.jsLib"),
                     enabledCookieJar = doc.readBool("$.enabledCookieJar"),
                     loginCheckJs = doc.readString("$.loginCheckJs"),
+                    speed = doc.readInt("$.speed"),
                     lastUpdateTime = doc.readLong("$.lastUpdateTime") ?: System.currentTimeMillis()
                 )
             }

@@ -19,6 +19,7 @@ data class AudioPlayUiState(
     val chapterIndex: Int = 0,
     val chapterTitle: String = "",
     val chapters: ImmutableList<PlayerChapterUi> = persistentListOf(),
+    val lyricLines: ImmutableList<AudioLyricLine> = persistentListOf(),
     val status: Int = Status.STOP,
     val isLoading: Boolean = false,
     val position: Int = 0,
@@ -40,6 +41,12 @@ data class AudioPlayUiState(
 ) {
     val isPlaying: Boolean get() = status == Status.PLAY
 }
+
+@Stable
+data class AudioLyricLine(
+    val timestampMs: Int,
+    val text: String,
+)
 
 /** 播放器内的设置弹窗（由 UiState 管理，避免分散在 Screen 本地状态）。 */
 sealed interface AudioPlaySheet {

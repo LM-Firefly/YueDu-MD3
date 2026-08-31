@@ -401,6 +401,8 @@
     <string name="default_expand_first">預設展開第一組發現</string>
     <string name="threads_num">目前執行緒數 %s</string>
     <string name="read_aloud_speed">朗讀語速</string>
+    <string name="read_aloud_speed_summary">全域播放倍速，本機變速對所有 TTS 音訊生效</string>
+    <string name="tts_source_speed_summary">音色合成語速，源介面支援語速參數時生效；與全域語速疊加</string>
     <string name="auto_next_page">自動翻頁</string>
     <string name="auto_next_page_stop">停止自動翻頁</string>
     <string name="auto_next_page_speed">自動翻頁間隔</string>

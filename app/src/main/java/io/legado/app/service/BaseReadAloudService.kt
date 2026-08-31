@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.media.AudioManager
 import android.net.wifi.WifiManager
 import android.os.Bundle
@@ -61,6 +62,7 @@ import io.legado.app.ui.main.MainActivity
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.activityPendingIntent
 import io.legado.app.utils.getPrefBoolean
+import io.legado.app.utils.isNightMode
 import io.legado.app.utils.observeEvent
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.toastOnUi
@@ -138,6 +140,8 @@ abstract class BaseReadAloudService : BaseService(),
 
         private const val TAG = "BaseReadAloudService"
         private const val ACTION_ADD_TIMER = "io.legado.app.action.ADD_READ_ALOUD_TIMER"
+        private const val ACTION_OPEN_MEDIA_CONTROL_READER =
+            "io.legado.app.action.OPEN_READ_ALOUD_MEDIA_CONTROL"
 
         /**
          * 语速 1.0x 时的每秒朗读字数估算值, 用于把字符进度换算成媒体播放器时间轴
@@ -920,7 +924,7 @@ abstract class BaseReadAloudService : BaseService(),
      */
     @SuppressLint("UnspecifiedImmutableFlag")
     private fun initMediaSession() {
-        mediaSessionCompat.setSessionActivity(readAloudActivityPendingIntent())
+        mediaSessionCompat.setSessionActivity(readAloudMediaControlActivityPendingIntent())
         mediaSessionCompat.setCallback(object : MediaSessionCompat.Callback() {
             override fun onPlay() {
                 resumeReadAloud()
@@ -1189,11 +1193,19 @@ abstract class BaseReadAloudService : BaseService(),
             .setOnlyAlertOnce(true)
             .setContentTitle(ReadBook.book?.name ?: getString(R.string.read_aloud))
             .setContentText(chapterTitle)
-            .setContentIntent(readAloudActivityPendingIntent())
+            .setContentIntent(readAloudMediaControlActivityPendingIntent())
             .setLargeIcon(cover)
             .setVibrate(null)
             .setSound(null)
             .setLights(0, 0, 0)
+            .apply {
+                if (!resources.configuration.isNightMode) {
+                    // Some OEM media controls derive a white progress tint from light artwork.
+                    // Keep the system surface and provide a contrasting accent in light mode.
+                    setColor(Color.BLACK)
+                    setColorized(false)
+                }
+            }
             .addAction(
                 R.drawable.ic_skip_previous,
                 previousLabel,
@@ -1226,6 +1238,11 @@ abstract class BaseReadAloudService : BaseService(),
     private fun readAloudActivityPendingIntent(): PendingIntent? = activityPendingIntent(
         MainActivity.createReadBookIntent(this, readAloud = true),
         "activity",
+    )
+
+    private fun readAloudMediaControlActivityPendingIntent(): PendingIntent? = activityPendingIntent(
+        MainActivity.createReadBookMediaControlIntent(this),
+        ACTION_OPEN_MEDIA_CONTROL_READER,
     )
 
     /**

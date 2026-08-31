@@ -65,6 +65,7 @@ import io.legado.app.ui.widget.components.modalBottomSheet.AppModalBottomSheet
 import io.legado.app.ui.widget.components.modalBottomSheet.OptionCard
 import io.legado.app.ui.widget.components.modalBottomSheet.OptionSheet
 import io.legado.app.ui.widget.components.settingItem.TinyClickableSettingItem
+import io.legado.app.ui.widget.components.settingItem.TinySliderSettingItem
 import io.legado.app.ui.widget.components.settingItem.TinySwitchSettingItem
 import io.legado.app.ui.widget.components.tabRow.AppTabRow
 import io.legado.app.ui.widget.components.text.AppText
@@ -471,6 +472,7 @@ private fun HttpTtsEditorSheet(
     var loginUi by remember(source) { mutableStateOf(source.loginUi.orEmpty()) }
     var loginCheckJs by remember(source) { mutableStateOf(source.loginCheckJs.orEmpty()) }
     var jsLib by remember(source) { mutableStateOf(source.jsLib.orEmpty()) }
+    var speed by remember(source) { mutableStateOf((source.speed ?: 5).toFloat()) }
 
     fun current() = source.copy(
         name = name,
@@ -482,6 +484,7 @@ private fun HttpTtsEditorSheet(
         loginUi = loginUi.ifBlank { null },
         loginCheckJs = loginCheckJs.ifBlank { null },
         jsLib = jsLib.ifBlank { null },
+        speed = speed.toInt(),
     )
 
     AppModalBottomSheet(
@@ -530,6 +533,7 @@ private fun HttpTtsEditorSheet(
                                     loginUi = imported.loginUi.orEmpty(); loginCheckJs =
                                     imported.loginCheckJs.orEmpty()
                                     jsLib = imported.jsLib.orEmpty()
+                                    speed = (imported.speed ?: 5).toFloat()
                                 }
                             }
                         },
@@ -567,6 +571,16 @@ private fun HttpTtsEditorSheet(
                     label = "URL",
                     minLines = 2,
                     modifier = Modifier.fillMaxWidth()
+                )
+            }
+            item {
+                TinySliderSettingItem(
+                    title = stringResource(R.string.read_aloud_speed),
+                    description = stringResource(R.string.tts_source_speed_summary),
+                    value = speed,
+                    valueRange = 0f..80f,
+                    steps = 79,
+                    onValueChange = { speed = it },
                 )
             }
             item {

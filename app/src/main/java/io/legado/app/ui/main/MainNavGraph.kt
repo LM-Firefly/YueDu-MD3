@@ -194,6 +194,12 @@ fun MainActivity.mainEntryProvider(
     entry<MainRouteSourceLogin>(
         metadata = ModalOverlaySceneStrategy.modalOverlay(),
     ) { route ->
+        DisposableEffect(route) {
+            MainActivity.hasActiveSourceLoginRoute = true
+            onDispose {
+                MainActivity.hasActiveSourceLoginRoute = false
+            }
+        }
         val viewModel = koinViewModel<SourceLoginViewModel>(
             key = "SourceLogin:${route.type}:${route.sourceKey}:${route.bookUrl}",
         )
@@ -948,10 +954,10 @@ fun MainActivity.mainEntryProvider(
             openUrl = route.openUrl,
             startPage = route.startPage,
             onBackClick = { onNavigateBack() },
-            onOpenArticles = { sortUrl ->
+            onOpenArticles = { sortUrl, targetOrigin ->
                 onNavigateToRoute(
                     MainRouteRssSort(
-                        sourceUrl = route.origin,
+                        sourceUrl = targetOrigin ?: route.origin,
                         sortUrl = sortUrl
                     )
                 )
