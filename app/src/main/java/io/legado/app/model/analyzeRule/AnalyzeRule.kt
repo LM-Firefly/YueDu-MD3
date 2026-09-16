@@ -14,10 +14,10 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.RssArticle
+import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.CacheManager
 import io.legado.app.help.JsExtensions
-import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.BackstageWebView
 import io.legado.app.help.http.CookieStore
 import io.legado.app.help.source.getShareScope
@@ -42,6 +42,7 @@ import org.apache.commons.text.StringEscapeUtils
 import org.jsoup.nodes.Node
 import org.mozilla.javascript.NativeObject
 import org.mozilla.javascript.Scriptable
+import org.koin.core.context.GlobalContext
 import java.lang.ref.WeakReference
 import java.net.URL
 import java.util.Locale
@@ -78,6 +79,7 @@ class AnalyzeRule(
 
     private val stringRuleCache = hashMapOf<String, List<SourceRule>>()
     private val regexCache = hashMapOf<String, Regex?>()
+    private val cacheSettingsGateway get() = GlobalContext.get().get<DownloadCacheSettingsGateway>()
     private val scriptCache = hashMapOf<String, CompiledScript>()
     private var topScopeRef: WeakReference<Scriptable>? = null
     private var evalJSCallCount = 0
@@ -175,7 +177,7 @@ class AnalyzeRule(
                 url = baseUrl,
                 html = content.toString(),
                 javaScript = jsStr,
-                headerMap = getSource()?.getHeaderMap(AppConfig.userAgent, true),
+                headerMap = getSource()?.getHeaderMap(cacheSettingsGateway.currentSettings.userAgent, true),
                 tag = getSource()?.getKey(),
                 cacheFirst = true,
                 timeout = 10000,

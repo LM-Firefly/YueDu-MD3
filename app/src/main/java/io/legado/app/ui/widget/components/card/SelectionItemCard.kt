@@ -207,14 +207,6 @@ fun SelectionItemCardContent(
         } else {
             ListItem(
                 modifier = Modifier.weight(1f),
-                headlineContent = {
-                    AppText(
-                        text = title,
-                        style = LegadoTheme.typography.titleSmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
                 supportingContent = when {
                     supportingContent != null -> supportingContent
                     !subtitle.isNullOrBlank() -> {
@@ -230,7 +222,14 @@ fun SelectionItemCardContent(
                     else -> null
                 },
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-            )
+            ) {
+                AppText(
+                    text = title,
+                    style = LegadoTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
         Row(

@@ -499,7 +499,11 @@ internal object HtmlParser {
             "ul", "ol" -> parseList(element, style, inheritedLink, paragraphs)
             "table" -> element.select("tr").forEach { row ->
                 val content = mutableListOf<HtmlInline>()
-                row.select(":scope > th, :scope > td").forEachIndexed { index, cell ->
+                // jsoup 1.16.2 (intentionally pinned for rule compatibility) does not support
+                // the CSS :scope pseudo-selector. Reading direct children also expresses the
+                // intended table-cell semantics without relying on selector support.
+                row.children().filter { it.normalName() == "th" || it.normalName() == "td" }
+                    .forEachIndexed { index, cell ->
                     if (index > 0) appendText(content, "  ", style, inheritedLink)
                     cell.childNodes().forEach { parseInline(it, style, inheritedLink, content) }
                 }

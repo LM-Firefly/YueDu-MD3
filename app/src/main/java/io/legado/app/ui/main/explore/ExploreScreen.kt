@@ -398,13 +398,6 @@ fun ExploreSourceHeader(
             colors = ListItemDefaults.colors(
                 containerColor = Color.Transparent
             ),
-            headlineContent = {
-                AppText(
-                    text = item.bookSourceName,
-                    style = LegadoTheme.typography.titleMedium,
-                    color = contentColor
-                )
-            },
             trailingContent = {
                 AnimatedContent(
                     targetState = loadingKinds,
@@ -466,7 +459,13 @@ fun ExploreSourceHeader(
                         onClick = { onDelete(); showMenu = false }
                     )
                 }
-            }
-        )
+            },
+        ) {
+            AppText(
+                text = item.bookSourceName,
+                style = LegadoTheme.typography.titleMedium,
+                color = contentColor
+            )
+        }
     }
 }

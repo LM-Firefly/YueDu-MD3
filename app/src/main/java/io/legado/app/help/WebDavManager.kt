@@ -6,7 +6,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.exception.NoStackTraceException
-import io.legado.app.help.config.AppConfig
+import io.legado.app.domain.gateway.BackupSettingsGateway
 import io.legado.app.help.config.AppConfigStore
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.storage.Backup
@@ -17,7 +17,6 @@ import io.legado.app.lib.webdav.WebDav
 import io.legado.app.lib.webdav.WebDavException
 import io.legado.app.lib.webdav.WebDavFile
 import io.legado.app.model.remote.RemoteBookWebDav
-import io.legado.app.ui.config.backupConfig.BackupConfig
 import io.legado.app.utils.AlphanumComparator
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
@@ -41,6 +40,7 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.koin.core.context.GlobalContext
 import java.io.File
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -71,6 +71,8 @@ sealed class WebDavState {
 class WebDavManager(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
+
+    private val backupGateway by lazy { GlobalContext.get().get<BackupSettingsGateway>() }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val configFlow = MutableStateFlow(readConfig())
@@ -213,7 +215,7 @@ class WebDavManager(
         onSuccess: (() -> Unit)? = null
     ) {
         val auth = requireAuthorization()
-        if (!AppConfig.syncBookProgress) return
+        if (!backupGateway.currentSettings.syncBookProgress) return
         if (!NetworkUtils.isAvailable()) return
         try {
             val bookProgress = BookProgress(book)
@@ -231,7 +233,7 @@ class WebDavManager(
 
     suspend fun uploadBookProgress(bookProgress: BookProgress, onSuccess: (() -> Unit)? = null) {
         val auth = requireAuthorization()
-        if (!AppConfig.syncBookProgress) return
+        if (!backupGateway.currentSettings.syncBookProgress) return
         if (!NetworkUtils.isAvailable()) return
         val json = GSON.toJson(bookProgress)
         val url = getProgressUrl(bookProgress.name, bookProgress.author)
@@ -285,12 +287,13 @@ class WebDavManager(
     }
 
     private fun readConfig(): WebDavConfig {
+        val settings = backupGateway.currentSettings
         return WebDavConfig(
-            url = BackupConfig.webDavUrl,
-            account = BackupConfig.webDavAccount,
-            password = BackupConfig.webDavPassword,
-            dir = BackupConfig.webDavDir,
-            deviceName = BackupConfig.webDavDeviceName
+            url = settings.webDavUrl,
+            account = settings.webDavAccount,
+            password = settings.webDavPassword,
+            dir = settings.webDavDir,
+            deviceName = settings.webDavDeviceName
         )
     }
 

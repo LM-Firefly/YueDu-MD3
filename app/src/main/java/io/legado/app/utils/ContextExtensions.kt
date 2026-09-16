@@ -41,13 +41,14 @@ import io.legado.app.data.entities.Book
 import io.legado.app.help.IntentHelp
 import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isImage
-import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.AppConfigStore
 import io.legado.app.help.config.SettingsWriter
-import io.legado.app.ui.config.readMangaConfig.ReadMangaConfig
+import io.legado.app.domain.gateway.BookshelfSettingsGateway
+import io.legado.app.domain.gateway.MangaSettingsGateway
 import io.legado.app.ui.main.MainActivity
 import io.legado.app.ui.main.bookshelf.BookShelfItem
 import kotlinx.coroutines.runBlocking
+import org.koin.core.context.GlobalContext
 import splitties.systemservices.clipboardManager
 import splitties.systemservices.connectivityManager
 import splitties.systemservices.uiModeManager
@@ -62,19 +63,25 @@ inline fun <reified A : Activity> Context.startActivity(configIntent: Intent.() 
     startActivity(intent)
 }
 
+private val mangaSettingsGateway
+    get() = GlobalContext.get().get<MangaSettingsGateway>()
+
+private val bookshelfSettingsGateway
+    get() = GlobalContext.get().get<BookshelfSettingsGateway>()
+
 fun Context.startActivityForBook(
     book: Book,
     configIntent: Intent.() -> Unit = {},
 ) {
     val intent = when {
         book.isAudio -> MainActivity.createAudioPlayIntent(this, book.bookUrl)
-        book.isImage && ReadMangaConfig.showMangaUi ->
+        book.isImage && mangaSettingsGateway.currentSettings.showMangaUi ->
             MainActivity.createReadMangaIntent(this, book.bookUrl)
 
         else -> MainActivity.createReadBookIntent(this, book.bookUrl)
     }
     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    if (book.isAudio || (book.isImage && ReadMangaConfig.showMangaUi)) {
+    if (book.isAudio || (book.isImage && mangaSettingsGateway.currentSettings.showMangaUi)) {
         intent.putExtra("bookUrl", book.bookUrl)
     }
     intent.apply(configIntent)
@@ -87,13 +94,13 @@ fun Context.startActivityForBook(
 ) {
     val intent = when {
         book.isAudio -> MainActivity.createAudioPlayIntent(this, book.bookUrl)
-        book.isImage && ReadMangaConfig.showMangaUi ->
+        book.isImage && mangaSettingsGateway.currentSettings.showMangaUi ->
             MainActivity.createReadMangaIntent(this, book.bookUrl)
 
         else -> MainActivity.createReadBookIntent(this, book.bookUrl)
     }
     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    if (book.isAudio || (book.isImage && ReadMangaConfig.showMangaUi)) {
+    if (book.isAudio || (book.isImage && mangaSettingsGateway.currentSettings.showMangaUi)) {
         intent.putExtra("bookUrl", book.bookUrl)
     }
     intent.apply(configIntent)
@@ -457,16 +464,16 @@ val Context.isDebuggable: Boolean
 
 val Context.bookshelfLayoutMode: Int
     get() = if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-        AppConfig.bookshelfLayoutModeLandscape
+        bookshelfSettingsGateway.currentSettings.bookshelfLayoutModeLandscape
     } else {
-        AppConfig.bookshelfLayoutModePortrait
+        bookshelfSettingsGateway.currentSettings.bookshelfLayoutModePortrait
     }
 
 val Context.bookshelfLayoutGrid: Int
     get() = if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-        AppConfig.bookshelfLayoutGridLandscape
+        bookshelfSettingsGateway.currentSettings.bookshelfLayoutGridLandscape
     } else {
-        AppConfig.bookshelfLayoutGridPortrait
+        bookshelfSettingsGateway.currentSettings.bookshelfLayoutGridPortrait
     }
 
 fun Context.themeColor(attr: Int): Int {

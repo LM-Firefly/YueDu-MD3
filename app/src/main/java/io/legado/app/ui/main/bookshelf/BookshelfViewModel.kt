@@ -24,9 +24,9 @@ import io.legado.app.domain.usecase.RefreshTocUseCase
 import io.legado.app.domain.usecase.UpdateBooksGroupUseCase
 import io.legado.app.domain.gateway.BookshelfSettingsGateway
 import io.legado.app.domain.gateway.AppShellSettingsGateway
+import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
 import io.legado.app.domain.gateway.ThemeSettingsGateway
 import io.legado.app.exception.NoStackTraceException
-import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.CacheBook
 import io.legado.app.model.SourceCallBack
@@ -92,6 +92,7 @@ class BookshelfViewModel(
     private val bookshelfSettingsGateway: BookshelfSettingsGateway,
     private val appShellSettingsGateway: AppShellSettingsGateway,
     private val themeSettingsGateway: ThemeSettingsGateway,
+    private val downloadCacheSettingsGateway: DownloadCacheSettingsGateway,
 ) : BaseViewModel(application) {
     private var addBookJob: Coroutine<*>? = null
 
@@ -144,7 +145,8 @@ class BookshelfViewModel(
     val scrollTrigger = _scrollTrigger.asSharedFlow()
 
     private val updateConcurrency: Int
-        get() = AppConfig.threadCount.coerceIn(1, AppConst.MAX_THREAD)
+        get() = downloadCacheSettingsGateway.currentSettings.threadCount
+            .coerceIn(1, AppConst.MAX_THREAD)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val updateDispatcher: CoroutineDispatcher
@@ -313,7 +315,7 @@ class BookshelfViewModel(
                 }
                 combine(flows) { results ->
                     results.fold(persistentMapOf<Long, ImmutableList<BookUiItem>>()) { acc, (id, list) ->
-                        acc.put(id, list)
+                        acc.putting(id, list)
                     }
                 }
             }
@@ -398,8 +400,8 @@ class BookshelfViewModel(
                 var previews = persistentMapOf<Long, ImmutableList<BookUiItem>>()
                 var counts = persistentMapOf<Long, Int>()
                 results.forEach { (groupId, count, preview) ->
-                    counts = counts.put(groupId, count)
-                    previews = previews.put(groupId, preview.toImmutableList())
+                    counts = counts.putting(groupId, count)
+                    previews = previews.putting(groupId, preview.toImmutableList())
                 }
                 GroupPreviewState(previews, counts, allBookCount)
             }
@@ -1080,9 +1082,12 @@ class BookshelfViewModel(
     }
 
     private fun addDownload(source: BookSource, book: Book) {
-        if (AppConfig.preDownloadNum == 0) return
+        if (downloadCacheSettingsGateway.currentSettings.preDownloadNum == 0) return
         val endIndex =
-            min(book.totalChapterNum - 1, book.durChapterIndex + AppConfig.preDownloadNum)
+            min(
+                book.totalChapterNum - 1,
+                book.durChapterIndex + downloadCacheSettingsGateway.currentSettings.preDownloadNum
+            )
         val cacheBook = CacheBook.getOrCreate(source, book)
         cacheBook.addDownload(book.durChapterIndex, endIndex)
     }
@@ -1096,7 +1101,7 @@ class BookshelfViewModel(
             )
         }
         eventListenerSource.clear()
-        if (AppConfig.preDownloadNum == 0) return
+        if (downloadCacheSettingsGateway.currentSettings.preDownloadNum == 0) return
         cacheBookJob?.cancel()
         cacheBookJob = viewModelScope.launch(updateDispatcher) {
             launch {

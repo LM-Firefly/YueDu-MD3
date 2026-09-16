@@ -15,7 +15,7 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -79,7 +79,7 @@ private fun ReadAloudDetachedCapsule(onIntent: (ReadBookIntent) -> Unit) {
     ) {
         MediumTonalButton(
             onClick = { onIntent(ReadBookIntent.BackToSpeakingPosition) },
-            icon = Icons.Default.VolumeUp,
+            icon = Icons.AutoMirrored.Filled.VolumeUp,
             text = stringResource(R.string.back_to_speaking_position),
             contentDescription = stringResource(R.string.back_to_speaking_position),
         )

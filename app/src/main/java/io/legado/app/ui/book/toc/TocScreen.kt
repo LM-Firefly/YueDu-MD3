@@ -357,7 +357,7 @@ fun TocScreen(
 
     LaunchedEffect(state.items, book) {
         if (!hasAutoScrolled && state.items.isNotEmpty() && book != null) {
-            val durIndex = book?.durChapterIndex ?: -1
+            val durIndex = book.durChapterIndex
             val targetIndex = state.items.indexOfFirst { it.id == durIndex || it.isDur }
             if (targetIndex != -1) {
                 delay(100) 
@@ -482,7 +482,7 @@ fun TocScreen(
                                 RoundDropdownMenuItem(
                                     text = stringResource(R.string.local_book_toc_rule),
                                     onClick = {
-                                        onEditLocalTocRule(book?.tocUrl)
+                                        onEditLocalTocRule(book.tocUrl)
                                         dismiss()
                                     }
                                 )
@@ -995,7 +995,7 @@ fun BookmarkListContent(
 
     LaunchedEffect(bookmarks, book?.durChapterIndex) {
         if (bookmarks.isNotEmpty() && book != null) {
-            val durIndex = book!!.durChapterIndex
+            val durIndex = book.durChapterIndex
             var scrollPos = 0
             for ((index, bookmark) in bookmarks.withIndex()) {
                 if (bookmark.chapterIndex >= durIndex) break

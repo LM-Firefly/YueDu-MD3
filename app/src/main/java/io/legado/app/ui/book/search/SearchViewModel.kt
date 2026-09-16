@@ -2,6 +2,7 @@ package io.legado.app.ui.book.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.data.local.preferences.LocalPreferencesKeys
@@ -20,7 +21,6 @@ import io.legado.app.domain.usecase.ExploreBooksUseCase
 import io.legado.app.domain.usecase.ResolveBookShelfStateUseCase
 import io.legado.app.domain.usecase.SearchBooksUseCase
 import io.legado.app.domain.usecase.SearchRunEvent
-import io.legado.app.ui.config.otherConfig.OtherConfig
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.collections.immutable.toImmutableList
@@ -55,6 +55,7 @@ class SearchViewModel(
     private val addToBookshelfUseCase: AddToBookshelfUseCase,
     private val checkBookContentQualityUseCase: CheckBookContentQualityUseCase,
     private val localPreferencesRepository: SettingsRepository,
+    private val downloadCacheSettingsGateway: DownloadCacheSettingsGateway,
 ) : ViewModel() {
 
     private val searchLayoutMode = localPreferencesRepository
@@ -588,7 +589,7 @@ class SearchViewModel(
                             page = page,
                             scope = BookSearchScope(searchScope.toString()),
                             matchMode = _uiState.value.matchMode,
-                            concurrency = OtherConfig.threadCount,
+                            concurrency = downloadCacheSettingsGateway.currentSettings.threadCount,
                             types = _uiState.value.selectedSourceTypes.takeIf { it.isNotEmpty() },
                         ),
                         searchControl

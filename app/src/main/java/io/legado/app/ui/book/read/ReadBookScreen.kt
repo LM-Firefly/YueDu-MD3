@@ -1,6 +1,5 @@
 package io.legado.app.ui.book.read
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Checkbox
@@ -68,9 +67,71 @@ import org.koin.compose.koinInject
 import io.legado.app.model.BookCover as BookCoverModel
 
 /**
- * Stateless ReadBook screen — renders BackHandler + dialogs + sheets.
- * ReadView is hosted in the XML layout, not here.
+ * Stateless reader overlays: back handling, dialogs and sheets.
+ * [ReadBookRouteScreen] owns the Compose Canvas reading surface.
  */
+@Composable
+fun ReadBookOverlayRoute(
+    viewModel: ReadBookViewModel,
+    state: ReadBookUiState,
+    preferences: ReadPreferences,
+    onOpenTextSelectMenuConfig: () -> Unit,
+    onPickBookmarkBadgeImage: () -> Unit,
+    onResetBookmarkBadge: () -> Unit,
+) {
+    val aiActive = rememberFeatureActivated(
+        state.activeSheet is ReadBookSheet.ChapterSummary ||
+            state.activeSheet is ReadBookSheet.AiTextClean ||
+            state.activeSheet is ReadBookSheet.AiTextRewrite ||
+            state.activeSheet is ReadBookSheet.AiRewritePresetConfig
+    )
+    val highlightActive = rememberFeatureActivated(
+        state.activeSheet is ReadBookSheet.HighlightRuleConfig
+    )
+    val markingActive = rememberFeatureActivated(state.activeSheet is ReadBookSheet.Marking)
+    val contentEditActive = rememberFeatureActivated(state.activeSheet is ReadBookSheet.ContentEdit)
+    val contentProcessActive = rememberFeatureActivated(
+        state.activeSheet is ReadBookSheet.TextProcessing
+    )
+    val aiState = if (aiActive) {
+        viewModel.aiState.collectAsStateWithLifecycle().value
+    } else ReadAiUiState()
+    val highlightRuleState = if (highlightActive) {
+        viewModel.highlightRuleState.collectAsStateWithLifecycle().value
+    } else HighlightRuleConfigUiState()
+    val markingState = if (markingActive) {
+        viewModel.markingState.collectAsStateWithLifecycle().value
+    } else MarkingUiState()
+    val contentEditState = if (contentEditActive) {
+        viewModel.contentEditState.collectAsStateWithLifecycle().value
+    } else ContentEditUiState()
+    val contentProcessState = if (contentProcessActive) {
+        viewModel.contentProcessState.collectAsStateWithLifecycle().value
+    } else ContentProcessConfigUiState()
+    ReadBookScreen(
+        state = state,
+        aiState = aiState,
+        highlightRuleState = highlightRuleState,
+        markingState = markingState,
+        contentEditState = contentEditState,
+        contentProcessState = contentProcessState,
+        preferences = preferences,
+        onIntent = viewModel::onIntent,
+        onOpenTextSelectMenuConfig = onOpenTextSelectMenuConfig,
+        onPickBookmarkBadgeImage = onPickBookmarkBadgeImage,
+        onResetBookmarkBadge = onResetBookmarkBadge,
+    )
+}
+
+@Composable
+private fun rememberFeatureActivated(active: Boolean): Boolean {
+    var activated by remember { mutableStateOf(active) }
+    LaunchedEffect(active) {
+        if (active) activated = true
+    }
+    return active || activated
+}
+
 @Composable
 fun ReadBookScreen(
     state: ReadBookUiState,
@@ -81,21 +142,10 @@ fun ReadBookScreen(
     contentProcessState: ContentProcessConfigUiState,
     preferences: ReadPreferences,
     onIntent: (ReadBookIntent) -> Unit,
-    onBack: () -> Unit,
     onOpenTextSelectMenuConfig: () -> Unit,
     onPickBookmarkBadgeImage: () -> Unit,
     onResetBookmarkBadge: () -> Unit,
 ) {
-    BackHandler {
-        when {
-            state.activeSheet != null -> onIntent(ReadBookIntent.DismissSheet)
-            state.isShowingSearchResult -> onIntent(ReadBookIntent.ExitSearch)
-            state.isAutoPage -> onIntent(ReadBookIntent.StopAutoPage)
-            state.menuState.canNavigateBack -> onIntent(ReadBookIntent.ReadMenuBack)
-            else -> onIntent(ReadBookIntent.CloseReadBook())
-        }
-    }
-
     // Dialogs driven by activeDialog state
     val restoreDialog = state.activeDialog as? ReadBookDialog.ConfirmRestoreProgress
     val syncDialog = state.activeDialog as? ReadBookDialog.SureSyncProgress
@@ -551,6 +601,9 @@ fun ReadBookScreen(
         )
     }
 
+    val showCharsetSheet = state.activeSheet is ReadBookSheet.Charset
+    val showSimulatedReadingSheet = state.activeSheet is ReadBookSheet.SimulatedReading
+
     // AlertDialog-based sheets and special cases — conditionally composed
     when (state.activeSheet) {
         is ReadBookSheet.ClickActionConfig -> {
@@ -586,12 +639,14 @@ fun ReadBookScreen(
 
         is ReadBookSheet.Charset -> {
             CharsetConfigSheet(
+                show = showCharsetSheet,
                 onDismissRequest = dismissSheet,
             )
         }
 
         is ReadBookSheet.SimulatedReading -> {
             SimulatedReadingSheet(
+                show = showSimulatedReadingSheet,
                 onDismissRequest = dismissSheet,
                 onApply = { onIntent(ReadBookIntent.ApplySimulatedReading) },
             )

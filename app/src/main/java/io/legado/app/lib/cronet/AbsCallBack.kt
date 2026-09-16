@@ -397,9 +397,15 @@ abstract class AbsCallBack(
             val requestBuilder = userResponse.request.newBuilder()
             if (HttpMethod.permitsRequestBody(method)) {
                 val responseCode = userResponse.code
-                val maintainBody = responseCode == HTTP_PERM_REDIRECT ||
+                // OkHttp 5.5 folds redirect status handling into redirectsToGet().
+                // PROPFIND is the only method whose body is retained for 301/302/303.
+                val maintainBody = method == "PROPFIND" ||
+                        responseCode == HTTP_PERM_REDIRECT ||
                         responseCode == HTTP_TEMP_REDIRECT
-                if (HttpMethod.redirectsToGet(method, responseCode)) {
+                if (HttpMethod.redirectsToGet(method, responseCode)
+                    && responseCode != HTTP_PERM_REDIRECT
+                    && responseCode != HTTP_TEMP_REDIRECT
+                ) {
                     requestBuilder.method("GET", null)
                 } else {
                     val requestBody = if (maintainBody) userResponse.request.body else null
@@ -432,6 +438,7 @@ abstract class AbsCallBack(
 
     inner class CronetBodySource : Source {
 
+        private var buffer: ByteBuffer? = ByteBuffer.allocateDirect(32 * 1024)
         private var closed = false
         private val timeout = readTimeoutMillis.toLong()
 
@@ -459,9 +466,11 @@ abstract class AbsCallBack(
                 return -1
             }
 
-            // 分配具有请求容量的临时缓冲区，以避免在Cronet可能正在使用共享缓冲区时修改其限制。
-            val readBuf = ByteBuffer.allocateDirect(byteCount.coerceAtMost(BUFFER_SIZE.toLong()).toInt())
-            request?.read(readBuf)
+            if (byteCount < buffer!!.limit()) {
+                buffer!!.limit(byteCount.toInt())
+            }
+
+            request?.read(buffer)
 
             val result = callbackResults.poll(timeout, TimeUnit.MILLISECONDS)
             if (result == null) {

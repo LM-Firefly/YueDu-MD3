@@ -2,6 +2,7 @@ package io.legado.app.ui.book.read
 
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.repository.ReadSettingsRepository
+import io.legado.app.feature.reader.core.navigation.ReaderPageContext
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isLocal
@@ -9,7 +10,6 @@ import io.legado.app.help.book.isLocalTxt
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.ReadBook
 import io.legado.app.model.webBook.WebBook
-import io.legado.app.ui.book.read.page.entities.TextPage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +32,8 @@ class ReadContentEditDelegate(
 ) {
 
     interface Host {
+        val currentCanvasPage: ReaderPageContext?
+
         fun setActiveSheet(sheet: ReadBookSheet?)
 
         suspend fun findChapter(bookUrl: String, chapterIndex: Int): BookChapter?
@@ -143,29 +145,12 @@ class ReadContentEditDelegate(
 
     // --- 光标定位：优先用打开弹层那一刻的可见首行，其次用锚点文本 ---
 
-    private fun currentPage(): TextPage? {
-        return ReadBook.curTextChapter?.getPage(ReadBook.durPageIndex)
-    }
+    private fun currentPage(): ReaderPageContext? = host.currentCanvasPage
+        ?.takeIf { it.chapterIndex == ReadBook.durChapterIndex }
 
-    private fun currentOffset(): Int {
-        val page = currentPage()
-        return page?.lines
-            ?.firstOrNull { !it.isTitle && it.text.isNotBlank() }
-            ?.chapterPosition
-            ?: page?.lines
-                ?.firstOrNull { !it.isTitle }
-                ?.chapterPosition
-            ?: ReadBook.durChapterPos
-    }
+    private fun currentOffset(): Int = currentPage()?.contentStartPosition ?: ReadBook.durChapterPos
 
-    private fun currentAnchor(): String? {
-        return currentPage()
-            ?.lines
-            ?.firstOrNull { !it.isTitle && it.text.isNotBlank() }
-            ?.text
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-    }
+    private fun currentAnchor(): String? = currentPage()?.anchorText
 
     private fun resolveCursorOffset(text: String): Int {
         if (text.isEmpty()) {

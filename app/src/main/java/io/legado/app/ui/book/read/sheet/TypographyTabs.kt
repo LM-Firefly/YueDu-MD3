@@ -13,16 +13,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AlignHorizontalCenter
-import androidx.compose.material.icons.filled.AlignHorizontalLeft
-import androidx.compose.material.icons.filled.AlignHorizontalRight
+import androidx.compose.material.icons.automirrored.filled.AlignHorizontalLeft
+import androidx.compose.material.icons.automirrored.filled.AlignHorizontalRight
 import androidx.compose.material.icons.filled.AspectRatio
-import androidx.compose.material.icons.filled.CallSplit
+import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.filled.CleanHands
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.CopyAll
 import androidx.compose.material.icons.filled.FormatAlignJustify
 import androidx.compose.material.icons.filled.FormatColorText
-import androidx.compose.material.icons.filled.FormatIndentIncrease
+import androidx.compose.material.icons.automirrored.filled.FormatIndentIncrease
 import androidx.compose.material.icons.filled.FormatItalic
 import androidx.compose.material.icons.filled.FormatLineSpacing
 import androidx.compose.material.icons.filled.FormatSize
@@ -32,7 +32,7 @@ import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LineWeight
 import androidx.compose.material.icons.filled.Minimize
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Segment
+import androidx.compose.material.icons.automirrored.filled.Segment
 import androidx.compose.material.icons.filled.SpaceBar
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Title
@@ -238,14 +238,14 @@ private fun PaddingSliders(
         title = stringResource(R.string.padding_left),
         value = left,
         valueRange = 0f..maxValue,
-        imageVector = Icons.Default.AlignHorizontalLeft,
+        imageVector = Icons.AutoMirrored.Filled.AlignHorizontalLeft,
         onValueChange = onLeftChange,
     )
     TinySliderSettingItem(
         title = stringResource(R.string.padding_right),
         value = right,
         valueRange = 0f..maxValue,
-        imageVector = Icons.Default.AlignHorizontalRight,
+        imageVector = Icons.AutoMirrored.Filled.AlignHorizontalRight,
         onValueChange = onRightChange,
     )
 }
@@ -356,7 +356,7 @@ internal fun TypographyBodyTab(
             value = indentCount.toFloat(),
             valueRange = 0f..4f,
             steps = 3,
-            imageVector = Icons.Default.FormatIndentIncrease,
+            imageVector = Icons.AutoMirrored.Filled.FormatIndentIncrease,
             onValueChange = { value ->
                 indentCount = value.toInt()
                 onIntent(ReadBookIntent.UpdateConfig(ConfigUpdate.ParagraphIndent("　".repeat(indentCount))))
@@ -391,7 +391,7 @@ internal fun TypographyBodyTab(
             value = paragraphSpacing,
             valueRange = 0f..20f,
             steps = 19,
-            imageVector = Icons.Default.Segment,
+            imageVector = Icons.AutoMirrored.Filled.Segment,
             valueFormat = { (it / 10f).toString() },
             onValueChange = { value ->
                 paragraphSpacing = value
@@ -520,7 +520,7 @@ internal fun TypographyTitleTab(
                 stringResource(R.string.split_title_by_regex),
             ),
             entryValues = arrayOf("0", "1", "2", "3"),
-            imageVector = Icons.Default.CallSplit,
+            imageVector = Icons.AutoMirrored.Filled.CallSplit,
             onValueChange = {
                 titleSegType = it.toInt()
                 onIntent(ReadBookIntent.UpdateConfig(ConfigUpdate.TitleSegType(titleSegType)))
@@ -692,7 +692,7 @@ internal fun TypographyHeaderTab(
             value = headerLeft,
             tipNames = tipNames,
             tipValues = tipValues,
-            imageVector = Icons.Default.AlignHorizontalLeft,
+            imageVector = Icons.AutoMirrored.Filled.AlignHorizontalLeft,
             onValueChange = { onTipChange(CustomTipTarget.HEADER_LEFT, it) },
         )
         TipPositionDropdown(
@@ -708,7 +708,7 @@ internal fun TypographyHeaderTab(
             value = headerRight,
             tipNames = tipNames,
             tipValues = tipValues,
-            imageVector = Icons.Default.AlignHorizontalRight,
+            imageVector = Icons.AutoMirrored.Filled.AlignHorizontalRight,
             onValueChange = { onTipChange(CustomTipTarget.HEADER_RIGHT, it) },
         )
 
@@ -808,7 +808,7 @@ internal fun TypographyFooterTab(
             value = footerLeft,
             tipNames = tipNames,
             tipValues = tipValues,
-            imageVector = Icons.Default.AlignHorizontalLeft,
+            imageVector = Icons.AutoMirrored.Filled.AlignHorizontalLeft,
             onValueChange = { onTipChange(CustomTipTarget.FOOTER_LEFT, it) },
         )
         TipPositionDropdown(
@@ -824,7 +824,7 @@ internal fun TypographyFooterTab(
             value = footerRight,
             tipNames = tipNames,
             tipValues = tipValues,
-            imageVector = Icons.Default.AlignHorizontalRight,
+            imageVector = Icons.AutoMirrored.Filled.AlignHorizontalRight,
             onValueChange = { onTipChange(CustomTipTarget.FOOTER_RIGHT, it) },
         )
 

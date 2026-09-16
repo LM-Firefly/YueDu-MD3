@@ -2,6 +2,7 @@ package io.legado.app.service
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -16,6 +17,21 @@ class TTSReadAloudProgressTest {
         }
 
         assertFalse(BaseReadAloudService.speechDrivingNavigation)
+    }
+
+    @Test
+    fun utteranceIdBindsPlaybackSessionAndParagraphIndex() {
+        assertEquals("Legado3:7", ttsUtteranceId("Legado", 3, 7))
+    }
+
+    @Test
+    fun utteranceIdChangesWithSessionSoStaleCallbacksAreRejections() {
+        // 同一段落下标, 会话号递增后 id 不同:
+        // 旧会话(暂停/停止/换章后迟到)的 onDone 不会命中新队列
+        val current = ttsUtteranceId("Legado", 5, 0)
+        assertNotEquals(current, ttsUtteranceId("Legado", 6, 0))
+        // 不同段落下标在同会话内仍然可区分
+        assertNotEquals(current, ttsUtteranceId("Legado", 5, 1))
     }
 
     @Test

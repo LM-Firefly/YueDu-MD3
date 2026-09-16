@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Login
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CleaningServices
 import androidx.compose.material.icons.filled.OpenInBrowser
@@ -27,7 +28,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -289,7 +289,7 @@ fun RssReadRouteScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         AppScaffold(
-            disableHazeSource = true,
+            disableContentSampling = true,
             topBar = {
                 GlassSmallTopAppBar(
                     title = pageTitle.ifBlank { defaultTopBarTitle },
@@ -348,7 +348,7 @@ fun RssReadRouteScreen(
                                         R.string.read_aloud
                                     ),
                                     leadingIcon = {
-                                        MenuItemIcon(if (isSpeaking) Icons.Default.Stop else Icons.Default.VolumeUp)
+                                        MenuItemIcon(if (isSpeaking) Icons.Default.Stop else Icons.AutoMirrored.Filled.VolumeUp)
                                     },
                                     onClick = {
                                         dismiss()

@@ -5,11 +5,11 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.TxtTocRule
+import io.legado.app.domain.gateway.ReadSettingsGateway
 import io.legado.app.exception.EmptyFileException
 import io.legado.app.help.DefaultData
 import io.legado.app.help.book.isLocalModified
 import io.legado.app.help.book.upKind
-import io.legado.app.ui.config.readConfig.ReadConfig
 import io.legado.app.utils.EncodingDetect
 import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.StringUtils
@@ -18,8 +18,11 @@ import java.io.FileNotFoundException
 import java.nio.charset.Charset
 import java.util.regex.PatternSyntaxException
 import kotlin.math.min
+import org.koin.core.context.GlobalContext
 
 class TextFile(private var book: Book) {
+
+    private val readSettingsGateway get() = GlobalContext.get().get<ReadSettingsGateway>()
 
     @Suppress("ConstPropertyName")
     companion object {
@@ -359,7 +362,7 @@ class TextFile(private var book: Book) {
         val toc = arrayListOf<BookChapter>()
         var bookWordCount = 0
         val maxByteLengthWithNoToc = maxLengthWithNoTocBytes(
-            charset, ReadConfig.maxLengthWithNoToc
+            charset, readSettingsGateway.currentSettings.maxLengthWithNoToc
         )
         LocalBook.getBookInputStream(book).use { bis ->
             //block的个数
@@ -511,7 +514,7 @@ class TextFile(private var book: Book) {
         return try {
             Regex(volumeRule, RegexOption.MULTILINE)
         } catch (e: PatternSyntaxException) {
-            AppLog.put("TXT分卷规则正则语法错误:${rule?.name}\n$e", e)
+            AppLog.put("TXT分卷规则正则语法错误:${rule.name}\n$e", e)
             null
         }
     }

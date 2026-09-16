@@ -22,8 +22,10 @@ data class PageEstimateConfig(
     val doublePage: Boolean = false,
     val useZhLayout: Boolean = false,
     val textFullJustify: Boolean = false,
+    val imageLayoutKey: String = "",
     val contentKey: String = "",
     val textEngineVersion: Int = TEXT_ENGINE_VERSION,
+    val titleLayoutKey: String = "",
 ) {
     init {
         require(contentWidthPx > 0)
@@ -58,7 +60,9 @@ data class PageEstimateConfig(
         add(doublePage)
         add(useZhLayout)
         add(textFullJustify)
+        add(imageLayoutKey)
         add(textEngineVersion)
+        add(titleLayoutKey)
         if (includeContentKey) add(contentKey)
     }.value
 

@@ -5,17 +5,34 @@ import android.graphics.drawable.Drawable
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.graphics.toColorInt
 import com.google.android.material.color.MaterialColors
+import io.legado.app.domain.gateway.AppShellSettingsGateway
+import io.legado.app.domain.gateway.ThemeSettingsGateway
 import io.legado.app.model.ReadSessionState
-import io.legado.app.ui.config.readConfig.ReadConfig
 import io.legado.app.utils.BitmapUtils
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.externalFiles
+import io.legado.app.utils.isNightMode
 import io.legado.app.utils.printOnDebug
 import io.legado.app.utils.resizeAndRecycle
+import io.legado.app.utils.sysConfiguration
 import splitties.init.appCtx
+import org.koin.core.context.GlobalContext
 import java.io.File
 
 object ReadStyleResolver {
+
+    private val shellGateway by lazy { GlobalContext.get().get<AppShellSettingsGateway>() }
+    private val themeGateway by lazy { GlobalContext.get().get<ThemeSettingsGateway>() }
+
+    private val isNightThemeCompat: Boolean
+        get() = when (shellGateway.currentSettings.themeMode) {
+            "1" -> false
+            "2" -> true
+            else -> sysConfiguration.isNightMode
+        }
+
+    private val isEInkModeCompat: Boolean
+        get() = themeGateway.currentSettings.appTheme == "4"
 
     enum class ReadStyleMode {
         Day,
@@ -29,16 +46,16 @@ object ReadStyleResolver {
     )
 
     fun currentMode(): ReadStyleMode {
-        val isNightTheme = ReadSessionState.isDarkThemeOverride ?: ReadConfig.isNightTheme
-        return resolveReadStyleMode(ReadConfig.isEInkMode, isNightTheme)
+        val isNightTheme = ReadSessionState.isDarkThemeOverride ?: isNightThemeCompat
+        return resolveReadStyleMode(isEInkModeCompat, isNightTheme)
     }
 
     fun currentMode(isNightTheme: Boolean): ReadStyleMode {
-        return resolveReadStyleMode(ReadConfig.isEInkMode, isNightTheme)
+        return resolveReadStyleMode(isEInkModeCompat, isNightTheme)
     }
 
     fun isNightTheme(): Boolean {
-        return ReadSessionState.isDarkThemeOverride ?: ReadConfig.isNightTheme
+        return ReadSessionState.isDarkThemeOverride ?: isNightThemeCompat
     }
 
     fun withCurrentBackground(

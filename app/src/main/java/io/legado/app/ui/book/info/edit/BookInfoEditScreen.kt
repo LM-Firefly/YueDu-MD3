@@ -55,7 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.legado.app.R
-import io.legado.app.ui.book.changecover.ChangeCoverDialog
+import io.legado.app.ui.book.info.ChangeCoverSheet
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.theme.fadingEdge
 import io.legado.app.ui.widget.components.AppScaffold
@@ -76,7 +76,6 @@ import io.legado.app.ui.widget.components.topbar.TopBarActionButton
 import io.legado.app.ui.widget.components.topbar.TopBarNavigationButton
 import io.legado.app.utils.SelectImageContract
 import io.legado.app.utils.launch
-import io.legado.app.utils.showDialogFragment
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -147,6 +146,17 @@ fun BookInfoEditContent(
     onOpenEventList: (String) -> Unit,
 ) {
     val context = LocalContext.current
+    var showChangeCoverSheet by remember { mutableStateOf(false) }
+    ChangeCoverSheet(
+        show = showChangeCoverSheet,
+        name = uiState.name,
+        author = uiState.author,
+        onDismissRequest = { showChangeCoverSheet = false },
+        onSelect = { coverUrl ->
+            viewModel.onCoverUrlChange(coverUrl)
+            showChangeCoverSheet = false
+        },
+    )
 
     val selectCover = rememberLauncherForActivityResult(SelectImageContract()) {
         it.uri?.let { uri ->
@@ -166,6 +176,12 @@ fun BookInfoEditContent(
                 name = uiState.name,
                 author = uiState.author,
                 path = uiState.coverUrl,
+                // 编辑页封面同样本地优先：编辑页封面请求不带书标识时，URL 被启动刷新轮换后
+                // 精确键会 miss，只能走慢速路径解析书源规则（执行 headerRule 里的登录检测脚本），
+                // 每次进编辑页都弹“未登录”提示。
+                // 传 bookUrl 后，书架/详情页缓存过的封面（含别名命中）直接本地返回，不碰书源。
+                bookUrl = uiState.book?.bookUrl,
+                preferCache = true,
                 modifier = Modifier
                     .width(110.dp)
             )
@@ -176,14 +192,7 @@ fun BookInfoEditContent(
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     MediumOutlinedButton(
-                        onClick = {
-                            (context as? BookInfoEditActivity)?.showDialogFragment(
-                                ChangeCoverDialog(
-                                    uiState.name,
-                                    uiState.author
-                                )
-                            )
-                        },
+                        onClick = { showChangeCoverSheet = true },
                         icon = Icons.Default.ImageSearch,
                         contentDescription = stringResource(R.string.refresh_cover)
                     )

@@ -17,7 +17,6 @@ import io.legado.app.domain.gateway.AppShellSettingsGateway
 import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.TTS
-import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
 import io.legado.app.help.webView.WebJsExtensions
@@ -56,7 +55,7 @@ data class ReadRssSettings(
 class ReadRssViewModel(
     application: Application,
     appShellSettingsGateway: AppShellSettingsGateway,
-    downloadCacheSettingsGateway: DownloadCacheSettingsGateway,
+    private val downloadCacheSettingsGateway: DownloadCacheSettingsGateway,
     private val rssRepository: RssRepository,
     private val articleRepository: RssArticleRepository,
     private val favoriteRepository: RssFavoriteRepository,
@@ -106,7 +105,8 @@ class ReadRssViewModel(
             rssSource = rssRepository.getByKey(args.origin)
             hasPreloadJs = !rssSource?.preloadJs.isNullOrBlank()
             headerMap = runScriptWithContext {
-                rssSource?.getHeaderMap(AppConfig.userAgent) ?: emptyMap()
+                rssSource?.getHeaderMap(downloadCacheSettingsGateway.currentSettings.userAgent)
+                    ?: emptyMap()
             }
             isStartPage = args.startPage
             if (isStartPage) {

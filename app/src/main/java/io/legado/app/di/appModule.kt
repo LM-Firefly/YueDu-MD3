@@ -176,6 +176,7 @@ import io.legado.app.domain.usecase.BuildSpeechPlanUseCase
 import io.legado.app.domain.usecase.CacheBookChaptersUseCase
 import io.legado.app.domain.usecase.ChangeBookSourceUseCase
 import io.legado.app.domain.usecase.ChangeSourceSearchUseCase
+import io.legado.app.domain.usecase.CheckBookContentQualityUseCase
 import io.legado.app.domain.usecase.CleanSelectedTextUseCase
 import io.legado.app.domain.usecase.ClearBookCacheUseCase
 import io.legado.app.domain.usecase.CoverAlbumUseCase
@@ -186,7 +187,6 @@ import io.legado.app.domain.usecase.ExportBookshelfUseCase
 import io.legado.app.domain.usecase.GenerateBookshelfAutoGroupPlanUseCase
 import io.legado.app.domain.usecase.GenerateChapterSummaryUseCase
 import io.legado.app.domain.usecase.GetChapterContentUseCase
-import io.legado.app.domain.usecase.CheckBookContentQualityUseCase
 import io.legado.app.domain.usecase.GetReadingProgressUseCase
 import io.legado.app.domain.usecase.HomeDashboardUseCase
 import io.legado.app.domain.usecase.IdentifyBookCharactersUseCase
@@ -211,6 +211,7 @@ import io.legado.app.domain.usecase.UploadReadingProgressUseCase
 import io.legado.app.domain.usecase.VerifyBookmarkTargetUseCase
 import io.legado.app.domain.usecase.WebDavBackupUseCase
 import io.legado.app.domain.usecase.readRecord.GetReadRecordOverviewUseCase
+import io.legado.app.feature.onboarding.OnboardingViewModel
 import io.legado.app.help.coil.CoverFetcher
 import io.legado.app.help.coil.CoverInterceptor
 import io.legado.app.help.config.ThemePackageManager
@@ -232,7 +233,6 @@ import io.legado.app.ui.book.bookmark.AllBookmarkViewModel
 import io.legado.app.ui.book.cache.manage.BookCacheManageViewModel
 import io.legado.app.ui.book.changecover.ChangeCoverViewModel
 import io.legado.app.ui.book.changesource.ChangeBookSourceComposeViewModel
-import io.legado.app.ui.book.changesource.ChangeBookSourceViewModel
 import io.legado.app.ui.book.changesource.ChangeChapterSourceViewModel
 import io.legado.app.ui.book.explore.ExploreShowViewModel
 import io.legado.app.ui.book.group.GroupViewModel
@@ -252,6 +252,7 @@ import io.legado.app.ui.book.knowledge.BookKnowledgeListViewModel
 import io.legado.app.ui.book.manage.BookshelfManageScreenViewModel
 import io.legado.app.ui.book.manga.MangaReaderViewModel
 import io.legado.app.ui.book.read.ReadBookViewModel
+import io.legado.app.ui.book.read.ReaderSessionViewModel
 import io.legado.app.ui.book.readRecord.ReadRecordOverviewViewModel
 import io.legado.app.ui.book.readRecord.ReadRecordViewModel
 import io.legado.app.ui.book.readaloud.cache.TtsCacheViewModel
@@ -590,6 +591,7 @@ val appModule = module {
     viewModelOf(::DownloadCacheConfigViewModel)
     viewModelOf(::ThemeConfigViewModel)
     viewModelOf(::ThemeManageViewModel)
+    viewModelOf(::OnboardingViewModel)
     viewModelOf(::BackupConfigViewModel)
     viewModelOf(::LabConfigViewModel)
     viewModelOf(::TranslationConfigViewModel)
@@ -710,6 +712,7 @@ val appModule = module {
         )
     }
     viewModelOf(::MangaReaderViewModel)
+    viewModelOf(::ReaderSessionViewModel)
     viewModel {
         ReadBookViewModel(
             application = get(),
@@ -754,7 +757,6 @@ val appModule = module {
     }
     viewModelOf(::ChangeCoverViewModel)
     viewModelOf(::ChangeBookSourceComposeViewModel)
-    viewModelOf(::ChangeBookSourceViewModel)
     viewModelOf(::ChangeChapterSourceViewModel)
     viewModelOf(::ExploreViewModel)
     viewModelOf(::RssViewModel)
@@ -774,7 +776,8 @@ val appModule = module {
             changeBookSourceUseCase = get(),
             clearBookCacheUseCase = get(),
             deleteBooksUseCase = get(),
-            updateBooksGroupUseCase = get()
+            updateBooksGroupUseCase = get(),
+            downloadCacheSettingsGateway = get()
         )
     }
 

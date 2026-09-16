@@ -48,10 +48,12 @@ class SystemTtsFileSynthesizer(
                     }
                 }
 
+                @Deprecated("Deprecated in Java")
                 override fun onError(failedId: String?) {
                     if (failedId == utteranceId && continuation.isActive) continuation.resume(false)
                 }
 
+                @Suppress("DEPRECATION")
                 override fun onError(failedId: String?, errorCode: Int) = onError(failedId)
             })
             if (instance.setSpeechRate(speechRate) == TextToSpeech.ERROR ||

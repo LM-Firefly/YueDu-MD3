@@ -262,12 +262,7 @@ val verifyConfigArchitecture = tasks.register<VerifyConfigArchitectureTask>(
             "io/legado/app/ui/association/AddToBookshelfDialog.kt" to 5,
             "io/legado/app/ui/association/ImportReplaceRuleDialog.kt" to 1,
             "io/legado/app/ui/association/ImportRssSourceDialog.kt" to 1,
-            "io/legado/app/ui/book/bookmark/BookmarkDialog.kt" to 2,
-            "io/legado/app/ui/book/changesource/ChangeBookSourceDialog.kt" to 1,
-            "io/legado/app/ui/book/group/GroupManageDialog.kt" to 2,
-            "io/legado/app/ui/book/group/GroupSelectDialog.kt" to 1,
             "io/legado/app/ui/book/read/ReadBookController.kt" to 3,
-            "io/legado/app/ui/book/read/page/provider/TextChapterLayout.kt" to 1,
             // 护栏缺席期间 main 新增（整书页码估算），随合并冻结
             "io/legado/app/ui/book/read/pageestimate/ExactChapterPageCountStore.kt" to 3,
             "io/legado/app/ui/book/search/SearchScope.kt" to 4,
@@ -276,8 +271,6 @@ val verifyConfigArchitecture = tasks.register<VerifyConfigArchitectureTask>(
             "io/legado/app/ui/rss/article/RssArticlesCompose.kt" to 1,
             "io/legado/app/ui/rss/read/RssJsExtensions.kt" to 8,
             "io/legado/app/ui/widget/dialog/BottomWebViewDialog.kt" to 1,
-            "io/legado/app/ui/widget/keyboard/KeyboardAssistsConfig.kt" to 7,
-            "io/legado/app/ui/widget/keyboard/KeyboardToolPop.kt" to 1,
         )
     )
 }

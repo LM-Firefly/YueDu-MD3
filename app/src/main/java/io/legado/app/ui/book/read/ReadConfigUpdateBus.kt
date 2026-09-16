@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.SharedFlow
 /**
  * Typed replacement for the legacy `EventBus.UP_CONFIG` integer-code channel.
  * Producers post [ConfigUpdateAction] sets; [ReadBookViewModel] collects and
- * forwards them to the ReadView as [ReadBookEffect.UpdateReadViewConfig].
+ * forwards them to the active reader renderer as [ReadBookEffect.UpdateReaderConfig].
  */
 object ReadConfigUpdateBus {
 

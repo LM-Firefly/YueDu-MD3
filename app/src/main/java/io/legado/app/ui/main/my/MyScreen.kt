@@ -58,7 +58,6 @@ import io.legado.app.ui.widget.components.settingItem.ClickableSettingItem
 import io.legado.app.ui.widget.components.settingItem.SwitchSettingItem
 import io.legado.app.ui.widget.components.topbar.GlassMediumFlexibleTopAppBar
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBarDefaults
-import io.legado.app.ui.widget.components.topbar.TopBarActionButton
 import org.koin.androidx.compose.koinViewModel
 
 
@@ -97,20 +96,7 @@ fun MyScreen(
         topBar = {
             GlassMediumFlexibleTopAppBar(
                 title = stringResource(R.string.my),
-                actions = {
-                    TopBarActionButton(
-                        onClick = {
-                            onNavigate(
-                                PrefClickEvent.ShowMd(
-                                    title = "",
-                                    path = "appHelp"
-                                )
-                            )
-                        },
-                        imageVector = Icons.AutoMirrored.Filled.HelpOutline,
-                        contentDescription = stringResource(R.string.help)
-                    )
-                },
+                actions = {},
                 scrollBehavior = scrollBehavior
             )
         }

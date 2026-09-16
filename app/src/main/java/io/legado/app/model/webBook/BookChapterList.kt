@@ -9,21 +9,23 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.rule.TocRule
+import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
+import io.legado.app.domain.gateway.OtherSettingsGateway
+import io.legado.app.domain.gateway.ReadSettingsGateway
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.exception.TocEmptyException
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.simulatedTotalChapterNum
-import io.legado.app.help.config.AppConfig
 import io.legado.app.model.Debug
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setChapter
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.model.analyzeRule.AnalyzeUrl
-import io.legado.app.ui.config.otherConfig.OtherConfig
 import io.legado.app.utils.isTrue
 import io.legado.app.utils.mapAsync
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.flow
+import org.koin.core.context.GlobalContext
 import org.mozilla.javascript.Context
 import splitties.init.appCtx
 import kotlin.coroutines.coroutineContext
@@ -32,6 +34,10 @@ import kotlin.coroutines.coroutineContext
  * 获取目录
  */
 object BookChapterList {
+
+    private val cacheSettingsGateway get() = GlobalContext.get().get<DownloadCacheSettingsGateway>()
+    private val otherSettingsGateway get() = GlobalContext.get().get<OtherSettingsGateway>()
+    private val readSettingsGateway get() = GlobalContext.get().get<ReadSettingsGateway>()
 
     suspend fun analyzeChapterList(
         bookSource: BookSource,
@@ -97,7 +103,7 @@ object BookChapterList {
                     for (urlStr in chapterData.second) {
                         emit(urlStr)
                     }
-                }.mapAsync(OtherConfig.threadCount) { urlStr ->
+                }.mapAsync(cacheSettingsGateway.currentSettings.threadCount) { urlStr ->
                     val analyzeUrl = AnalyzeUrl(
                         mUrl = urlStr,
                         source = bookSource,
@@ -155,8 +161,8 @@ object BookChapterList {
         book.durChapterTitle = list.getOrElse(book.durChapterIndex) { list.last() }
             .getDisplayTitle(
                 replaceRules,
-                book.getUseReplaceRule(AppConfig.replaceEnableDefault),
-                chineseConverterType = AppConfig.chineseConverterType,
+                book.getUseReplaceRule(otherSettingsGateway.currentSettings.replaceEnableDefault),
+                chineseConverterType = readSettingsGateway.currentSettings.chineseConverterType,
             )
         if (book.totalChapterNum < list.size) {
             book.lastCheckCount = list.size - book.totalChapterNum
@@ -168,8 +174,8 @@ object BookChapterList {
             list.getOrElse(book.simulatedTotalChapterNum() - 1) { list.last() }
                 .getDisplayTitle(
                     replaceRules,
-                    book.getUseReplaceRule(AppConfig.replaceEnableDefault),
-                    chineseConverterType = AppConfig.chineseConverterType,
+                    book.getUseReplaceRule(otherSettingsGateway.currentSettings.replaceEnableDefault),
+                    chineseConverterType = readSettingsGateway.currentSettings.chineseConverterType,
                 )
         coroutineContext.ensureActive()
         preserveChapterMetadata(list, book)

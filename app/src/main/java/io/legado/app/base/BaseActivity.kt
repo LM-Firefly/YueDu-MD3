@@ -30,10 +30,11 @@ import io.legado.app.BuildConfig
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.PreferKey
 import io.legado.app.constant.Theme
-import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ThemeConfigStore
 import io.legado.app.domain.gateway.AppLocaleGateway
+import io.legado.app.domain.gateway.AppShellSettingsGateway
 import io.legado.app.domain.gateway.AppUiConfigurationGateway
+import io.legado.app.domain.gateway.ThemeSettingsGateway
 import io.legado.app.domain.model.settings.AppUiConfiguration
 import io.legado.app.domain.model.settings.AppUiConfigurationDiff
 import io.legado.app.domain.model.settings.diffFrom
@@ -47,6 +48,7 @@ import io.legado.app.utils.getPrefString
 import io.legado.app.utils.hideSoftInput
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.setStatusBarColorAuto
+import io.legado.app.utils.sysConfiguration
 import io.legado.app.utils.themeColor
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.windowSize
@@ -67,6 +69,8 @@ abstract class BaseActivity<VB : ViewBinding>(
 
     private val appLocaleGateway by inject<AppLocaleGateway>()
     private val appUiConfigurationGateway by inject<AppUiConfigurationGateway>()
+    private val shellGateway by inject<AppShellSettingsGateway>()
+    private val themeGateway by inject<ThemeSettingsGateway>()
     private var lastUiConfiguration: AppUiConfiguration? = null
     private var lastPlatformConfiguration: Configuration? = null
     private var pendingControlledRecreate = false
@@ -104,7 +108,7 @@ abstract class BaseActivity<VB : ViewBinding>(
         window.decorView.disableAutoFill()
         AppContextWrapper.applyFont(this)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val enable = !AppConfig.isPredictiveBackEnabled
+            val enable = !shellGateway.currentSettings.predictiveBackEnabled
             if (enable) {
                 onBackInvokedDispatcher.registerOnBackInvokedCallback(
                     OnBackInvokedDispatcher.PRIORITY_DEFAULT
@@ -155,7 +159,11 @@ abstract class BaseActivity<VB : ViewBinding>(
             true,
             fullScreen
         )
-        val isDarkTheme = AppConfig.isNightTheme
+        val isDarkTheme = when (shellGateway.currentSettings.themeMode) {
+            "1" -> false
+            "2" -> true
+            else -> sysConfiguration.isNightMode
+        }
         WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = !isDarkTheme
     }
 
@@ -276,14 +284,14 @@ abstract class BaseActivity<VB : ViewBinding>(
                 }
 
                 // 必须在动态取色之后应用，否则会被动态配色的 surface/background 覆盖
-                if (AppConfig.customMode == "accent")
+                if (themeGateway.currentSettings.customMode == "accent")
                     setTheme(R.style.ThemeOverlay_WhiteBackground)
             }
 
             "13" -> setTheme(R.style.AppTheme_Transparent)
         }
 
-        if (AppConfig.pureBlack)
+        if (themeGateway.currentSettings.isPureBlack)
             setTheme(R.style.ThemeOverlay_PureBlack)
     }
 

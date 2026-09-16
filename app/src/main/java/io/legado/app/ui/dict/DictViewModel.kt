@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.data.entities.DictRule
 import io.legado.app.data.repository.DictRuleRepository
+import io.legado.app.model.analyzeRule.AnalyzeUrl
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +34,7 @@ class DictViewModel(
         when (intent) {
             is DictIntent.Load -> load(intent.word)
             is DictIntent.SelectRule -> selectRule(intent.index)
+            DictIntent.OpenSelectedRuleInWebView -> openSelectedRuleInWebView()
         }
     }
 
@@ -136,6 +138,28 @@ class DictViewModel(
                         )
                     }
                 }
+            }
+        }
+    }
+
+    private fun openSelectedRuleInWebView() {
+        val rule = dictRules.getOrNull(_uiState.value.selectedIndex) ?: return
+        val word = _uiState.value.word
+        if (word.isBlank()) return
+
+        viewModelScope.launch {
+            val url = try {
+                withContext(Dispatchers.IO) {
+                    AnalyzeUrl(rule.urlRule, key = word, coroutineContext = coroutineContext).url
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                _effects.emit(DictEffect.ShowToast(error.localizedMessage ?: "ERROR"))
+                return@launch
+            }
+            if (url.isNotBlank()) {
+                _effects.emit(DictEffect.OpenWebPage(rule.name, url))
             }
         }
     }

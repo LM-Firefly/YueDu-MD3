@@ -18,7 +18,6 @@ import io.legado.app.data.entities.BaseSource
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.CacheManager
 import io.legado.app.help.WebCacheManager
-import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.webView.WebJsExtensions
 import io.legado.app.help.webView.WebJsExtensions.Companion.getInjectionString
@@ -57,6 +56,8 @@ class BackstageWebView(
     private val result: String? = null,
     private val isRule: Boolean = false,
 ) {
+
+    private val cacheSettingsGateway get() = org.koin.core.context.GlobalContext.get().get<io.legado.app.domain.gateway.DownloadCacheSettingsGateway>()
 
     private val mHandler = Handler(Looper.getMainLooper())
     private var callback: Callback? = null
@@ -138,7 +139,7 @@ class BackstageWebView(
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.blockNetworkImage = true
-        settings.userAgentString = headerMap?.get(AppConst.UA_NAME) ?: AppConfig.userAgent
+        settings.userAgentString = headerMap?.get(AppConst.UA_NAME) ?: cacheSettingsGateway.currentSettings.userAgent
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         settings.cacheMode = if (cacheFirst) {
             WebSettings.LOAD_CACHE_ELSE_NETWORK

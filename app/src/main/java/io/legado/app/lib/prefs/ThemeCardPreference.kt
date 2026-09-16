@@ -19,7 +19,6 @@ import com.google.android.material.card.MaterialCardView
 import io.legado.app.R
 import io.legado.app.constant.PreferKey
 import io.legado.app.domain.gateway.ThemeSettingsGateway
-import io.legado.app.ui.config.themeConfig.ThemeConfig
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.activity
@@ -92,8 +91,8 @@ class ThemeCardPreference(context: Context, attrs: AttributeSet) : Preference(co
             holder.card.setOnClickListener {
                 if (value != currentValue) {
                     if (value == "13") {
-                        val hasLightBg = !ThemeConfig.bgImageLight.isNullOrEmpty()
-                        val hasDarkBg = !ThemeConfig.bgImageDark.isNullOrEmpty()
+                        val hasLightBg = !themeSettingsGateway.currentSettings.backgroundImageLight.isNullOrEmpty()
+                        val hasDarkBg = !themeSettingsGateway.currentSettings.backgroundImageDark.isNullOrEmpty()
                         if (!hasLightBg || !hasDarkBg) {
                             context.toastOnUi(R.string.transparent_theme_alarm)
                             return@setOnClickListener

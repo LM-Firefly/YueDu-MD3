@@ -14,7 +14,8 @@ import io.legado.app.domain.model.BookContentProcessEngine
 import io.legado.app.domain.model.TextProcessAction
 import io.legado.app.domain.model.TextProcessStyle
 import io.legado.app.exception.RegexTimeoutException
-import io.legado.app.help.config.AppConfig
+import io.legado.app.domain.gateway.OtherSettingsGateway
+import io.legado.app.domain.gateway.ReadSettingsGateway
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.utils.ChineseUtils
 import io.legado.app.utils.GSON
@@ -24,6 +25,7 @@ import io.legado.app.utils.replace
 import io.legado.app.utils.stackTraceStr
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CancellationException
+import org.koin.core.context.GlobalContext
 import splitties.init.appCtx
 import java.lang.ref.WeakReference
 import java.util.concurrent.CopyOnWriteArrayList
@@ -60,6 +62,9 @@ class ContentProcessor private constructor(
     private val titleReplaceRules = CopyOnWriteArrayList<ReplaceRule>()
     private val contentReplaceRules = CopyOnWriteArrayList<ReplaceRule>()
     val removeSameTitleCache = hashSetOf<String>()
+
+    private val otherGateway by lazy { GlobalContext.get().get<OtherSettingsGateway>() }
+    private val readGateway by lazy { GlobalContext.get().get<ReadSettingsGateway>() }
 
     init {
         upReplaceRules()
@@ -119,12 +124,12 @@ class ContentProcessor private constructor(
                 if (match != null) {
                     mContent = mContent.substring(match.range.last + 1)
                     sameTitleRemoved = true
-                } else if (useReplace && book.getUseReplaceRule(AppConfig.replaceEnableDefault)) {
+                } else if (useReplace && book.getUseReplaceRule(otherGateway.currentSettings.replaceEnableDefault)) {
                     title = Regex.escape(
                         chapter.getDisplayTitle(
                             contentReplaceRules,
                             chineseConvert = false,
-                            chineseConverterType = AppConfig.chineseConverterType,
+                            chineseConverterType = readGateway.currentSettings.chineseConverterType,
                         )
                     )
                     match = Regex("^(\\s|\\p{P}|${name})*${title}(\\s)*")
@@ -144,7 +149,7 @@ class ContentProcessor private constructor(
             if (chineseConvert) {
                 //简繁转换
                 try {
-                    when (AppConfig.chineseConverterType) {
+                    when (readGateway.currentSettings.chineseConverterType) {
                         1 -> mContent = ChineseUtils.t2s(mContent)
                         2 -> mContent = ChineseUtils.s2t(mContent)
                     }
@@ -153,14 +158,14 @@ class ContentProcessor private constructor(
                 }
             }
             val useHtmlMap = mutableMapOf<String, String>()
-            if (AppConfig.adaptSpecialStyle) { //html处理
+            if (readGateway.currentSettings.adaptSpecialStyle) { //html处理
                 mContent = AppPattern.useHtmlRegex.replace(mContent) { matchResult ->
                     val placeholder = "特殊格式的占位不应该被看见${useHtmlMap.size}。"
                     useHtmlMap[placeholder] = "\n${matchResult.value.replace("\n", "")}\n"
                     placeholder
                 }
             }
-            if (useReplace && book.getUseReplaceRule(AppConfig.replaceEnableDefault)) {
+            if (useReplace && book.getUseReplaceRule(otherGateway.currentSettings.replaceEnableDefault)) {
                 val replaceBook = book.toSearchBook()
                 //替换
                 effectiveReplaceRules = arrayListOf()
@@ -220,8 +225,8 @@ class ContentProcessor private constructor(
             //重新添加标题
             mContent = chapter.getDisplayTitle(
                 getTitleReplaceRules(),
-                useReplace = useReplace && book.getUseReplaceRule(AppConfig.replaceEnableDefault),
-                chineseConverterType = AppConfig.chineseConverterType,
+                useReplace = useReplace && book.getUseReplaceRule(otherGateway.currentSettings.replaceEnableDefault),
+                chineseConverterType = readGateway.currentSettings.chineseConverterType,
             ) + "\n" + mContent
         }
         if (isAndroid8) {

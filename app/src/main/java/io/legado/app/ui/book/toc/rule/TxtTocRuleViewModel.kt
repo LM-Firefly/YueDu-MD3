@@ -85,7 +85,7 @@ class TxtTocRuleViewModel(
     override fun TxtTocRule.toUiItem() =
         TxtTocRuleItemUi(id, name, enable, this, example = example ?: "")
 
-    @Suppress("DEPRECATION")
+    @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
     override fun filterData(data: List<TxtTocRule>, key: String): List<TxtTocRule> {
         val filtered = if (key.isEmpty()) data
         else data.filter { it.name.contains(key, ignoreCase = true) }

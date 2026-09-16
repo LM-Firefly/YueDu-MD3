@@ -27,7 +27,9 @@ from capture_reader_c3_baseline import (  # noqa: E402
 
 
 FIRST_FRAME_EXTRA = "readerFirstFrameStartedAtNanos"
-FRAME_PATTERN = re.compile(r"renderer=(legacy|compose) durationMs=([\d.]+)")
+FRAME_PATTERN = re.compile(
+    r"renderer=(legacy|compose(?:-canvas)?) (?:phase=(loading|content) )?durationMs=([\d.]+)"
+)
 
 
 def elapsed_realtime_nanos(adb: Adb) -> int:
@@ -61,7 +63,12 @@ def capture_mode(adb: Adb, package: str, mode: str, runs: int) -> dict[str, obje
         while time.monotonic() < deadline:
             logs = adb.run("logcat", "-d", "-s", "ReaderFirstFrame:I", "*:S")
             matches = FRAME_PATTERN.findall(logs)
-            matching = [float(value) for renderer, value in matches if renderer == mode]
+            matching = [
+                float(value)
+                for renderer, phase, value in matches
+                if (renderer == mode or renderer.startswith(f"{mode}-"))
+                and phase in ("", "content")
+            ]
             if matching:
                 duration = matching[-1]
                 break

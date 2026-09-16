@@ -323,7 +323,7 @@ private fun PageControlSettings(
     TinySliderSettingItem(
         title = stringResource(R.string.bookmark_badge_size),
         value = preferences.bookmarkBadgeSize.toFloat(),
-        valueRange = 6f..50f,
+        valueRange = 0f..50f,
         valueFormat = { "${it.roundToInt()}dp" },
         onValueChange = { onBookmarkBadgeSizeChange(it.roundToInt()) },
     )

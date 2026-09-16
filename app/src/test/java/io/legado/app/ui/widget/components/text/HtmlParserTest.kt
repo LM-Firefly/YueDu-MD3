@@ -69,4 +69,14 @@ class HtmlParserTest {
             doc.paragraphs.flatMap { it.content }.filterIsInstance<HtmlInline.Image>().single()
         assertEquals(null, image.click)
     }
+
+    @Test
+    fun tableWithDirectCellsIsParsedWithoutScopeSelector() {
+        val doc = HtmlParser.parse("<table><tr><th>Word</th><td>释义</td></tr></table>")
+
+        val text = doc.paragraphs.single().content
+            .filterIsInstance<HtmlInline.Text>()
+            .joinToString("") { it.value }
+        assertEquals("Word  释义", text)
+    }
 }

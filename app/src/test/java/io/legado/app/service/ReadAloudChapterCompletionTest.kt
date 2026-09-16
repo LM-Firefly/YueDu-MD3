@@ -58,7 +58,9 @@ class ReadAloudChapterCompletionTest {
     }
 
     @Test
-    fun chapterAlreadyAdvancedSkipsWithMatchingArmCleared() {
+    fun armedChapterFinishingWhileReaderBrowsedAheadStillStops() {
+        // 脱离浏览：页面已翻到第 6 章，朗读仍在第 5 章；定时臂标锚定的是
+        // 朗读中的第 5 章 —— 本章自然读完必须停止，不能被误判为"章节已推进"
         val decision = decideChapterCompletion(
             durChapterIndex = 6,
             finishedChapterIndex = 5,
@@ -66,7 +68,7 @@ class ReadAloudChapterCompletionTest {
             finishChapterSettingEnabled = true,
         )
 
-        assertEquals(ChapterCompletionAction.SKIP, decision.action)
+        assertEquals(ChapterCompletionAction.STOP, decision.action)
         assertEquals(true, decision.clearTimer)
     }
 
@@ -76,6 +78,21 @@ class ReadAloudChapterCompletionTest {
             durChapterIndex = 6,
             finishedChapterIndex = 5,
             finishChapterAtIndex = 3,
+            finishChapterSettingEnabled = true,
+        )
+
+        assertEquals(ChapterCompletionAction.SKIP, decision.action)
+        assertEquals(false, decision.clearTimer)
+    }
+
+    @Test
+    fun lateDuplicateCompletionAfterAdvanceSkipsInsteadOfDoubleAdvancing() {
+        // 双重触发竞态：首次完结已 ADVANCE 且臂标为空，迟到的同章完结
+        // 不得再次推进（否则跳过下一章）
+        val decision = decideChapterCompletion(
+            durChapterIndex = 6,
+            finishedChapterIndex = 5,
+            finishChapterAtIndex = NO_FINISH_CHAPTER,
             finishChapterSettingEnabled = true,
         )
 

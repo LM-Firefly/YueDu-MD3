@@ -3,6 +3,7 @@ package io.legado.app.ui.book.read
 import io.legado.app.R
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.repository.BookmarkRepository
+import io.legado.app.feature.reader.core.navigation.ReaderPageContext
 import io.legado.app.model.ReadBook
 import io.legado.app.model.ReaderBookmarkState
 import kotlinx.coroutines.CoroutineScope
@@ -45,6 +46,8 @@ class ReadBookmarkDelegate(
     private val toggleMutex = Mutex()
 
     interface Host {
+        val currentCanvasPage: ReaderPageContext?
+
         /** 打开/关闭书签弹层的同时收起阅读菜单。 */
         fun setActiveSheet(sheet: ReadBookSheet?)
 
@@ -87,28 +90,22 @@ class ReadBookmarkDelegate(
     /**
      * 下滑手势：本页无书签则直接存一条（不弹编辑器），已有则删掉离当前阅读位置最近的一条。
      *
-     * 页范围取 `[页首位置, 下一页页首位置)`——末页取到章节已排版长度，
-     * 与 [addForCurrentPage] 存入的 `ReadBook.durChapterPos` 落点一致。
-     * 消息页/空页与角标判定一致地跳过（页首位置取 `textLines.first()`，空页会抛异常）。
+     * 页范围取 `[页首位置, 下一页页首位置)`；Canvas 就绪后直接使用 reader core
+     * 从当前页面元素计算的范围与正文。
+     * 与 [addForCurrentPage] 存入的 `ReadBook.durChapterPos` 落点一致，空页会被跳过。
      * 整体串行化：先查后写不是原子的，快速连滑会双双看到「空」而重复插入。
      */
     fun toggleForCurrentPage() {
         scope.launch(IO) {
             toggleMutex.withLock {
                 val book = ReadBook.book ?: return@withLock
-                val chapter = ReadBook.curTextChapter ?: return@withLock
-                val pageIndex = ReadBook.durPageIndex
-                val page = chapter.getPage(pageIndex) ?: return@withLock
-                if (page.isMsgPage || page.lineSize <= 0) return@withLock
-                val startPos = page.chapterPosition
-                val endPos = chapter.getPage(pageIndex + 1)?.chapterPosition
-                    ?: (startPos + page.charSize)
+                val page = currentPage() ?: return@withLock
                 val existing = bookmarkRepository.getByChapterRange(
                     bookName = book.name,
                     bookAuthor = book.author,
-                    chapterIndex = chapter.chapter.index,
-                    startPos = startPos,
-                    endPos = endPos,
+                    chapterIndex = page.chapterIndex,
+                    startPos = page.startPosition,
+                    endPos = page.endPosition,
                 )
                 if (existing.isEmpty()) {
                     bookmarkRepository.save(
@@ -116,8 +113,8 @@ class ReadBookmarkDelegate(
                             bookName = book.name,
                             bookAuthor = book.author,
                             bookUrl = book.bookUrl,
-                            chapterIndex = chapter.chapter.index,
-                            chapterName = chapter.title,
+                            chapterIndex = page.chapterIndex,
+                            chapterName = page.chapterTitle,
                             chapterPos = ReadBook.durChapterPos,
                             bookText = page.text.replace(BOOK_TEXT_MARKS, "").trim(),
                             content = "",
@@ -144,14 +141,13 @@ class ReadBookmarkDelegate(
     fun addForCurrentPage() {
         scope.launch(IO) {
             val book = ReadBook.book ?: return@launch
-            val chapter = ReadBook.curTextChapter ?: return@launch
-            val page = chapter.pages.getOrNull(ReadBook.durPageIndex) ?: return@launch
+            val page = currentPage() ?: return@launch
             val bookmark = Bookmark(
                 bookName = book.name,
                 bookAuthor = book.author,
                 bookUrl = book.bookUrl,
-                chapterIndex = chapter.chapter.index,
-                chapterName = chapter.title,
+                chapterIndex = page.chapterIndex,
+                chapterName = page.chapterTitle,
                 chapterPos = ReadBook.durChapterPos,
                 bookText = page.text,
                 content = "",
@@ -180,6 +176,9 @@ class ReadBookmarkDelegate(
             host.setActiveSheet(null)
         }
     }
+
+    private fun currentPage(): ReaderPageContext? = host.currentCanvasPage
+        ?.takeIf { it.chapterIndex == ReadBook.durChapterIndex }
 
     private companion object {
         /** 与 ReadBookController.addBookmark 一致：剔除正文里的排版占位符。 */

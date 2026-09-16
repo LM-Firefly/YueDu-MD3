@@ -79,7 +79,7 @@ class SystemTtsVoiceCatalog(context: Context) {
             } else {
                 TextToSpeech(appContext, listener, enginePackage)
             }
-            continuation.invokeOnCancellation { instance?.shutdown() }
+            continuation.invokeOnCancellation { instance.shutdown() }
         }
 
     companion object {

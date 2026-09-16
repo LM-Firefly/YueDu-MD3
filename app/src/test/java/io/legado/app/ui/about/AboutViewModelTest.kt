@@ -2,7 +2,9 @@ package io.legado.app.ui.about
 
 import android.app.Application
 import android.os.Looper
+import io.legado.app.domain.gateway.BackupSettingsGateway
 import io.legado.app.domain.gateway.OtherSettingsGateway
+import io.legado.app.domain.model.settings.BackupSettings
 import io.legado.app.domain.model.settings.OtherSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,13 +33,24 @@ class AboutViewModelTest {
     @Test
     fun `更新渠道通过唯一UiState入口下发`() {
         val gateway = FakeOtherSettingsGateway("official_version")
-        val viewModel = AboutViewModel(application, gateway)
+        val viewModel = AboutViewModel(application, gateway, FakeBackupSettingsGateway())
         Shadows.shadowOf(Looper.getMainLooper()).idle()
 
         gateway.emit("beta")
         Shadows.shadowOf(Looper.getMainLooper()).idle()
 
         assertEquals("beta", viewModel.uiState.value.updateToVariant)
+    }
+
+    private class FakeBackupSettingsGateway : BackupSettingsGateway {
+        private val state = MutableStateFlow(BackupSettings())
+
+        override val currentSettings: BackupSettings get() = state.value
+        override val settings: Flow<BackupSettings> = state
+
+        override suspend fun update(transform: (BackupSettings) -> BackupSettings) {
+            state.value = transform(state.value)
+        }
     }
 
     private class FakeOtherSettingsGateway(initialVariant: String) : OtherSettingsGateway {

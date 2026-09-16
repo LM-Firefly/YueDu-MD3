@@ -16,6 +16,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.Bookmark
+import io.legado.app.data.entities.BookMarking
 import io.legado.app.data.entities.DictRule
 import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.entities.HighlightTagRule
@@ -51,7 +52,6 @@ import io.legado.app.help.config.SettingsWriter
 import io.legado.app.help.config.ThemeConfigStore
 import io.legado.app.model.BookCover
 import io.legado.app.model.localBook.LocalBook
-import io.legado.app.ui.config.otherConfig.OtherConfig
 import io.legado.app.utils.ACache
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
@@ -149,10 +149,17 @@ object Restore : KoinComponent {
                 }
             }
         }
+        // 书签与划线/想法笔记（book_marks）视为一体，统一受既有 bookmark 忽略项控制
         if (BackupConfig.dbIsNotIgnored("bookmark")) {
             fileToListT<Bookmark>(path, "bookmark.json")?.let {
                 try {
                     appDb.bookmarkDao.insert(*it.toTypedArray())
+                } catch (_: SQLiteConstraintException) {
+                }
+            }
+            fileToListT<BookMarking>(path, "bookMarking.json")?.let {
+                try {
+                    appDb.bookMarkingDao.insert(*it.toTypedArray())
                 } catch (_: SQLiteConstraintException) {
                 }
             }
@@ -356,7 +363,7 @@ object Restore : KoinComponent {
             get<ReadStyleGateway>().refresh()
             // refresh 只重建 Compose 侧 state；阅读器开着时渲染层的两份快照（RenderStyle/
             // TipStyle）与已排版内容不会跟着刷新，得走配置总线让 controller 重建并重排。
-            // 阅读器没开时无人消费，重开由 ReadView.init 的重建入口兜底。
+            // 阅读器没开时无人消费，重开后由 Compose 阅读路由的分页重建入口兜底。
             ReadConfigUpdateBus.post(
                 setOf(
                     ConfigUpdateAction.UpdateBackground,
@@ -382,7 +389,7 @@ object Restore : KoinComponent {
         appCtx.toastOnUi(R.string.restore_success)
         withContext(Main) {
             delay(100)
-            get<AppLocaleGateway>().setLanguage(OtherConfig.language)
+            get<AppLocaleGateway>().apply { setLanguage(currentLanguage) }
             if (!BuildConfig.DEBUG) {
                 LauncherIconHelp.changeIcon(appCtx.getPrefString(PreferKey.launcherIcon))
             }

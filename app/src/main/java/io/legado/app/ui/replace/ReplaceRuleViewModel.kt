@@ -12,10 +12,10 @@ import io.legado.app.data.repository.ReadSettingsRepository
 import io.legado.app.data.repository.ReplaceRuleRepository
 import io.legado.app.data.repository.UploadRepository
 import io.legado.app.domain.gateway.BookContentProcessGateway
+import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.domain.model.TextProcessAction
 import io.legado.app.domain.model.TextProcessAnchor
 import io.legado.app.help.ReplaceAnalyzer
-import io.legado.app.help.config.AppConfig
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.ContentProcessConfigUiState
 import io.legado.app.ui.book.read.ContentProcessItemUi
@@ -55,6 +55,7 @@ class ReplaceRuleViewModel(
     private val bookContentProcessGateway: BookContentProcessGateway,
     private val readSettingsRepository: ReadSettingsRepository,
     private val repository: ReplaceRuleRepository,
+    private val otherSettingsGateway: OtherSettingsGateway,
 ) : BaseRuleViewModel<ReplaceRuleItemUi, ReplaceRule, Long, ReplaceRuleUiState>(
     application,
     ReplaceRuleUiState(interaction = InteractionState(isLoading = true)),
@@ -416,10 +417,11 @@ class ReplaceRuleViewModel(
 
     private fun initBookData(bookUrl: String) {
         val book = ReadBook.book
-        val textChapter = ReadBook.curTextChapter
+        val chapterInput = ReadBook.readerChapterInputWindow.current
         if (book != null && book.bookUrl == bookUrl) {
-            val effectiveRules = textChapter?.effectiveReplaceRules.orEmpty().toImmutableList()
-            val replaceEnabled = book.getUseReplaceRule(AppConfig.replaceEnableDefault)
+            val effectiveRules = chapterInput?.content?.effectiveReplaceRules.orEmpty().toImmutableList()
+            val replaceEnabled =
+                book.getUseReplaceRule(otherSettingsGateway.currentSettings.replaceEnableDefault)
             val chineseConvertActive = readSettingsRepository.currentSettings.chineseConverterType > 0
             val reSegmentActive = book.getReSegment()
             _bookState.update {
@@ -436,7 +438,9 @@ class ReplaceRuleViewModel(
 
     private fun toggleReplaceEnable() {
         ReadBook.book?.let { book ->
-            val enabled = !book.getUseReplaceRule(AppConfig.replaceEnableDefault)
+            val enabled = !book.getUseReplaceRule(
+                otherSettingsGateway.currentSettings.replaceEnableDefault
+            )
             book.setUseReplaceRule(enabled)
             ReadBook.saveRead()
             _bookState.update { it.copy(replaceEnabled = enabled) }

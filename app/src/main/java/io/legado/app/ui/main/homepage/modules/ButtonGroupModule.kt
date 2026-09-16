@@ -115,7 +115,7 @@ fun ButtonGroupModule(
                                 ) {
                                     if (hasIcon) {
                                         SourceIcon(
-                                            path = buttonIcon!!,
+                                            path = buttonIcon,
                                             modifier = Modifier.size(20.dp),
                                             placeholderIcon = {
 

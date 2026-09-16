@@ -12,9 +12,9 @@ import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.exception.NoStackTraceException
-import io.legado.app.help.config.AppConfig
+import io.legado.app.domain.gateway.AppShellSettingsGateway
+import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
 import io.legado.app.help.config.ThemeConfigStore
-import io.legado.app.ui.config.themeConfig.ThemeConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.crypto.base64ToByteArray
 import io.legado.app.help.crypto.digest
@@ -32,7 +32,6 @@ import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.QueryTTF
 import io.legado.app.ui.association.OnLineImportActivity
 import io.legado.app.ui.association.OpenUrlConfirmActivity
-import io.legado.app.ui.config.otherConfig.OtherConfig
 import io.legado.app.utils.ArchiveUtils
 import io.legado.app.utils.ChineseUtils
 import io.legado.app.utils.EncoderUtils
@@ -65,6 +64,7 @@ import okio.use
 import org.jsoup.Connection
 import org.jsoup.Jsoup
 import splitties.init.appCtx
+import org.koin.core.context.GlobalContext
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -92,6 +92,11 @@ interface JsExtensions : JsEncodeUtils {
 
     fun getSource(): BaseSource?
     fun getTag(): String?
+
+    private val cacheGateway
+        get() = GlobalContext.get().get<DownloadCacheSettingsGateway>()
+    private val shellGateway
+        get() = GlobalContext.get().get<AppShellSettingsGateway>()
 
     private val context: CoroutineContext
         get() = rhinoContextOrNull?.coroutineContext ?: EmptyCoroutineContext
@@ -133,7 +138,7 @@ interface JsExtensions : JsEncodeUtils {
     }
     fun ajaxAll(urlList: Array<String>, skipRateLimit: Boolean): Array<StrResponse> {
         return runBlocking(context) {
-            urlList.asFlow().mapAsync(OtherConfig.threadCount) { url ->
+            urlList.asFlow().mapAsync(cacheGateway.currentSettings.threadCount) { url ->
                 val analyzeUrl = AnalyzeUrl(
                     url,
                     source = getSource(),
@@ -156,7 +161,7 @@ interface JsExtensions : JsEncodeUtils {
         skipRateLimit: Boolean
     ): Array<StrResponse> {
         return runBlocking(context) {
-            urlList.asFlow().mapAsync(OtherConfig.threadCount) { url ->
+            urlList.asFlow().mapAsync(cacheGateway.currentSettings.threadCount) { url ->
                 val analyzeUrl = AnalyzeUrl(
                     url,
                     source = getSource(),
@@ -232,7 +237,7 @@ interface JsExtensions : JsEncodeUtils {
                 url = url,
                 html = html,
                 javaScript = js,
-                headerMap = getSource()?.getHeaderMap(AppConfig.userAgent, true),
+                headerMap = getSource()?.getHeaderMap(cacheGateway.currentSettings.userAgent, true),
                 tag = getSource()?.getKey()
             ).getStrResponse().body
         }
@@ -271,7 +276,7 @@ interface JsExtensions : JsEncodeUtils {
                 url = url,
                 html = html,
                 javaScript = js,
-                headerMap = getSource()?.getHeaderMap(AppConfig.userAgent, true),
+                headerMap = getSource()?.getHeaderMap(cacheGateway.currentSettings.userAgent, true),
                 tag = getSource()?.getKey(),
                 sourceRegex = sourceRegex,
                 delayTime = delayTime
@@ -317,7 +322,7 @@ interface JsExtensions : JsEncodeUtils {
                 url = url,
                 html = html,
                 javaScript = js,
-                headerMap = getSource()?.getHeaderMap(AppConfig.userAgent, true),
+                headerMap = getSource()?.getHeaderMap(cacheGateway.currentSettings.userAgent, true),
                 tag = getSource()?.getKey(),
                 overrideUrlRegex = overrideUrlRegex,
                 delayTime = delayTime
@@ -1196,7 +1201,7 @@ interface JsExtensions : JsEncodeUtils {
      */
     @JavascriptInterface
     fun getThemeMode(): String {
-        return ThemeConfig.themeMode
+        return shellGateway.currentSettings.themeMode
     }
 
     /**

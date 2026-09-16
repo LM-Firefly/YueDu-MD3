@@ -23,6 +23,48 @@ import kotlin.reflect.full.primaryConstructor
 class ReadBookDomainSplitBoundaryTest {
 
     @Test
+    fun `Compose reader must remain the only production body renderer`() {
+        listOf(
+            "ui/book/read/page/ReadView.kt",
+            "ui/book/read/page/PageView.kt",
+            "ui/book/read/page/ContentTextView.kt",
+            "ui/book/read/page/provider/TextChapterLayout.kt",
+        ).forEach { relativePath ->
+            assertTrue(
+                "$relativePath must not be restored after the Compose Canvas migration",
+                !mainSourcePath("io/legado/app/$relativePath").exists(),
+            )
+        }
+        assertTrue(
+            "view_book_page.xml must not be restored after the Compose Canvas migration",
+            !projectPath("app/src/main/res/layout/view_book_page.xml").exists(),
+        )
+    }
+
+    @Test
+    fun `Canvas runtime must not recreate View page layout`() {
+        val runtimeFiles = listOf(
+            "model/ReadBook.kt",
+            "ui/book/read/ReadBookController.kt",
+            "ui/book/readaloud/player/ReadAloudPlayerCoordinator.kt",
+            "service/BaseReadAloudService.kt",
+            "service/TTSReadAloudService.kt",
+            "service/HttpReadAloudService.kt",
+        )
+        runtimeFiles.forEach { path ->
+            val source = mainSourceFile("io/legado/app/$path").readText()
+            listOf(
+                "import io.legado.app.ui.book.read.page.provider.ChapterProvider",
+                "import io.legado.app.ui.book.read.page.entities.TextChapter",
+                "getTextChapterAsync(",
+                "ReadBook.curTextChapter",
+            ).forEach { legacyDependency ->
+                assertTrue("$path still depends on $legacyDependency", legacyDependency !in source)
+            }
+        }
+    }
+
+    @Test
     fun `已摘出的域状态不再挂在 ReadBookUiState 上`() {
         val readBookFields = constructorParameterNames(ReadBookUiState::class)
         DOMAINS.forEach { domain ->
@@ -268,7 +310,7 @@ class ReadBookDomainSplitBoundaryTest {
                 stateFields = setOf("contentProcessConfig"),
                 stateTypes = listOf("ContentProcessConfigUiState", "ContentProcessItemUi"),
             ),
-            // 开书域无自持状态：isInitFinish 是 ReadView 首帧的放行门闩，必须留在 UiState
+            // 开书域无自持状态：isInitFinish 是 Canvas 首帧的放行门闩，必须留在 UiState
             DomainSplit(
                 name = "开书/换源",
                 delegateFile = "io/legado/app/ui/book/read/ReadBookLoadDelegate.kt",
@@ -393,15 +435,30 @@ class ReadBookDomainSplitBoundaryTest {
         )
 
         fun mainSourceFile(relativePath: String): File {
+            val candidate = mainSourcePath(relativePath)
+            if (candidate.isFile) return candidate
+            error("从 ${File("").absolutePath} 向上找不到 $relativePath")
+        }
+
+        fun mainSourcePath(relativePath: String): File = locateProjectPath(
+            candidates = listOf("src/main/java/$relativePath", "app/src/main/java/$relativePath"),
+        )
+
+        fun projectPath(relativePath: String): File = locateProjectPath(
+            candidates = listOf(relativePath, relativePath.removePrefix("app/")),
+        )
+
+        private fun locateProjectPath(candidates: List<String>): File {
             var directory: File? = File("").absoluteFile
             while (directory != null) {
-                for (prefix in listOf("src/main/java", "app/src/main/java")) {
-                    val candidate = File(directory, "$prefix/$relativePath")
-                    if (candidate.isFile) return candidate
+                candidates.forEach { relativePath ->
+                    val candidate = File(directory, relativePath)
+                    if (candidate.exists()) return candidate
                 }
+                if (File(directory, ".git").exists()) return File(directory, candidates.first())
                 directory = directory.parentFile
             }
-            error("从 ${File("").absolutePath} 向上找不到 $relativePath")
+            return File(candidates.first())
         }
     }
 }

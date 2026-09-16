@@ -4,7 +4,6 @@ import io.legado.app.constant.EventBus
 import io.legado.app.model.ReadBook
 import io.legado.app.ui.book.read.ConfigUpdateAction
 import io.legado.app.ui.book.read.ReadConfigUpdateBus
-import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.utils.postEvent
 
 /** Applies runtime reader changes after a setting has entered the effective settings snapshot. */
@@ -45,7 +44,6 @@ class ApplyReadSettingUseCase {
             // useUnderline 进了 RenderStyle 快照，改完必须重建并重绘，否则朗读/搜索
             // 高亮线要等下一次样式变更才生效
             is ReadConfigIntent.UseUnderlineChanged -> {
-                ChapterProvider.upRenderStyle()
                 ReadConfigUpdateBus.post(setOf(ConfigUpdateAction.InvalidateTextPage))
             }
             else -> Unit
@@ -53,14 +51,11 @@ class ApplyReadSettingUseCase {
     }
 
     private fun updateLayout() {
-        // textBottomJustify 属于 RenderStyle 快照，重排前得先重建，否则排版读到旧值
-        ChapterProvider.upRenderStyle()
-        ChapterProvider.upLayout()
+        // The Compose paginator reads a fresh immutable style snapshot for every generation.
         ReadBook.loadContent(false)
     }
 
     private fun updateStyle() {
-        ChapterProvider.upStyle()
         ReadBook.renderCallBack?.upPageAnim(true)
         ReadBook.loadContent(false)
     }

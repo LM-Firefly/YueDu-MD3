@@ -8,13 +8,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -27,8 +22,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.legado.app.R
 import io.legado.app.model.ReadBook
-import io.legado.app.ui.theme.LegadoTheme
-import io.legado.app.ui.theme.ProvideAppDensity
+import io.legado.app.ui.widget.components.AppTextField
+import io.legado.app.ui.widget.components.alert.AppAlertDialog
 import io.legado.app.ui.widget.components.settingItem.TinySwitchSettingItem
 import java.time.Instant
 import java.time.LocalDate
@@ -38,6 +33,7 @@ import java.time.format.DateTimeFormatter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SimulatedReadingSheet(
+    show: Boolean,
     onDismissRequest: () -> Unit,
     onApply: () -> Unit,
 ) {
@@ -49,112 +45,82 @@ fun SimulatedReadingSheet(
     var showDatePicker by remember { mutableStateOf(false) }
     val dateFormatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd") }
 
-    AlertDialog(
+    AppAlertDialog(
+        show = show,
         onDismissRequest = onDismissRequest,
-        containerColor = LegadoTheme.colorScheme.surfaceContainer,
-        title = { ProvideAppDensity { Text(stringResource(R.string.simulated_reading)) } },
-        text = {
-            ProvideAppDensity {
-                Column {
-                    OutlinedTextField(
-                        value = startDate.format(dateFormatter),
-                        onValueChange = {},
-                        label = { Text(stringResource(R.string.start_from)) },
-                        readOnly = true,
+        title = stringResource(R.string.simulated_reading),
+        content = {
+            Column {
+                AppTextField(
+                    value = startDate.format(dateFormatter),
+                    onValueChange = {},
+                    label = stringResource(R.string.start_from),
+                    readOnly = true,
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showDatePicker = true },
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                TinySwitchSettingItem(
+                    title = stringResource(R.string.simulated_reading),
+                    checked = enabled,
+                    onCheckedChange = { enabled = it },
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    AppTextField(
+                        value = startChapter,
+                        onValueChange = { startChapter = it },
+                        label = stringResource(R.string.start_chapter),
                         singleLine = true,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showDatePicker = true },
-                        enabled = false,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    TinySwitchSettingItem(
-                        title = stringResource(R.string.simulated_reading),
-                        checked = enabled,
-                        onCheckedChange = { enabled = it },
+                    Spacer(modifier = Modifier.width(8.dp))
+                    AppTextField(
+                        value = dailyChapters,
+                        onValueChange = { dailyChapters = it },
+                        label = stringResource(R.string.daily_chapters),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    // Start chapter + daily chapters
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = startChapter,
-                            onValueChange = { startChapter = it },
-                            label = { Text(stringResource(R.string.start_chapter)) },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f),
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        OutlinedTextField(
-                            value = dailyChapters,
-                            onValueChange = { dailyChapters = it },
-                            label = { Text(stringResource(R.string.daily_chapters)) },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
                 }
             }
         },
-        confirmButton = {
-            ProvideAppDensity {
-                TextButton(
-                    onClick = {
-                        book.setStartDate(startDate)
-                        book.setDailyChapters(dailyChapters.toIntOrNull() ?: 0)
-                        book.setStartChapter(startChapter.toIntOrNull() ?: 0)
-                        book.setReadSimulating(enabled)
-                        book.save()
-                        onApply()
-                        onDismissRequest()
-                    },
-                ) {
-                    Text(stringResource(R.string.ok))
-                }
-            }
+        confirmText = stringResource(R.string.ok),
+        onConfirm = {
+            book.setStartDate(startDate)
+            book.setDailyChapters(dailyChapters.toIntOrNull() ?: 0)
+            book.setStartChapter(startChapter.toIntOrNull() ?: 0)
+            book.setReadSimulating(enabled)
+            book.save()
+            onApply()
+            onDismissRequest()
         },
-        dismissButton = {
-            ProvideAppDensity {
-                TextButton(onClick = onDismissRequest) {
-                    Text(stringResource(R.string.cancel))
-                }
-            }
-        },
+        dismissText = stringResource(R.string.cancel),
+        onDismiss = onDismissRequest,
     )
 
-    // Date picker dialog
-    if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = startDate.atStartOfDay(ZoneId.systemDefault()).toInstant()
-                .toEpochMilli(),
-        )
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            colors = androidx.compose.material3.DatePickerDefaults.colors(
-                containerColor = LegadoTheme.colorScheme.surfaceContainer,
-            ),
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        datePickerState.selectedDateMillis?.let { millis ->
-                            startDate = Instant.ofEpochMilli(millis)
-                                .atZone(ZoneId.systemDefault())
-                                .toLocalDate()
-                        }
-                        showDatePicker = false
-                    },
-                ) {
-                    Text(stringResource(R.string.ok))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        ) {
-            DatePicker(state = datePickerState)
-        }
-    }
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = startDate.atStartOfDay(ZoneId.systemDefault()).toInstant()
+            .toEpochMilli(),
+    )
+    AppAlertDialog(
+        show = showDatePicker,
+        onDismissRequest = { showDatePicker = false },
+        content = { DatePicker(state = datePickerState) },
+        confirmText = stringResource(R.string.ok),
+        onConfirm = {
+            datePickerState.selectedDateMillis?.let { millis ->
+                startDate = Instant.ofEpochMilli(millis)
+                    .atZone(ZoneId.systemDefault())
+                    .toLocalDate()
+            }
+            showDatePicker = false
+        },
+        dismissText = stringResource(R.string.cancel),
+        onDismiss = { showDatePicker = false },
+    )
 }

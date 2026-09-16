@@ -69,10 +69,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalClipboardManager
+import android.content.ClipData
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -127,7 +128,7 @@ fun AiChatScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    val clipboardManager = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
     var draft by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
     val density = LocalDensity.current
@@ -329,7 +330,11 @@ fun AiChatScreen(
                             assistantLabel = assistantLabel,
                             onOpenBookInfo = onOpenBookInfo,
                             onCopy = {
-                                clipboardManager.setText(AnnotatedString(message.content))
+                                scope.launch {
+                                    clipboard.setClipEntry(
+                                        ClipEntry(ClipData.newPlainText("content", message.content))
+                                    )
+                                }
                             },
                             onRegenerate = if (message.role == AiMessageRole.ASSISTANT && message.parentMessageId != null) {
                                 { onIntent(AiChatIntent.RegenerateMessage(message.id)) }

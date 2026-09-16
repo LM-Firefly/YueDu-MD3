@@ -15,7 +15,6 @@ import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.service.HttpReadAloudService
 import io.legado.app.service.TTSReadAloudService
-import io.legado.app.ui.config.readConfig.ReadConfig
 import io.legado.app.utils.GSON
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.StringUtils
@@ -27,8 +26,9 @@ import kotlinx.coroutines.runBlocking
 import splitties.init.appCtx
 
 object ReadAloud {
+    private val aloudSettingsGateway get() = org.koin.core.context.GlobalContext.get().get<io.legado.app.domain.gateway.ReadAloudSettingsGateway>()
     private var aloudClass: Class<*> = getReadAloudClass()
-    val ttsEngine get() = ReadBook.book?.getTtsEngine() ?: ReadConfig.ttsEngine
+    val ttsEngine get() = ReadBook.book?.getTtsEngine() ?: aloudSettingsGateway.currentSettings.ttsEngine
     var httpTTS: HttpTTS? = null
     var coordinatorDefaultEngineType: String = ReadAloudVoice.ENGINE_SYSTEM
         private set
@@ -83,7 +83,7 @@ object ReadAloud {
     }
 
     private fun findCoordinatorHttpSeed(): HttpTTS? {
-        if (!ReadConfig.useMultiSpeaker) return null
+        if (!aloudSettingsGateway.currentSettings.useMultiSpeaker) return null
         return runCatching {
             val bookUrl = ReadBook.book?.bookUrl ?: return@runCatching null
             val boundVoices = runBlocking {
@@ -119,7 +119,9 @@ object ReadAloud {
         context: Context,
         play: Boolean = true,
         pageIndex: Int = ReadBook.durPageIndex,
-        startPos: Int = 0
+        startPos: Int = 0,
+        /** Absolute position in the processed chapter; preferred by the Canvas reader. */
+        chapterPosition: Int? = null,
     ) {
         if (!BaseReadAloudService.isRun) {
             aloudClass = getReadAloudClass()
@@ -129,6 +131,7 @@ object ReadAloud {
         intent.putExtra("play", play)
         intent.putExtra("pageIndex", pageIndex)
         intent.putExtra("startPos", startPos)
+        chapterPosition?.let { intent.putExtra("chapterPosition", it) }
         LogUtils.d("ReadAloud", intent.toString())
         try {
             context.startForegroundServiceCompat(intent)
@@ -142,12 +145,14 @@ object ReadAloud {
     fun playByEventBus(
         play: Boolean = true,
         pageIndex: Int = ReadBook.durPageIndex,
-        startPos: Int = 0
+        startPos: Int = 0,
+        chapterPosition: Int? = null,
     ) {
         val bundle = Bundle().apply {
             putBoolean("play", play)
             putInt("pageIndex", pageIndex)
             putInt("startPos", startPos)
+            chapterPosition?.let { putInt("chapterPosition", it) }
         }
         postEvent(EventBus.READ_ALOUD_PLAY, bundle)
     }
@@ -169,7 +174,7 @@ object ReadAloud {
     }
 
     fun stop(context: Context) {
-        if (BaseReadAloudService.isRun) {
+        if (BaseReadAloudService.requestStop()) {
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.stop
             context.startForegroundServiceCompat(intent)

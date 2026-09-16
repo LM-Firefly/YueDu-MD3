@@ -18,7 +18,8 @@ import io.legado.app.help.book.getBookSource
 import io.legado.app.help.book.readSimulating
 import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.help.book.update
-import io.legado.app.help.config.AppConfig
+import io.legado.app.domain.gateway.OtherSettingsGateway
+import io.legado.app.domain.gateway.ReadSettingsGateway
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.AudioPlayService
@@ -28,11 +29,15 @@ import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancelChildren
+import org.koin.core.context.GlobalContext
 import splitties.init.appCtx
 
 @SuppressLint("StaticFieldLeak")
 @Suppress("unused")
 object AudioPlay : CoroutineScope by MainScope() {
+
+    private val otherSettingsGateway get() = GlobalContext.get().get<OtherSettingsGateway>()
+    private val readSettingsGateway get() = GlobalContext.get().get<ReadSettingsGateway>()
 
     enum class PlayMode {
         LIST_END_STOP,
@@ -406,8 +411,8 @@ object AudioPlay : CoroutineScope by MainScope() {
                 appDb.bookChapterDao.getChapter(book.bookUrl, book.durChapterIndex)?.let {
                     book.durChapterTitle = it.getDisplayTitle(
                         ContentProcessor.get(book.name, book.origin).getTitleReplaceRules(),
-                        book.getUseReplaceRule(AppConfig.replaceEnableDefault),
-                        chineseConverterType = AppConfig.chineseConverterType,
+                        book.getUseReplaceRule(otherSettingsGateway.currentSettings.replaceEnableDefault),
+                        chineseConverterType = readSettingsGateway.currentSettings.chineseConverterType,
                     )
                     SourceCallBack.callBackBook(SourceCallBack.SAVE_READ, bookSource, book, it)
                 }

@@ -14,8 +14,8 @@ import io.legado.app.model.cache.CacheDownloadRequest
 import io.legado.app.model.cache.CacheDownloadStateStore
 import io.legado.app.model.cache.ChapterSelection
 import io.legado.app.model.cache.ExplicitCacheBookFifo
+import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
 import io.legado.app.service.CacheBookService
-import io.legado.app.ui.config.otherConfig.OtherConfig
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.onEachParallel
 import kotlinx.coroutines.CompletableDeferred
@@ -39,6 +39,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.koin.core.context.GlobalContext
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
@@ -67,13 +68,15 @@ object CacheBook {
         private val processMutex = Mutex()
         private val workingState = MutableStateFlow(true)
 
+        private val cacheSettingsGateway get() = GlobalContext.get().get<DownloadCacheSettingsGateway>()
+
         fun setWorkingState(value: Boolean) {
             workingState.value = value
         }
 
         suspend fun startProcessJob(context: CoroutineContext) = processMutex.withLock {
             setWorkingState(true)
-            val concurrency = OtherConfig.cacheBookThreadCount.coerceIn(1, maxDownloadConcurrency)
+            val concurrency = cacheSettingsGateway.currentSettings.cacheBookThreadCount.coerceIn(1, maxDownloadConcurrency)
             flow {
                 while (currentCoroutineContext().isActive && taskMap.isNotEmpty() && !isPaused) {
                     if (!workingState.value) {

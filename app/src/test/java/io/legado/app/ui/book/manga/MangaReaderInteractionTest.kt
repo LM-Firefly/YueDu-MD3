@@ -133,7 +133,7 @@ class MangaReaderInteractionTest {
     }
 
     @Test
-    fun `webtoon enters later chapter at its first visible page not its last`() {
+    fun `webtoon enters later chapter at its first visible page after transition leaves viewport`() {
         val items = listOf(
             page(8, chapter = 20),
             MangaReaderItemUi.ChapterTransition(
@@ -153,7 +153,35 @@ class MangaReaderInteractionTest {
             2,
             mangaWebtoonFocusedPageIndex(
                 items = items,
-                visibleItemIndices = listOf(1, 2, 3, 4),
+                visibleItemIndices = listOf(2, 3, 4),
+                currentChapterIndex = 20,
+            ),
+        )
+    }
+
+    @Test
+    fun `webtoon keeps current chapter page while next chapter page is also visible`() {
+        val items = listOf(
+            page(7, chapter = 20),
+            page(8, chapter = 20),
+            MangaReaderItemUi.ChapterTransition(
+                key = "transition",
+                direction = MangaChapterTransitionDirection.NEXT,
+                targetChapterIndex = 21,
+                currentChapterName = "20",
+                targetChapterName = "21",
+                targetStatus = MangaChapterTransitionStatus.READY,
+            ),
+            page(0, chapter = 21),
+        )
+
+        // 当前章最后一页和下一章第一页同时可见时，焦点必须留在当前章，
+        // 否则 UI 会先把相邻章页写成当前页，图片高度变化后再触发来回切章。
+        assertEquals(
+            1,
+            mangaWebtoonFocusedPageIndex(
+                items = items,
+                visibleItemIndices = listOf(1, 2, 3),
                 currentChapterIndex = 20,
             ),
         )
@@ -181,6 +209,39 @@ class MangaReaderInteractionTest {
                 items = items,
                 visibleItemIndices = listOf(0, 1, 2),
                 currentChapterIndex = 21,
+            ),
+        )
+    }
+
+    @Test
+    fun `webtoon waits for transition card to leave viewport before promoting loaded chapter`() {
+        val items = listOf(
+            page(8, chapter = 20),
+            MangaReaderItemUi.ChapterTransition(
+                key = "transition",
+                direction = MangaChapterTransitionDirection.NEXT,
+                targetChapterIndex = 21,
+                currentChapterName = "20",
+                targetChapterName = "21",
+                targetStatus = MangaChapterTransitionStatus.READY,
+            ),
+            page(0, chapter = 21),
+        )
+
+        // 下一章刚插入列表，过渡卡片还在可视区域：不能因布局更新自动切章。
+        assertNull(
+            mangaWebtoonFocusedPageIndex(
+                items = items,
+                visibleItemIndices = listOf(1, 2),
+                currentChapterIndex = 20,
+            ),
+        )
+        assertEquals(
+            2,
+            mangaWebtoonFocusedPageIndex(
+                items = items,
+                visibleItemIndices = listOf(2),
+                currentChapterIndex = 20,
             ),
         )
     }
@@ -243,6 +304,28 @@ class MangaReaderInteractionTest {
                 visibleChapterIndex = 6,
                 currentChapterVisible = true,
             ),
+        )
+    }
+
+    @Test
+    fun `old session emission cannot reclaim an explicit chapter navigation`() {
+        assertFalse(
+            acceptsMangaSessionForExplicitNavigation(
+                pendingExplicitChapterIndex = 12,
+                sessionChapterIndex = 3,
+            )
+        )
+        assertTrue(
+            acceptsMangaSessionForExplicitNavigation(
+                pendingExplicitChapterIndex = 12,
+                sessionChapterIndex = 12,
+            )
+        )
+        assertTrue(
+            acceptsMangaSessionForExplicitNavigation(
+                pendingExplicitChapterIndex = null,
+                sessionChapterIndex = 3,
+            )
         )
     }
 

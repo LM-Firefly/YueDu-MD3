@@ -9,6 +9,7 @@ import io.legado.app.data.repository.HttpTtsRepository
 import io.legado.app.data.repository.ReadAloudSettingsRepository
 import io.legado.app.data.repository.ReadSettingsRepository
 import io.legado.app.domain.gateway.AiProfileGateway
+import io.legado.app.domain.model.AiReasoningLevel
 import io.legado.app.domain.model.AiTaskType
 import io.legado.app.domain.model.PlaybackTimer
 import io.legado.app.domain.model.readaloud.ReadAloudSessionStatus
@@ -96,6 +97,7 @@ class ReadAloudDelegate(
                         readAloudFinishCurrentChapterAfterTimer =
                             prefs.finishCurrentChapterAfterTimer,
                         speechAnalysisMode = prefs.speechAnalysisMode,
+                        speechAnalysisReasoningLevel = prefs.speechAnalysisReasoningLevel,
                         useMultiSpeaker = prefs.useMultiSpeaker,
                         defaultReadAloudInterface = prefs.defaultInterface,
                         preDownloadNum = host.preDownloadNum,
@@ -434,6 +436,16 @@ class ReadAloudDelegate(
     }
 
     /**
+     * 朗读分析的推理级别。关闭思考模式是 AI 朗读分析的默认值：默认思考的模型（智谱 GLM 等）
+     * 只把内容放在 reasoning_content 里，分析会直接失败。
+     */
+    fun setSpeechAnalysisReasoningLevel(value: String) {
+        val level = AiReasoningLevel.fromStorage(value, AiReasoningLevel.OFF)
+        updateSettings { it.copy(speechAnalysisReasoningLevel = level.storageValue) }
+        host.updateState { it.copy(speechAnalysisReasoningLevel = level.storageValue) }
+    }
+
+    /**
      * 多角色朗读开关。正在朗读时必须重启朗读服务才能换掉合成管线，
      * 重启前记住页内位置，等服务真的回到 Idle 再重放，避免新旧管线叠音。
      */
@@ -441,13 +453,10 @@ class ReadAloudDelegate(
         scope.launch {
             val shouldRestart = BaseReadAloudService.isRun
             val resumePlaying = shouldRestart && !BaseReadAloudService.pause
-            val chapter = ReadBook.curTextChapter
             val chapterPosition = readAloudSessionStore.state.value.playback.chapterPosition
             readAloudSettingsRepository.update { it.copy(useMultiSpeaker = value) }
             host.updateState { it.copy(useMultiSpeaker = value) }
-            if (shouldRestart && chapter != null) {
-                val pageIndex = chapter.getPageIndexByCharIndex(chapterPosition)
-                val startPos = chapterPosition - chapter.getReadLength(pageIndex)
+            if (shouldRestart && ReadBook.readerChapterInputWindow.current != null) {
                 ReadAloud.stop(context)
                 val stopped = withTimeoutOrNull(2_000) {
                     readAloudSessionStore.state.first {
@@ -459,8 +468,7 @@ class ReadAloudDelegate(
                 ReadAloud.play(
                     context = context,
                     play = resumePlaying,
-                    pageIndex = pageIndex,
-                    startPos = startPos.coerceAtLeast(0),
+                    chapterPosition = chapterPosition.coerceAtLeast(0),
                 )
             }
         }

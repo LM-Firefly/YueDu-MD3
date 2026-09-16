@@ -31,9 +31,10 @@ import io.legado.app.help.book.removeType
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.model.CacheBook
 import io.legado.app.service.ExportBookService
-import io.legado.app.ui.config.bookshelfConfig.BookshelfConfig
+import io.legado.app.domain.gateway.BookshelfSettingsGateway
+import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
+import org.koin.core.context.GlobalContext
 import io.legado.app.ui.config.bookshelfConfig.BookshelfManageScreenConfig
-import io.legado.app.ui.config.otherConfig.OtherConfig
 import io.legado.app.ui.main.bookshelf.toLightBook
 import io.legado.app.utils.cnCompare
 import io.legado.app.utils.move
@@ -56,6 +57,8 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.max
 import kotlin.math.min
 
+private val bookshelfSettingsGateway get() = GlobalContext.get().get<BookshelfSettingsGateway>()
+
 data class BookshelfManageScreenExportConfig(
     val exportUseReplace: Boolean = true,
     val enableCustomExport: Boolean = false,
@@ -77,8 +80,8 @@ data class BookshelfManageScreenUiState(
     val groupName: String? = null,
     val groupList: List<BookGroup> = emptyList(),
     val books: List<Book> = emptyList(),
-    val bookSort: Int = BookshelfConfig.bookshelfSort,
-    val bookSortOrder: Int = BookshelfConfig.bookshelfSortOrder,
+    val bookSort: Int = bookshelfSettingsGateway.currentSettings.bookshelfSort,
+    val bookSortOrder: Int = bookshelfSettingsGateway.currentSettings.bookshelfSortOrder,
     val isDownloadRunning: Boolean = false,
     val isChangingSource: Boolean = false,
     val changeSourceProgress: String? = null,
@@ -166,7 +169,8 @@ class BookshelfManageScreenViewModel(
     private val changeBookSourceUseCase: ChangeBookSourceUseCase,
     private val clearBookCacheUseCase: ClearBookCacheUseCase,
     private val deleteBooksUseCase: DeleteBooksUseCase,
-    private val updateBooksGroupUseCase: UpdateBooksGroupUseCase
+    private val updateBooksGroupUseCase: UpdateBooksGroupUseCase,
+    private val downloadCacheSettingsGateway: DownloadCacheSettingsGateway,
 ) : BaseViewModel(application) {
 
     private companion object {
@@ -742,7 +746,7 @@ class BookshelfManageScreenViewModel(
             return
         }
         execute {
-            val concurrency = OtherConfig.threadCount.coerceAtLeast(1)
+            val concurrency = downloadCacheSettingsGateway.currentSettings.threadCount.coerceAtLeast(1)
             _uiState.update {
                 it.copy(
                     isChangingSource = true,

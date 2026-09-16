@@ -10,6 +10,7 @@ import io.legado.app.constant.AppLog
 import io.legado.app.constant.IntentAction
 import io.legado.app.constant.NotificationId
 import io.legado.app.data.appDb
+import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
 import io.legado.app.help.book.update
 import io.legado.app.model.CacheBook
 import io.legado.app.model.CacheBookModel
@@ -18,7 +19,6 @@ import io.legado.app.model.cache.CacheDownloadRequest
 import io.legado.app.model.cache.CacheDownloadSource
 import io.legado.app.model.cache.ChapterSelection
 import io.legado.app.model.webBook.WebBook
-import io.legado.app.ui.config.otherConfig.OtherConfig
 import io.legado.app.ui.main.MainActivity
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.activityPendingIntent
@@ -37,6 +37,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.koin.core.context.GlobalContext
 import splitties.init.appCtx
 import splitties.systemservices.notificationManager
 import java.util.concurrent.ConcurrentHashMap
@@ -58,7 +59,8 @@ class CacheBookService : BaseService() {
             private set
     }
 
-    private val threadCount = OtherConfig.cacheBookThreadCount.coerceIn(1, CacheBook.maxDownloadConcurrency)
+    private val cacheSettingsGateway get() = GlobalContext.get().get<DownloadCacheSettingsGateway>()
+    private val threadCount = cacheSettingsGateway.currentSettings.cacheBookThreadCount.coerceIn(1, CacheBook.maxDownloadConcurrency)
     // 显式离线缓存：书籍级 FIFO，同时只准入一本；单书内仍用 threadCount 并发章节
     private val maxActiveBookCount = 1
     private val admissionQueue = CacheDownloadAdmissionQueue(maxActiveBookCount)

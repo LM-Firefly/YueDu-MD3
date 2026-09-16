@@ -7,12 +7,12 @@ import androidx.documentfile.provider.DocumentFile
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
+import io.legado.app.domain.gateway.BackupSettingsGateway
 import io.legado.app.domain.gateway.ReadStyleGateway
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.book.isLocal
-import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.AppConfigStore
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
@@ -53,6 +53,9 @@ object Backup {
     private val readStyleGateway: ReadStyleGateway
         get() = GlobalContext.get().get()
 
+    private val backupSettingsGateway: BackupSettingsGateway
+        get() = GlobalContext.get().get()
+
     val backupPath: String by lazy {
         appCtx.filesDir.getFile("backup").createFolderIfNotExist().absolutePath
     }
@@ -64,6 +67,7 @@ object Backup {
         arrayOf(
             "bookshelf.json",
             "bookmark.json",
+            "bookMarking.json",
             "bookGroup.json",
             "bookSource.json",
             "rssSources.json",
@@ -96,8 +100,8 @@ object Backup {
     private fun getNowZipFileName(): String {
         val backupDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
             .format(Date(System.currentTimeMillis()))
-        val deviceName = AppConfig.webDavDeviceName
-        return if (deviceName?.isNotBlank() == true) {
+        val deviceName = backupSettingsGateway.currentSettings.webDavDeviceName
+        return if (deviceName.isNotBlank()) {
             "backup${backupDate}-${deviceName}.zip"
         } else {
             "backup${backupDate}.zip"
@@ -116,7 +120,7 @@ object Backup {
                     if (shouldBackup()) {
                         val backupZipFileName = getNowZipFileName()
                         if (!AppWebDav.hasBackUp(backupZipFileName)) {
-                            backup(context, AppConfig.backupPath)
+                            backup(context, backupSettingsGateway.currentSettings.backupPath)
                         } else {
                             LocalConfig.lastBackup = System.currentTimeMillis()
                         }
@@ -146,8 +150,10 @@ object Backup {
             "bookshelf.json",
             backupPath,
         )
+        // 书签与划线/想法笔记（book_marks）视为一体，统一受既有 bookmark 忽略项控制
         if (BackupConfig.dbIsNotIgnored("bookmark", true)) {
             writeListToJson(appDb.bookmarkDao.all, "bookmark.json", backupPath)
+            writeListToJson(appDb.bookMarkingDao.all, "bookMarking.json", backupPath)
         }
         if (BackupConfig.dbIsNotIgnored("bookGroup", true)) {
             writeListToJson(appDb.bookGroupDao.all, "bookGroup.json", backupPath)
@@ -276,7 +282,7 @@ object Backup {
             .map(File::getAbsolutePath)
         FileUtils.delete(zipFilePath)
         FileUtils.delete(zipFilePath.replace("tmp_", ""))
-        val backupFileName = if (AppConfig.onlyLatestBackup) {
+        val backupFileName = if (backupSettingsGateway.currentSettings.onlyLatestBackup) {
             "backup.zip"
         } else {
             zipFileName

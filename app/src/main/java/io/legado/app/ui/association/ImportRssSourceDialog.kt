@@ -19,7 +19,6 @@ import io.legado.app.data.entities.RssSource
 import io.legado.app.databinding.DialogCustomGroupBinding
 import io.legado.app.databinding.DialogRecyclerViewBinding
 import io.legado.app.databinding.ItemSourceImportBinding
-import io.legado.app.help.config.AppConfig
 import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.domain.model.settings.OtherSettings
 import io.legado.app.lib.dialogs.alert
@@ -143,11 +142,11 @@ class ImportRssSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_view
         binding.toolBar.setOnMenuItemClickListener(this)
         binding.toolBar.inflateMenu(R.menu.import_source)
         binding.toolBar.menu.findItem(R.id.menu_keep_original_name)?.isChecked =
-            AppConfig.importKeepName
+            otherSettingsGateway.currentSettings.importKeepName
         binding.toolBar.menu.findItem(R.id.menu_keep_group)?.isChecked =
-            AppConfig.importKeepGroup
+            otherSettingsGateway.currentSettings.importKeepGroup
         binding.toolBar.menu.findItem(R.id.menu_keep_enable)?.isChecked =
-            AppConfig.importKeepEnable
+            otherSettingsGateway.currentSettings.importKeepEnable
         binding.toolBar.menu.findItem(R.id.menu_select_new_source)?.isVisible = false
         binding.toolBar.menu.findItem(R.id.menu_select_update_source)?.isVisible = false
     }

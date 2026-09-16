@@ -61,7 +61,6 @@ import io.legado.app.model.SourceCallBack
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.webBook.WebBook
-import io.legado.app.ui.config.coverConfig.CoverConfig
 import io.legado.app.ui.main.MainIntent
 import io.legado.app.ui.widget.components.image.cover.buildCoverImageRequest
 import io.legado.app.utils.ArchiveUtils
@@ -640,7 +639,7 @@ class BookInfoViewModel(
                 context = context,
                 data = path,
                 sourceOrigin = sourceOrigin,
-                loadOnlyWifi = CoverConfig.loadCoverOnlyWifi,
+                loadOnlyWifi = coverSettingsGateway.currentSettings.loadOnlyOnWifi,
                 crossfade = false
             )
             val result = imageLoader.execute(request)

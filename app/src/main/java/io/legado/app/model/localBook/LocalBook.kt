@@ -18,6 +18,9 @@ import io.legado.app.exception.EmptyFileException
 import io.legado.app.exception.NoBooksDirException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.exception.TocEmptyException
+import io.legado.app.domain.gateway.ImportBookSettingsGateway
+import io.legado.app.domain.gateway.OtherSettingsGateway
+import io.legado.app.domain.gateway.ReadSettingsGateway
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
@@ -36,12 +39,10 @@ import io.legado.app.help.book.isUmd
 import io.legado.app.help.book.removeLocalUriCache
 import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.help.book.upKind
-import io.legado.app.help.config.AppConfig
 import io.legado.app.lib.webdav.WebDav
 import io.legado.app.lib.webdav.WebDavException
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.analyzeRule.CustomUrl
-import io.legado.app.ui.config.otherConfig.OtherConfig
 import io.legado.app.utils.ArchiveUtils
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.FileUtils
@@ -58,6 +59,7 @@ import io.legado.app.utils.printOnDebug
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.runBlocking
 import org.apache.commons.text.StringEscapeUtils
+import org.koin.core.context.GlobalContext
 import splitties.init.appCtx
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -71,6 +73,10 @@ import java.io.InputStream
  * 支持在线文件(txt epub umd 压缩文件 本地文件
  */
 object LocalBook {
+
+    private val otherSettingsGateway get() = GlobalContext.get().get<OtherSettingsGateway>()
+    private val readSettingsGateway get() = GlobalContext.get().get<ReadSettingsGateway>()
+    private val importBookSettingsGateway get() = GlobalContext.get().get<ImportBookSettingsGateway>()
 
     private val nameAuthorPatterns = arrayOf(
         Regex("(.*?)《([^《》]+)》.*?作者：(.*)"),
@@ -157,15 +163,15 @@ object LocalBook {
         book.durChapterTitle = list.getOrElse(book.durChapterIndex) { list.last() }
             .getDisplayTitle(
                 replaceRules,
-                book.getUseReplaceRule(AppConfig.replaceEnableDefault),
-                chineseConverterType = AppConfig.chineseConverterType,
+                book.getUseReplaceRule(otherSettingsGateway.currentSettings.replaceEnableDefault),
+                chineseConverterType = readSettingsGateway.currentSettings.chineseConverterType,
             )
         book.latestChapterTitle =
             list.getOrElse(book.simulatedTotalChapterNum() - 1) { list.last() }
                 .getDisplayTitle(
                     replaceRules,
-                    book.getUseReplaceRule(AppConfig.replaceEnableDefault),
-                    chineseConverterType = AppConfig.chineseConverterType,
+                    book.getUseReplaceRule(otherSettingsGateway.currentSettings.replaceEnableDefault),
+                    chineseConverterType = readSettingsGateway.currentSettings.chineseConverterType,
                 )
         book.totalChapterNum = list.size
         book.latestChapterTime = System.currentTimeMillis()
@@ -385,11 +391,11 @@ object LocalBook {
         val tempFileName = fileName.substringBeforeLast(".")
         var name = ""
         var author = ""
-        if (!AppConfig.bookImportFileName.isNullOrBlank()) {
+        if (!importBookSettingsGateway.currentSettings.bookImportFileName.isNullOrBlank()) {
             try {
                 //在用户脚本后添加捕获author、name的代码，只要脚本中author、name有值就会被捕获
                 val js =
-                    AppConfig.bookImportFileName + "\nJSON.stringify({author:author,name:name})"
+                    importBookSettingsGateway.currentSettings.bookImportFileName + "\nJSON.stringify({author:author,name:name})"
                 //在脚本中定义如何分解文件名成书名、作者名
                 val jsonStr = RhinoScriptEngine.run {
                     val bindings = ScriptBindings()
@@ -446,7 +452,7 @@ object LocalBook {
         fileName: String,
         source: BaseSource? = null,
     ): Uri {
-        OtherConfig.defaultBookTreeUri
+        otherSettingsGateway.currentSettings.defaultBookTreeUri
             ?: throw NoBooksDirException()
         val inputStream = when {
             str.isAbsUrl() -> AnalyzeUrl(
@@ -472,7 +478,7 @@ object LocalBook {
         fileName: String
     ): Uri {
         inputStream.use {
-            val defaultBookTreeUri = OtherConfig.defaultBookTreeUri
+            val defaultBookTreeUri = otherSettingsGateway.currentSettings.defaultBookTreeUri
             if (defaultBookTreeUri.isNullOrBlank()) throw NoBooksDirException()
             val treeUri = defaultBookTreeUri.toUri()
             return if (treeUri.isContentScheme()) {
@@ -526,7 +532,7 @@ object LocalBook {
         val webDavUrl = localBook.getRemoteUrl()
         if (webDavUrl.isNullOrBlank()) throw NoStackTraceException("Book file is not webDav File")
         try {
-            OtherConfig.defaultBookTreeUri
+            otherSettingsGateway.currentSettings.defaultBookTreeUri
                 ?: throw NoBooksDirException()
             // 兼容旧版链接
             val webdav: WebDav = kotlin.runCatching {

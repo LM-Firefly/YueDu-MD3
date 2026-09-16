@@ -43,10 +43,11 @@ import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.databinding.DialogWebViewBinding
+import io.legado.app.domain.gateway.AppShellSettingsGateway
 import io.legado.app.domain.gateway.AppUiConfigurationGateway
+import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.WebCacheManager
-import io.legado.app.help.config.AppConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.http.newCallResponse
 import io.legado.app.help.http.newCallResponseBody
@@ -63,16 +64,18 @@ import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.ui.association.OnLineImportActivity
-import io.legado.app.ui.file.HandleFileContract
+import androidx.activity.result.contract.ActivityResultContracts
 import io.legado.app.utils.ACache
 import io.legado.app.utils.GSON
 import io.legado.app.utils.applyDayNight
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.invisible
+import io.legado.app.utils.isNightMode
 import io.legado.app.utils.longSnackbar
 import io.legado.app.utils.openUrl
 import io.legado.app.utils.setLayout
 import io.legado.app.utils.startActivity
+import io.legado.app.utils.sysConfiguration
 import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import io.legado.app.utils.visible
@@ -124,13 +127,24 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     }
     private val displayMetrics by lazy { resources.displayMetrics }
     private val appUiConfigurationGateway by inject<AppUiConfigurationGateway>()
-    private var appliedDarkTheme: Boolean? = null
-    private val selectImageDir = registerForActivityResult(HandleFileContract()) {
-        it.uri?.let { uri ->
-            ACache.get().put(imagePathKey, uri.toString())
-            saveImage(it.value, uri)
+    private val otherSettingsGateway by inject<OtherSettingsGateway>()
+    private val appShellSettingsGateway by inject<AppShellSettingsGateway>()
+    private val isNightTheme: Boolean
+        get() = when (appShellSettingsGateway.currentSettings.themeMode) {
+            "1" -> false
+            "2" -> true
+            else -> sysConfiguration.isNightMode
         }
-    }
+    private var appliedDarkTheme: Boolean? = null
+    private val selectImageDir =
+        registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+            if (uri != null) {
+                ACache.get().put(imagePathKey, uri.toString())
+                saveImage(pendingSaveImage, uri)
+            }
+        }
+
+    private var pendingSaveImage: String? = null
 
     private lateinit var currentWebView: WebView
     private var source: BaseSource? = null
@@ -571,14 +585,18 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     }
 
     private fun selectSaveFolder(webPic: String?) {
-        val default = arrayListOf<SelectItem<Int>>()
-        val path = ACache.get().getAsString(imagePathKey)
-        if (!path.isNullOrEmpty()) {
-            default.add(SelectItem(path, -1))
+        val lastPath = ACache.get().getAsString(imagePathKey)
+        val options = buildList {
+            if (!lastPath.isNullOrEmpty()) add(lastPath)
+            add(getString(R.string.sys_folder_picker))
         }
-        selectImageDir.launch {
-            otherActions = default
-            value = webPic
+        requireContext().selector(R.string.select_folder, options) { _, index ->
+            if (!lastPath.isNullOrEmpty() && index == 0) {
+                saveImage(webPic, lastPath.toUri())
+            } else {
+                pendingSaveImage = webPic
+                selectImageDir.launch(null)
+            }
         }
     }
 
@@ -727,7 +745,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         }
 
         override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
-            if (!AppConfig.recordLog) return false
+            if (!otherSettingsGateway.currentSettings.recordLog) return false
             val source = source ?: return false
             val messageLevel = consoleMessage.messageLevel().name
             val message = consoleMessage.message()
@@ -765,7 +783,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
 
         override fun onPageFinished(view: WebView?, url: String?) {
             super.onPageFinished(view, url)
-            applyWebViewTheme(appliedDarkTheme ?: AppConfig.isNightTheme, force = true)
+            applyWebViewTheme(appliedDarkTheme ?: isNightTheme, force = true)
         }
 
         private fun shouldOverrideUrlLoading(url: Uri): Boolean {

@@ -51,6 +51,8 @@ import io.legado.app.domain.usecase.SyncReadAloudVoicesUseCase
 import io.legado.app.domain.usecase.UploadReadingProgressUseCase
 import io.legado.app.domain.usecase.VerifyBookmarkTargetUseCase
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.feature.reader.core.navigation.ReaderChapterPagePosition
+import io.legado.app.feature.reader.core.navigation.ReaderPageContext
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isEpub
@@ -76,9 +78,9 @@ import io.legado.app.model.translation.TranslationChapterKey
 import io.legado.app.model.translation.TranslationChapterStatus
 import io.legado.app.model.translation.TranslationManager
 import io.legado.app.service.BaseReadAloudService
-import io.legado.app.ui.book.read.page.entities.TextChapter
 import io.legado.app.ui.book.read.sheet.ReaderBookSheetTab
 import io.legado.app.ui.book.searchContent.SearchResult
+import io.legado.app.utils.GSON
 import io.legado.app.utils.ImageSaveUtils
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.isAbsUrl
@@ -102,6 +104,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+private const val READER_SYNC_MIN_INTERVAL_MS = 250L
 
 /**
  * 阅读界面 ViewModel — MVI/UDF 架构
@@ -155,6 +160,10 @@ class ReadBookViewModel(
     val uiState = _uiState.asStateFlow()
     private val _effects = MutableSharedFlow<ReadBookEffect>(extraBufferCapacity = 16)
     val effects = _effects.asSharedFlow()
+    private var composePagePosition: ReaderChapterPagePosition? = null
+    @Volatile private var composePageContext: ReaderPageContext? = null
+    private var composeProgressJob: Job? = null
+    private var readBookSyncJob: Job? = null
     private val _readAloudProgress = MutableStateFlow(
         activeReadAloudProgress(
             isPlaying = BaseReadAloudService.isPlay(),
@@ -196,7 +205,7 @@ class ReadBookViewModel(
     }
     // --- 正文处理域 ---
 
-    private val contentProcessDelegate = ReadContentProcessDelegate(
+    private val contentProcessDelegate by lazy { ReadContentProcessDelegate(
         context = context,
         scope = viewModelScope,
         host = object : ReadContentProcessDelegate.Host {
@@ -205,19 +214,19 @@ class ReadBookViewModel(
             }
         },
         bookContentProcessGateway = bookContentProcessGateway,
-    )
+    ) }
 
-    val contentProcessState = contentProcessDelegate.uiState
+    val contentProcessState get() = contentProcessDelegate.uiState
     // --- 划线/高亮笔记域：一次「选中 → 配置样式/备注 → 保存」的临时会话 ---
 
-    private val markingDelegate = MarkingDelegate(
+    private val markingDelegate by lazy { MarkingDelegate(
         scope = viewModelScope,
         context = context,
         highlightRuleRepository = highlightRuleRepository,
         saveMarkingUseCase = saveMarkingUseCase,
         host = object : MarkingDelegate.Host {
             override fun reloadCurrentChapter() {
-                contentProcessDelegate.reloadCurrentChapter()
+                contentProcessDelegate.reloadCurrentChapterPreservingSnapshot()
             }
 
             override fun dismissMarkingSheet() {
@@ -228,9 +237,9 @@ class ReadBookViewModel(
                 _effects.tryEmit(ReadBookEffect.ShowToast(message))
             }
         },
-    )
+    ) }
 
-    val markingState = markingDelegate.uiState
+    val markingState get() = markingDelegate.uiState
     /**
      * 划线笔记编辑可能从目录 Sheet 进入：保存/删除/取消后应回到原 sheet（目录），
      * 而不是被丢回阅读页。从划词菜单新建时无原 sheet，回 null。
@@ -245,7 +254,7 @@ class ReadBookViewModel(
 
     // --- 跳转校验域：书签/笔记跳转前比对源与章节标题 ---
 
-    private val bookmarkNavigateDelegate = ReadBookmarkNavigateDelegate(
+    private val bookmarkNavigateDelegate by lazy { ReadBookmarkNavigateDelegate(
         scope = viewModelScope,
         bookRepository = bookRepository,
         verifyUseCase = verifyBookmarkTargetUseCase,
@@ -263,7 +272,7 @@ class ReadBookViewModel(
                 _uiState.update { it.copy(pendingBookmarkTarget = pending) }
             }
         },
-    )
+    ) }
 
     // --- AI 域（摘要 / 净化 / 重写 / 预设）---
 
@@ -298,7 +307,7 @@ class ReadBookViewModel(
             bookRepository.getChapters(bookUrl)
     }
 
-    private val aiDelegate = ReadAiDelegate(
+    private val aiDelegate by lazy { ReadAiDelegate(
         context = context,
         scope = viewModelScope,
         host = aiHost,
@@ -308,12 +317,12 @@ class ReadBookViewModel(
         saveBookContentProcessUseCase = saveBookContentProcessUseCase,
         aiArtifactGateway = aiArtifactGateway,
         aiPromptPresetGateway = aiPromptPresetGateway,
-    )
+    ) }
 
-    val aiState = aiDelegate.uiState
+    val aiState get() = aiDelegate.uiState
     // --- 高亮规则域 ---
 
-    private val highlightRuleDelegate = ReadHighlightRuleDelegate(
+    private val highlightRuleDelegate by lazy { ReadHighlightRuleDelegate(
         context = context,
         scope = viewModelScope,
         host = object : ReadHighlightRuleDelegate.Host {
@@ -323,7 +332,7 @@ class ReadBookViewModel(
 
             override fun notifyRulesChanged() {
                 _effects.tryEmit(
-                    ReadBookEffect.UpdateReadViewConfig(
+                    ReadBookEffect.UpdateReaderConfig(
                         setOf(
                             ConfigUpdateAction.UpdateChapterStyle,
                             ConfigUpdateAction.ReloadContent,
@@ -334,26 +343,26 @@ class ReadBookViewModel(
         },
         highlightRuleRepository = highlightRuleRepository,
         uploadRepository = uploadRepository,
-    )
+    ) }
 
-    val highlightRuleState = highlightRuleDelegate.uiState
+    val highlightRuleState get() = highlightRuleDelegate.uiState
 
     // --- 正文编辑域 ---
 
-    private val contentEditDelegate = ReadContentEditDelegate(
+    private val contentEditDelegate by lazy { ReadContentEditDelegate(
         scope = viewModelScope,
         host = object : ReadContentEditDelegate.Host {
+            override val currentCanvasPage: ReaderPageContext? get() = composePageContext
             override fun setActiveSheet(sheet: ReadBookSheet?) {
                 _uiState.update { it.copy(activeSheet = sheet) }
             }
 
-            override suspend fun findChapter(bookUrl: String, chapterIndex: Int): BookChapter? =
-                bookRepository.getChapter(bookUrl, chapterIndex)
+            override suspend fun findChapter(bookUrl: String, chapterIndex: Int): BookChapter? = bookRepository.getChapter(bookUrl, chapterIndex)
         },
         readSettingsRepository = readSettingsRepository,
-    )
+    ) }
 
-    val contentEditState = contentEditDelegate.uiState
+    val contentEditState get() = contentEditDelegate.uiState
 
     // --- 配置更新分发（无自持状态，menuConfig 仍在 ReadBookUiState）---
 
@@ -389,27 +398,27 @@ class ReadBookViewModel(
 
     // --- 书签域（无自持状态，草稿随 ReadBookSheet.Bookmark 走）---
 
-    private val bookmarkDelegate = ReadBookmarkDelegate(
+    private val bookmarkDelegate by lazy { ReadBookmarkDelegate(
         scope = viewModelScope,
         host = object : ReadBookmarkDelegate.Host {
-            override fun setActiveSheet(sheet: ReadBookSheet?) {
-                _uiState.update { it.copy(menuState = ReadBookMenuState(), activeSheet = sheet) }
+            override val currentCanvasPage: ReaderPageContext? get() = composePageContext
+
+            override fun setActiveSheet(sheet: ReadBookSheet?) = _uiState.update {
+                it.copy(menuState = ReadBookMenuState(), activeSheet = sheet)
             }
 
-            override fun emitEffect(effect: ReadBookEffect) {
-                _effects.tryEmit(effect)
-            }
+            override fun emitEffect(effect: ReadBookEffect) { _effects.tryEmit(effect) }
         },
         bookmarkRepository = bookmarkRepository,
         bookKey = _uiState.map { it.book?.let { book -> book.name to book.author } },
-    )
+    ) }
 
-    private val readRecordAliasDelegate = ReadRecordAliasDelegate(
+    private val readRecordAliasDelegate by lazy { ReadRecordAliasDelegate(
         viewModelScope, localPreferencesRepository, readRecordRepository,
         { _uiState.value.activeDialog != null },
         { book, time -> _uiState.update { it.copy(activeDialog = ReadBookDialog.ReadRecordAliasConflict(book.name, book.author, time)) } },
         { _uiState.update { it.copy(activeDialog = null) } },
-    )
+    ) }
     // --- 开书 / 目录 / 换源 / 进度同步域（无自持状态，isInitFinish 仍在 UiState）---
 
     private val loadDelegate: ReadBookLoadDelegate = ReadBookLoadDelegate(
@@ -492,19 +501,19 @@ class ReadBookViewModel(
     )
 
     /** 自定义书签角标（拷贝落盘 + 刷新角标），独立于样式域的小委托。 */
-    private val bookmarkBadgeDelegate = BookmarkBadgeDelegate(
+    private val bookmarkBadgeDelegate by lazy { BookmarkBadgeDelegate(
         scope = viewModelScope,
         context = context,
         readSettingsRepository = readSettingsRepository,
         emitEffect = _effects::tryEmit,
-    )
+    ) }
 
     /** 日夜切换冷却期内不再弹提醒；光线传感器回调在 RouteScreen 里先问这个再发 intent。 */
     fun isDayNightSwitchCoolingDown(): Boolean = styleDelegate.isDayNightSwitchCoolingDown()
 
     // --- 朗读域（无自持状态，朗读设置字段仍在 ReadBookUiState）---
 
-    private val readAloudDelegate = ReadAloudDelegate(
+    private val readAloudDelegate by lazy { ReadAloudDelegate(
         context = context,
         scope = viewModelScope,
         host = object : ReadAloudDelegate.Host {
@@ -540,11 +549,11 @@ class ReadBookViewModel(
         httpTtsRepository = httpTtsRepository,
         aiProfileGateway = aiProfileGateway,
         syncReadAloudVoicesUseCase = syncReadAloudVoicesUseCase,
-    )
+    ) }
 
     // --- 菜单按钮配置域（无自持状态，按钮列表仍在 menuConfig）---
 
-    private val buttonConfigDelegate = ReadButtonConfigDelegate(
+    private val buttonConfigDelegate by lazy { ReadButtonConfigDelegate(
         context = context,
         scope = viewModelScope,
         readSettingsRepository = readSettingsRepository,
@@ -557,7 +566,7 @@ class ReadBookViewModel(
                 configUpdateDelegate.handle(update)
             }
         },
-    )
+    ) }
 
     // --- 净化规则域（无自持状态，规则列表仍在 uiState.allReplaceRules）---
 
@@ -590,34 +599,9 @@ class ReadBookViewModel(
     private var pendingBooksDirReloadChapterList: Boolean = false
     private var translationStatusJob: Job? = null
     private var observedTranslationKey: TranslationChapterKey? = null
+    private var deferredReaderFeaturesStarted = false
 
     val isInitFinish: Boolean get() = _uiState.value.isInitFinish
-
-    private var cachedChapterBookUrl: String? = null
-
-    /**
-     * ReadView 在 Compose 组合期就构造并画第一帧, 早于 initData 完成,
-     * 那时 isInitFinish 还是 false, 于是先闪一帧 "加载数据中".
-     * 记下本路由要打开的书, 供 [isCachedChapterUsable] 在绘制时判定.
-     */
-    fun prepareCachedChapterFallback(bookUrl: String?, chapterChanged: Boolean) {
-        cachedChapterBookUrl = bookUrl?.takeUnless { it.isEmpty() || chapterChanged }
-    }
-
-    /**
-     * ReadBook 里已经有本书可直接用的章节(重新进入, 或导航期间预加载排好的).
-     * 在绘制时判定而不是组合期一次性判定: 预加载的发布可能比组合晚几十毫秒.
-     */
-    fun isCachedChapterUsable(): Boolean {
-        val bookUrl = cachedChapterBookUrl ?: return false
-        if (ReadBook.book?.bookUrl != bookUrl) return false
-        if (ReadBook.msg != null) return false
-        val chapter = ReadBook.curTextChapter ?: return false
-        if (!chapter.isLayoutSizeMatch()) return false
-        // 长章节在导航窗口内排不完整章, 只要当前页已经排出来就够画第一帧了
-        return chapter.isCompleted ||
-                (chapter.isLayoutRunning && chapter.getPage(ReadBook.durPageIndex) != null)
-    }
 
     private fun isNightTheme(): Boolean =
         appUiConfigurationGateway.currentConfiguration.isDarkTheme
@@ -638,15 +622,21 @@ class ReadBookViewModel(
         // collect 的挂起点——本行返回时订阅者已注册。
         collectReaderSessionEvents()
         readerSession.attach()
-        buttonConfigDelegate.refresh()
         collectReadPreferences()
         styleDelegate.collectEyeProtectionSettings()
-        readAloudDelegate.collectPreferences()
         collectEventBus()
         collectReaderSession()
         collectReadStyle()
-        bookmarkDelegate.start()
         replaceRuleDelegate.start()
+    }
+
+    /** Starts non-renderer features only after navigation/shared-bounds animation is idle. */
+    fun onReaderEntranceSettled() {
+        if (deferredReaderFeaturesStarted) return
+        deferredReaderFeaturesStarted = true
+        buttonConfigDelegate.refresh()
+        readAloudDelegate.collectPreferences()
+        bookmarkDelegate.start()
         execute { readAloudDelegate.syncConfiguredTtsVoices() }
     }
 
@@ -687,10 +677,20 @@ class ReadBookViewModel(
      * 收集在 mutator 返回之后异步触发，故 syncFromReadBook 读到的 ReadBook 字段已是最终态。
      */
     private fun collectReaderSession() {
+        // 快照同步一律尾随合并：syncFromReadBook 全量重建 UiState（含 ReadMenuConfig
+        // 等 50+ 字段）并整屏重组，不能落在滚动/翻页动画的帧上。热路径（跨页进度）
+        // 已不发布快照，剩余发布主要是切章/换书等结构变化，延迟一个间隔无感。
         viewModelScope.launch {
-            readerSession.state.collect {
-                _uiState.update { state -> syncFromReadBook(state) }
-            }
+            readerSession.state.collect { scheduleReadBookSync() }
+        }
+    }
+
+    /** 合并高频快照/事件刷新：连续发布只保留最后一次，同步永远离帧 250ms。 */
+    private fun scheduleReadBookSync() {
+        readBookSyncJob?.cancel()
+        readBookSyncJob = viewModelScope.launch {
+            delay(READER_SYNC_MIN_INTERVAL_MS)
+            _uiState.update { syncFromReadBook(it) }
         }
     }
 
@@ -706,7 +706,9 @@ class ReadBookViewModel(
             readerSession.events.collect { event ->
                 when (event) {
                     is ReaderSessionEvent.StateInvalidated -> {
-                        _uiState.update { syncFromReadBook(it) }
+                        // 切章等结构性变化也走尾随合并：发布点多在翻页帧上
+                        // （如 moveToNextChapter 的 upMenuView），立即重组会掉帧。
+                        scheduleReadBookSync()
                     }
 
                     is ReaderSessionEvent.ChapterListRequested -> loadChapterList(event.book)
@@ -1090,11 +1092,11 @@ class ReadBookViewModel(
             is ReadBookIntent.MenuSameTitleRemoved -> {
                 ReadBook.book?.let {
                     val contentProcessor = ContentProcessor.get(it)
-                    val textChapter = ReadBook.curTextChapter
-                    if (textChapter != null
-                        && !textChapter.sameTitleRemoved
+                    val chapterInput = ReadBook.readerChapterInputWindow.current
+                    if (chapterInput != null
+                        && !chapterInput.content.sameTitleRemoved
                         && !contentProcessor.removeSameTitleCache.contains(
-                            textChapter.chapter.getFileName("nr")
+                            chapterInput.chapter.getFileName("nr")
                         )
                     ) {
                         _effects.tryEmit(ReadBookEffect.ShowToast("未找到可移除的重复标题"))
@@ -1107,8 +1109,8 @@ class ReadBookViewModel(
                 ReadBook.book?.setImageStyle(intent.style)
                 if (intent.style == Book.imgStyleSingle) {
                     ReadBook.book?.setPageAnim(0)
-                    _effects.tryEmit(ReadBookEffect.MenuImageStyleChanged(intent.style))
                 }
+                _effects.tryEmit(ReadBookEffect.MenuImageStyleChanged(intent.style))
                 ReadBook.loadContent(false)
             }
 
@@ -1143,7 +1145,7 @@ class ReadBookViewModel(
                     if (ReadBook.bookSource == null) {
                         _effects.tryEmit(ReadBookEffect.UpContent(0, true))
                     } else {
-                        ReadBook.curTextChapter = null
+                        ReadBook.clearTextChapter()
                         _effects.tryEmit(ReadBookEffect.UpContent(0, true))
                         refreshContentDur(book)
                     }
@@ -1354,8 +1356,8 @@ class ReadBookViewModel(
                 readAloudDelegate.setTtsFollowSys(intent.value)
             is ReadBookIntent.SetReadAloudTtsSpeechRate ->
                 readAloudDelegate.setTtsSpeechRate(intent.value)
-            is ReadBookIntent.SetSpeechAnalysisMode ->
-                readAloudDelegate.setSpeechAnalysisMode(intent.value)
+            is ReadBookIntent.SetSpeechAnalysisMode -> readAloudDelegate.setSpeechAnalysisMode(intent.value)
+            is ReadBookIntent.SetSpeechAnalysisReasoningLevel -> readAloudDelegate.setSpeechAnalysisReasoningLevel(intent.value)
             is ReadBookIntent.SetUseMultiSpeaker ->
                 readAloudDelegate.setUseMultiSpeaker(intent.value)
             is ReadBookIntent.SetDefaultReadAloudInterface ->
@@ -1426,9 +1428,12 @@ class ReadBookViewModel(
             // Text action menu
             is ReadBookIntent.TextActionAloud -> {
                 when (readAloudSettingsRepository.currentSettings.contentSelectSpeakMode) {
-                    1 -> intent.selectStartPos?.let {
-                        _effects.tryEmit(ReadBookEffect.TextActionAloudSelect(it.copy()))
-                    } ?: _effects.tryEmit(ReadBookEffect.TextActionSpeak(intent.text))
+                    1 -> when {
+                        intent.chapterPosition != null -> _effects.tryEmit(
+                            ReadBookEffect.TextActionAloudPosition(intent.chapterPosition)
+                        )
+                        else -> _effects.tryEmit(ReadBookEffect.TextActionSpeak(intent.text))
+                    }
                     else -> _effects.tryEmit(ReadBookEffect.TextActionSpeak(intent.text))
                 }
             }
@@ -1441,6 +1446,30 @@ class ReadBookViewModel(
                 markingDelegate.open(intent.selection)
                 _uiState.update { it.copy(activeSheet = ReadBookSheet.Marking) }
             }
+
+            is ReadBookIntent.OpenQuickMarking -> {
+                markingReturnSheet = null
+                markingDelegate.open(intent.selection, inlineMode = true)
+            }
+
+            is ReadBookIntent.OpenQuickMarkingEdit -> {
+                markingReturnSheet = null
+                markingDelegate.openForEdit(intent.id, inlineMode = true)
+            }
+
+            is ReadBookIntent.ApplyQuickMarking -> {
+                viewModelScope.launch {
+                    readSettingsRepository.update {
+                        it.copy(lastMarkingStyle = GSON.toJson(intent.style))
+                    }
+                }
+                markingDelegate.save(
+                    style = intent.style,
+                    note = intent.note ?: markingDelegate.uiState.value.editing?.note.orEmpty(),
+                )
+            }
+
+            ReadBookIntent.DismissQuickMarking -> markingDelegate.closeInlineSession()
 
             is ReadBookIntent.EditMarking -> {
                 // 从目录 Sheet 进入：记住原 sheet，保存/删除/取消后返回
@@ -1758,7 +1787,7 @@ class ReadBookViewModel(
                         sheetConfig = buildSheetConfig(),
                     )
                 }
-                emitEffectWhenSubscribed(ReadBookEffect.UpdateReadViewConfig(actions))
+                emitEffectWhenSubscribed(ReadBookEffect.UpdateReaderConfig(actions))
             }
         }
         viewModelScope.launch {
@@ -1989,21 +2018,22 @@ class ReadBookViewModel(
 
     private fun syncFromReadBook(current: ReadBookUiState): ReadBookUiState {
         val book = ReadBook.book
-        val textChapter = ReadBook.curTextChapter
+        val chapterInput = ReadBook.readerChapterInputWindow.current
+        val canvasPage = composePagePosition
+            ?.takeIf { it.chapterIndex == ReadBook.durChapterIndex }
         val translationStatus = observeCurrentTranslation(book, ReadBook.durChapterIndex)
         return current.copy(
             book = book,
             bookSource = ReadBook.bookSource,
             bookName = book?.name ?: "",
-            chapterName = textChapter?.title ?: "",
-            chapterUrl = textChapter?.chapter?.url ?: "",
+            chapterName = chapterInput?.displayTitle ?: "",
+            chapterUrl = chapterInput?.chapter?.url ?: "",
             chapterSize = ReadBook.chapterSize,
             durChapterIndex = ReadBook.durChapterIndex,
             durChapterPos = ReadBook.durChapterPos,
-            durPageIndex = ReadBook.durPageIndex,
+            durPageIndex = canvasPage?.pageIndex ?: ReadBook.durPageIndex,
             isLocalBook = ReadBook.isLocalBook,
             msg = ReadBook.msg,
-            curTextChapter = textChapter,
             seekProgress = calculateSeekProgress(),
             seekMax = calculateSeekMax(),
             readingAnchorAvailable = ReadBook.hasReadingAnchor(),
@@ -2011,9 +2041,9 @@ class ReadBookViewModel(
             replaceRuleEnabled = book?.getUseReplaceRule(
                 otherSettingsGateway.currentSettings.replaceEnableDefault
             ) ?: false,
-            effectiveReplaceCount = textChapter?.effectiveReplaceRules?.size ?: 0,
-            effectiveContentProcessCount = textChapter?.effectiveContentProcesses?.size ?: 0,
-            effectiveReplaceRules = textChapter?.effectiveReplaceRules.orEmpty().toImmutableList(),
+            effectiveReplaceCount = chapterInput?.content?.effectiveReplaceRules?.size ?: 0,
+            effectiveContentProcessCount = chapterInput?.content?.effectiveContentProcesses?.size ?: 0,
+            effectiveReplaceRules = chapterInput?.content?.effectiveReplaceRules.orEmpty().toImmutableList(),
             chineseConverterActive = readSettingsRepository.currentSettings.chineseConverterType > 0,
             translationMode = book?.getTranslationMode() ?: false,
             translationStatus = translationStatus,
@@ -2025,7 +2055,7 @@ class ReadBookViewModel(
             reSegment = book?.getReSegment() ?: false,
             delRubyTag = book?.getDelTag(Book.rubyTag) ?: false,
             delHTag = book?.getDelTag(Book.hTag) ?: false,
-            sameTitleRemoved = textChapter?.sameTitleRemoved ?: false,
+            sameTitleRemoved = chapterInput?.content?.sameTitleRemoved ?: false,
             isReadingProgressSyncConfigured = isReadingProgressSyncConfigured(),
             menuConfig = ReadMenuConfig(
                 titleBarIconPosition = ReadBookConfig.titleBarIconPosition,
@@ -2113,14 +2143,21 @@ class ReadBookViewModel(
 
     private fun calculateSeekProgress(): Int {
         return when (readSettingsRepository.currentSettings.progressBarBehavior) {
-            "page" -> ReadBook.durPageIndex
+            "page" -> composePagePosition
+                ?.takeIf { it.chapterIndex == ReadBook.durChapterIndex }
+                ?.pageIndex
+                ?: ReadBook.durPageIndex
             else -> ReadBook.durChapterIndex
         }
     }
 
     private fun calculateSeekMax(): Int {
         return when (readSettingsRepository.currentSettings.progressBarBehavior) {
-            "page" -> (ReadBook.curTextChapter?.pages?.size ?: 1) - 1
+            "page" -> composePagePosition
+                ?.takeIf { it.chapterIndex == ReadBook.durChapterIndex }
+                ?.pageCount
+                ?.minus(1)
+                ?: 0
             else -> ReadBook.chapterSize - 1
         }
     }
@@ -2143,8 +2180,11 @@ class ReadBookViewModel(
     suspend fun initReadBookConfig(request: ReadBookInitRequest) =
         loadDelegate.initReadBookConfig(request)
 
-    fun initData(request: ReadBookInitRequest, success: (() -> Unit)? = null) =
-        loadDelegate.initData(request, success)
+    fun initData(
+        request: ReadBookInitRequest,
+        initialBook: Book? = null,
+        success: (() -> Unit)? = null,
+    ) = loadDelegate.initData(request, initialBook, success)
 
     fun markJustInitData() {
         justInitData = true
@@ -2316,13 +2356,6 @@ class ReadBookViewModel(
         reverseContent()
     }
 
-    /** 纯定位逻辑见 [ReadSearchResultLocator]；这里保留转发入口供 ReadBookController 调用。 */
-    fun searchResultPositions(
-        textChapter: TextChapter,
-        searchResult: SearchResult,
-        query: String = _uiState.value.searchContentQuery,
-    ): Array<Int> = ReadSearchResultLocator.positions(textChapter, searchResult, query)
-
     /**
      * Compute the search result position and emit [ReadBookEffect.NavigateToSearchResult]
      * so the Controller can navigate and highlight.
@@ -2330,64 +2363,54 @@ class ReadBookViewModel(
     private fun navigateToSearchResult(result: SearchResult) {
         val query = _uiState.value.searchContentQuery
         if (query.isEmpty()) return
-        val chapterIndex = result.chapterIndex
-        val textChapter = ReadBook.curTextChapter
-        if (textChapter != null && textChapter.chapter.index == chapterIndex) {
-            val pos = searchResultPositions(textChapter, result, query)
-            val lineIndex = pos[1]
-            val charIndex = pos[2]
-            val endRelativePage = pos[3]
-            val endLineIndex = pos[4]
-            val endCharIndex = pos[5]
-            _effects.tryEmit(
-                ReadBookEffect.NavigateToSearchResult(
-                    result = result,
-                    chapterIndex = chapterIndex,
-                    pageIndex = pos[0],
-                    lineIndex = lineIndex,
-                    startCharIndex = charIndex,
-                    endRelativePage = endRelativePage,
-                    endLineIndex = endLineIndex,
-                    endCharIndex = endCharIndex,
-                )
-            )
-        } else {
-            // Chapter not loaded — emit with -1 so the Controller knows to open the chapter first
-            _effects.tryEmit(
-                ReadBookEffect.NavigateToSearchResult(
-                    result = result,
-                    chapterIndex = chapterIndex,
-                    pageIndex = -1,
-                    lineIndex = 0,
-                    startCharIndex = 0,
-                    endRelativePage = 0,
-                    endLineIndex = 0,
-                    endCharIndex = 0,
-                )
-            )
-        }
+        _effects.tryEmit(
+            ReadBookEffect.NavigateToSearchResult(result)
+        )
     }
 
     fun reverseRemoveSameTitle() {
         execute {
             val book = ReadBook.book ?: return@execute
-            val textChapter = ReadBook.curTextChapter ?: return@execute
+            val chapterInput = ReadBook.readerChapterInputWindow.current ?: return@execute
             BookHelp.setRemoveSameTitle(
-                book, textChapter.chapter, !textChapter.sameTitleRemoved
+                book, chapterInput.chapter, !chapterInput.content.sameTitleRemoved
             )
             ReadBook.loadContent(ReadBook.durChapterIndex)
         }
     }
 
     fun refreshImage(src: String) {
-        execute {
-            ReadBook.book?.let { book ->
-                val vFile = BookHelp.getImage(book, src)
-                ImageProvider.bitmapLruCache.remove(vFile.absolutePath)
-                vFile.delete()
+        refreshImages(setOf(src))
+    }
+
+    /**
+     * Re-fetch the supplied inline images. Theme changes use this same path as the
+     * reader's explicit “refresh image” action so source-side JS is evaluated again.
+     */
+    fun refreshImages(sources: Set<String>) {
+        if (sources.isEmpty()) return
+        viewModelScope.launch {
+            val refreshed = refreshImageFiles(sources)
+            if (refreshed.isNotEmpty()) {
+                _effects.tryEmit(ReadBookEffect.InvalidateReaderImages(refreshed))
             }
-        }.onFinally {
-            ReadBook.loadContent(false)
+        }
+    }
+
+    /** Performs the file-cache half of image refresh before a renderer redraws it. */
+    suspend fun refreshImageFiles(sources: Set<String>): Set<String> = withContext(IO) {
+        val book = ReadBook.book ?: return@withContext emptySet()
+        buildSet {
+            sources.forEach { source ->
+                val refreshed = runCatching {
+                    val vFile = BookHelp.getImage(book, source)
+                    ImageProvider.bitmapLruCache.remove(vFile.absolutePath)
+                    vFile.delete()
+                    ImageProvider.cacheImage(book, source, ReadBook.bookSource)
+                    vFile.isFile && vFile.length() > 0L
+                }.getOrDefault(false)
+                if (refreshed) add(source)
+            }
         }
     }
 
@@ -2463,16 +2486,47 @@ class ReadBookViewModel(
     }
 
     fun refreshSeekState() {
-        _uiState.update { it.copy(
-            seekProgress = calculateSeekProgress(),
-            seekMax = calculateSeekMax(),
-        ) }
+        _uiState.update {
+            it.copy(seekProgress = calculateSeekProgress(), seekMax = calculateSeekMax())
+        }
+    }
+
+    fun updateComposeReaderPage(position: ReaderChapterPagePosition?, pageContext: ReaderPageContext?) {
+        composePagePosition = position
+        composePageContext = pageContext
+        if (position == null || position.chapterIndex != ReadBook.durChapterIndex) return
+        // 滚动热路径每次跨页都会调用；进度 UI(_uiState) 是整屏重组源，延迟到节拍
+        // 间隙发布。composePagePosition/Context 已同步更新，直读字段的路径不受影响。
+        composeProgressJob?.cancel()
+        composeProgressJob = viewModelScope.launch {
+            delay(250L)
+            publishComposeProgress()
+        }
+    }
+
+    private fun publishComposeProgress() {
+        val position = composePagePosition?.takeIf { it.chapterIndex == ReadBook.durChapterIndex } ?: return
+        _uiState.update { state ->
+            state.copy(
+                durPageIndex = position.pageIndex,
+                seekProgress = if (readSettingsRepository.currentSettings.progressBarBehavior == "page") {
+                    position.pageIndex
+                } else {
+                    state.seekProgress
+                },
+                seekMax = if (readSettingsRepository.currentSettings.progressBarBehavior == "page") {
+                    position.pageCount.coerceAtLeast(1) - 1
+                } else {
+                    state.seekMax
+                },
+            )
+        }
     }
 
     private fun openChapterUrl() {
         if (ReadBook.isLocalBook) return
         viewModelScope.launch {
-            val chapter = ReadBook.curTextChapter?.chapter
+            val chapter = ReadBook.readerChapterInputWindow.current?.chapter
                 ?: currentChapter()
                 ?: return@launch
             val url = chapter.getAbsoluteURL()

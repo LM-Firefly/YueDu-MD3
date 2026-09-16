@@ -34,8 +34,10 @@ sealed interface DictEmptyReason {
 sealed interface DictIntent {
     data class Load(val word: String) : DictIntent
     data class SelectRule(val index: Int) : DictIntent
+    data object OpenSelectedRuleInWebView : DictIntent
 }
 
 sealed interface DictEffect {
     data class ShowToast(val message: String) : DictEffect
+    data class OpenWebPage(val title: String, val url: String) : DictEffect
 }

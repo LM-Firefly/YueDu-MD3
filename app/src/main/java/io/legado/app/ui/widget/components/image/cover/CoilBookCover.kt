@@ -54,6 +54,13 @@ private const val SharedCoverRadiusCacheMaxSize = 256
 private const val DefaultCoverPath = "use_default_cover"
 private val sharedCoverRadiusCache = mutableStateMapOf<String, Dp>()
 
+/**
+ * 封面在源页面的圆角缓存读取入口：封面离开源页面（Visible→Visible 定格）时写入，
+ * 阅读端 sharedBounds 的起始圆角由它提供，保证转场两端圆角衔接连续。
+ */
+internal fun sharedCoverSourceRadius(sharedCoverKey: String?): Dp? =
+    sharedCoverKey?.let { sharedCoverRadiusCache[it] }
+
 @Composable
 internal fun usesDefaultBookCover(path: String?): Boolean {
     return LocalAppUiConfiguration.current.cover.useDefaultCover ||
@@ -61,6 +68,7 @@ internal fun usesDefaultBookCover(path: String?): Boolean {
             path == DefaultCoverPath
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun BookCoverImage(
     name: String?,
@@ -69,6 +77,9 @@ fun BookCoverImage(
     modifier: Modifier = Modifier,
     sourceOrigin: String? = null,
     memoryCacheKey: String? = null,
+    // 本书 bookUrl（别名缓存键）与书架本地优先标志，透传给 buildCoverImageRequest。
+    bookUrl: String? = null,
+    preferCache: Boolean = false,
     ignoreUseDefaultCover: Boolean = false,
     showLoadingPlaceholder: Boolean = true,
     contentScale: ContentScale = ContentScale.Crop,
@@ -76,6 +87,8 @@ fun BookCoverImage(
     onSuccess: (() -> Unit)? = null,
     onError: (() -> Unit)? = null,
     sharedCoverKey: String? = null,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
     requestBuilder: ImageRequest.Builder.() -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -123,7 +136,20 @@ fun BookCoverImage(
             isUsingDefaultCover ||
                 (showLoadingPlaceholder && showLoadingDefault)
         )
-    Box(modifier = modifier) {
+    Box(
+        modifier = modifier.then(
+            with(sharedTransitionScope) {
+                if (this != null && animatedVisibilityScope != null && sharedCoverKey != null) {
+                    Modifier.sharedBounds(
+                        sharedContentState = rememberSharedContentState(sharedCoverKey),
+                        animatedVisibilityScope = animatedVisibilityScope,
+                    )
+                } else {
+                    Modifier
+                }
+            }
+        )
+    ) {
         if (showCustomDefault) {
             AsyncImage(
                 model = buildCoverImageRequest(
@@ -163,6 +189,8 @@ fun BookCoverImage(
                     memoryCacheKey = sharedCoverKey?.let {
                         "$it:cover:${memoryCacheKey ?: finalPath}"
                     } ?: memoryCacheKey ?: finalPath,
+                    bookUrl = bookUrl,
+                    preferCache = preferCache,
                     configure = requestBuilder,
                 ),
                 contentDescription = null,
@@ -200,6 +228,9 @@ fun CoilBookCover(
     radius: Dp = 4.dp,
     modifier: Modifier = Modifier.width(64.dp),
     sourceOrigin: String? = null,
+    // 本书 bookUrl + 书架本地优先标志，透传给 BookCoverImage
+    bookUrl: String? = null,
+    preferCache: Boolean = false,
     onLoadFinish: (() -> Unit)? = null,
     onError: (() -> Unit)? = null,
     ignoreUseDefaultCover: Boolean = false,
@@ -249,7 +280,7 @@ fun CoilBookCover(
             .then(
                 with(sharedTransitionScope) {
                     if (this != null && animatedVisibilityScope != null && sharedCoverKey != null) {
-                        Modifier.sharedElement(
+                        Modifier.sharedBounds(
                             sharedContentState = rememberSharedContentState(sharedCoverKey),
                             animatedVisibilityScope = animatedVisibilityScope,
                             clipInOverlayDuringTransition = OverlayClip(shape)
@@ -276,6 +307,8 @@ fun CoilBookCover(
             path = path,
             modifier = Modifier.fillMaxSize(),
             sourceOrigin = sourceOrigin,
+            bookUrl = bookUrl,
+            preferCache = preferCache,
             ignoreUseDefaultCover = ignoreUseDefaultCover,
             showLoadingPlaceholder = showLoadingPlaceholder,
             onSuccess = {

@@ -7,20 +7,20 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.rule.ContentRule
+import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
+import io.legado.app.domain.gateway.ReadSettingsGateway
 import io.legado.app.exception.ContentEmptyException
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.isAudio
 import io.legado.app.help.book.isOnLineTxt
 import io.legado.app.help.book.isVideo
-import io.legado.app.help.config.AppConfig
 import io.legado.app.model.Debug
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setChapter
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setNextChapterUrl
 import io.legado.app.model.analyzeRule.AnalyzeUrl
-import io.legado.app.ui.config.otherConfig.OtherConfig
 import io.legado.app.utils.HtmlFormatter
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.mapAsync
@@ -28,6 +28,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.flow
 import org.apache.commons.text.StringEscapeUtils
+import org.koin.core.context.GlobalContext
 import splitties.init.appCtx
 import kotlin.coroutines.coroutineContext
 
@@ -37,6 +38,8 @@ import kotlin.coroutines.coroutineContext
 object BookContent {
 
     private const val maxNextPageConcurrency = 4
+    private val cacheSettingsGateway get() = GlobalContext.get().get<DownloadCacheSettingsGateway>()
+    private val readSettingsGateway get() = GlobalContext.get().get<ReadSettingsGateway>()
 
     @Throws(Exception::class)
     suspend fun analyzeContent(
@@ -119,7 +122,7 @@ object BookContent {
                 for (urlStr in contentData.second) {
                     emit(urlStr)
                 }
-            }.mapAsync(OtherConfig.threadCount.coerceIn(1, maxNextPageConcurrency)) { urlStr ->
+            }.mapAsync(cacheSettingsGateway.currentSettings.threadCount.coerceIn(1, maxNextPageConcurrency)) { urlStr ->
                 val analyzeUrl = AnalyzeUrl(
                     mUrl = urlStr,
                     source = bookSource,
@@ -231,7 +234,7 @@ object BookContent {
         var content = analyzeRule.getString(contentRule.content, unescape = false)
         if (!book.isAudio && !book.isVideo) { //音频和视频获取的是链接，不需要html格式化 && !book.isVideo
             val useHtmlMap = mutableMapOf<String, String>()
-            if (AppConfig.adaptSpecialStyle) {
+            if (readSettingsGateway.currentSettings.adaptSpecialStyle) {
                 content = AppPattern.useHtmlRegex.replace(content) {
                     val placeholder = "{usehtml_${useHtmlMap.size}}"
                     useHtmlMap[placeholder] = it.value

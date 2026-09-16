@@ -1,7 +1,5 @@
 package io.legado.app.ui.book.info
 
-import io.legado.app.ui.config.themeConfig.ThemeConfig
-
 internal data class BookInfoBackdropStyle(
     val showCover: Boolean,
     val blurCover: Boolean,
@@ -9,14 +7,15 @@ internal data class BookInfoBackdropStyle(
 )
 
 internal fun resolveBookInfoBackdropStyle(backgroundMode: String): BookInfoBackdropStyle {
+    // 取值与主题设置持久化的 bookInfoBackground 一致：off/ off_for_default / on
     return when (backgroundMode) {
-        ThemeConfig.BOOK_INFO_BACKGROUND_BLUR_OFF -> BookInfoBackdropStyle(
+        "off" -> BookInfoBackdropStyle(
             showCover = true,
             blurCover = false,
             applySeedOverlay = true,
         )
 
-        ThemeConfig.BOOK_INFO_BACKGROUND_COVER_HIDDEN -> BookInfoBackdropStyle(
+        "off_for_default" -> BookInfoBackdropStyle(
             showCover = false,
             blurCover = false,
             applySeedOverlay = false,

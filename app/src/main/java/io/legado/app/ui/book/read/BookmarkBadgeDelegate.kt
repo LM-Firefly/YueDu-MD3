@@ -35,7 +35,7 @@ class BookmarkBadgeDelegate(
                 path
             }.onSuccess { path ->
                 readSettingsRepository.preferences.first { it.bookmarkBadgeImage == path }
-                emitEffect(ReadBookEffect.UpdateReadViewConfig(setOf(ConfigUpdateAction.UpdateStyle)))
+                emitEffect(ReadBookEffect.UpdateReaderConfig(setOf(ConfigUpdateAction.UpdateStyle)))
                 emitEffect(ReadBookEffect.ShowToast(context.getString(R.string.success)))
             }.onFailure { throwable ->
                 AppLog.put("选择书签角标失败", throwable)
@@ -56,7 +56,7 @@ class BookmarkBadgeDelegate(
             oldPath.takeIf { it.isNotBlank() }?.let { runCatching { File(it).delete() } }
             readSettingsRepository.update { it.copy(bookmarkBadgeImage = "") }
             readSettingsRepository.preferences.first { it.bookmarkBadgeImage.isEmpty() }
-            emitEffect(ReadBookEffect.UpdateReadViewConfig(setOf(ConfigUpdateAction.UpdateStyle)))
+            emitEffect(ReadBookEffect.UpdateReaderConfig(setOf(ConfigUpdateAction.UpdateStyle)))
         }
     }
 

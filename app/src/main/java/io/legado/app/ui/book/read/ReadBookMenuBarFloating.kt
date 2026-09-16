@@ -29,7 +29,7 @@ import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.Toc
+import androidx.compose.material.icons.automirrored.filled.Toc
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
@@ -191,7 +191,7 @@ private fun OverflowDropdownMenu(
                 if (state.isLocalTxt) {
                     RoundDropdownMenuItem(
                         text = stringResource(R.string.txt_toc_rule),
-                        leadingIcon = menuIcon(Icons.Default.Toc),
+                        leadingIcon = menuIcon(Icons.AutoMirrored.Filled.Toc),
                         onClick = { dismiss(); onIntent(ReadBookIntent.MenuTocRegex) },
                     )
                 }
@@ -241,7 +241,7 @@ private fun OverflowDropdownMenu(
         )
         RoundDropdownMenuItem(
             text = stringResource(R.string.re_segment),
-            leadingIcon = menuIcon(Icons.Default.Toc),
+            leadingIcon = menuIcon(Icons.AutoMirrored.Filled.Toc),
             isSelected = state.reSegment,
             onClick = { onIntent(ReadBookIntent.MenuReSegment) },
         )

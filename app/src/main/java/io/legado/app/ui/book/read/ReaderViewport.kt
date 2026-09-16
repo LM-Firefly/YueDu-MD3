@@ -65,8 +65,7 @@ interface ReaderLayoutController {
 }
 
 /**
- * Track C · C4 的尺寸输入接缝。分页仍由 ChapterProvider 完成；本类只负责把
- * View/Compose 的测量结果统一成正文尺寸，并暴露排版完成 revision。
+ * Publishes the Compose viewport to the Canvas pagination environment and exposes layout revisions.
  */
 internal class ReaderLayoutCoordinator(
     private val updateLayoutSize: (width: Int, height: Int) -> Unit,

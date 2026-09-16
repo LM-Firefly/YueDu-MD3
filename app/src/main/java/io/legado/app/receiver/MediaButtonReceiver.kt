@@ -7,8 +7,8 @@ import android.view.KeyEvent
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
+import io.legado.app.domain.gateway.ReadAloudSettingsGateway
 import io.legado.app.help.LifecycleHelp
-import io.legado.app.help.config.AppConfig
 import io.legado.app.model.AudioPlay
 import io.legado.app.model.ReadAloud
 import io.legado.app.model.ReadBook
@@ -18,6 +18,7 @@ import io.legado.app.ui.main.MainActivity
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.getPrefBoolean
 import io.legado.app.utils.postEvent
+import org.koin.core.context.GlobalContext
 
 
 /**
@@ -35,6 +36,8 @@ class MediaButtonReceiver : BroadcastReceiver() {
     companion object {
 
         private const val TAG = "MediaButtonReceiver"
+
+        private val aloudSettingsGateway get() = GlobalContext.get().get<ReadAloudSettingsGateway>()
 
         fun handleIntent(context: Context, intent: Intent): Boolean {
             val intentAction = intent.action
@@ -90,14 +93,14 @@ class MediaButtonReceiver : BroadcastReceiver() {
                     }
                 }
 
-                isMediaKey && !AppConfig.readAloudByMediaButton -> {
+                isMediaKey && !aloudSettingsGateway.currentSettings.readAloudByMediaButton -> {
                     // break
                 }
 
                 MainActivity.hasActiveReadBookRoute || MainActivity.hasActiveAudioPlayRoute ->
                     postEvent(EventBus.MEDIA_BUTTON, true)
 
-                else -> if (AppConfig.mediaButtonOnExit || LifecycleHelp.activitySize() > 0 || !isMediaKey) {
+                else -> if (aloudSettingsGateway.currentSettings.mediaButtonOnExit || LifecycleHelp.activitySize() > 0 || !isMediaKey) {
                     ReadAloud.upReadAloudClass()
                     if (ReadBook.book != null) {
                         ReadBook.readAloud()

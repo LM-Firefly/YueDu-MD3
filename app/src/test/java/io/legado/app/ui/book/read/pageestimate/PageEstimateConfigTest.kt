@@ -40,8 +40,23 @@ class PageEstimateConfigTest {
 
 
     @Test
+    fun `title segmentation invalidates exact pages and calibration`() {
+        val changed = config.copy(titleLayoutKey = "type=1,distance=4,scale=0.5,spacing=1.2")
+        assertNotEquals(config.layoutSignature, changed.layoutSignature)
+        assertNotEquals(config.calibrationBucket, changed.calibrationBucket)
+    }
+
+    @Test
     fun `layout dimensions affect signature and calibration bucket`() {
         val changed = config.copy(contentWidthPx = 900)
+
+        assertNotEquals(config.layoutSignature, changed.layoutSignature)
+        assertNotEquals(config.calibrationBucket, changed.calibrationBucket)
+    }
+
+    @Test
+    fun `image layout mode invalidates exact pages and calibration`() {
+        val changed = config.copy(imageLayoutKey = "FULL")
 
         assertNotEquals(config.layoutSignature, changed.layoutSignature)
         assertNotEquals(config.calibrationBucket, changed.calibrationBucket)

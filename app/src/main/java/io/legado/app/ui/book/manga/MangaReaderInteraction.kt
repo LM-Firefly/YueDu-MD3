@@ -67,7 +67,9 @@ internal fun nextPageItemIndex(
  * last one promotes the session directly to that chapter's final visible page. Once the current
  * chapter has left the viewport, use the first visible page when entering a later chapter and
  * the last visible page when entering an earlier one. Those are the pages adjacent to the
- * boundary in reading order.
+ * boundary in reading order. If that boundary's transition card is still visible, defer the
+ * promotion: adjacent content may only just have been appended after loading, without a user
+ * scroll past the card.
  */
 internal fun mangaWebtoonFocusedPageIndex(
     items: List<MangaReaderItemUi>,
@@ -78,14 +80,23 @@ internal fun mangaWebtoonFocusedPageIndex(
         (items.getOrNull(index) as? MangaReaderItemUi.Page)?.let { index to it }
     }
     if (visiblePages.isEmpty()) return null
-    if (visiblePages.any { (_, page) -> page.chapterIndex == currentChapterIndex }) {
-        return visiblePages.last().first
-    }
-    return when {
+    // 当前章仍可见时只更新当前章内的底部页。若直接取整个视口的最后一页，章节边界上
+    // 会把相邻章第一页当成当前页写回 UI；随后图片尺寸变化又可能报告另一章，产生来回切章。
+    visiblePages.lastOrNull { (_, page) -> page.chapterIndex == currentChapterIndex }
+        ?.let { return it.first }
+    val focusedPage = when {
         visiblePages.first().second.chapterIndex > currentChapterIndex -> visiblePages.first().first
         visiblePages.last().second.chapterIndex < currentChapterIndex -> visiblePages.last().first
         else -> visiblePages.last().first
     }
+    val focusedChapterIndex = (items[focusedPage] as MangaReaderItemUi.Page).chapterIndex
+    // 相邻章节从 Loading 变 Ready 时，新的首/末页会被追加到仍停在过渡卡片上的视口。
+    // 这不是用户继续翻过章节边界，不能因此直接切章；等过渡卡片离开视口后再上报。
+    val transitionStillVisible = visibleItemIndices.any { index ->
+        (items.getOrNull(index) as? MangaReaderItemUi.ChapterTransition)
+            ?.targetChapterIndex == focusedChapterIndex
+    }
+    return focusedPage.takeUnless { transitionStillVisible }
 }
 
 /** A programmatic position restore must not be overwritten by the old viewport's first callback. */
@@ -96,6 +107,18 @@ internal fun acceptsMangaVisibleItem(
 
 internal fun shouldExposeMangaPages(currentChapterFinished: Boolean): Boolean =
     currentChapterFinished
+
+/**
+ * While an explicit catalog/menu navigation is being handed to the session, emissions from the
+ * previous chapter must not reclaim the UI. The session command is ordered asynchronously, so a
+ * presentation or page-state update for the old chapter can otherwise replace the target loading
+ * placeholder before [MangaSessionCommand.OpenChapter] is reduced.
+ */
+internal fun acceptsMangaSessionForExplicitNavigation(
+    pendingExplicitChapterIndex: Int?,
+    sessionChapterIndex: Int,
+): Boolean = pendingExplicitChapterIndex == null ||
+        pendingExplicitChapterIndex == sessionChapterIndex
 
 enum class MangaChapterSwitch { NONE, NEXT, PREVIOUS }
 
