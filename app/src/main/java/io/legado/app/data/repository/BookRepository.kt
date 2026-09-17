@@ -3,6 +3,7 @@ package io.legado.app.data.repository
 import io.legado.app.data.AppDatabase
 import io.legado.app.data.dao.BookChapterDao
 import io.legado.app.data.dao.BookDao
+import io.legado.app.data.dao.BookSummary
 import io.legado.app.data.dao.GroupBookCount
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
@@ -26,6 +27,10 @@ class BookRepository(
 
     fun getAllBooks(): Flow<List<Book>> {
         return bookDao.flowAll()
+    }
+
+    fun flowAllBookSummaries(): Flow<List<BookSummary>> {
+        return bookDao.flowAllSummary()
     }
 
     suspend fun getBookCoverByNameAndAuthor(bookName: String, bookAuthor: String): String? {
