@@ -141,9 +141,9 @@ class BookRepository(
         }
     }
 
-    suspend fun getHasUpdateBooks(): List<Book> {
+    suspend fun getHasUpdateBookUrls(): List<String> {
         return withContext(Dispatchers.IO) {
-            bookDao.hasUpdateBooks
+            bookDao.hasUpdateBookUrls
         }
     }
 

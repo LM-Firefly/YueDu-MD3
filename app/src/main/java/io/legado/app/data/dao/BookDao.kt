@@ -751,8 +751,8 @@ interface BookDao {
     @get:Query("SELECT * FROM books where type & ${BookType.local} = 0")
     val webBooks: List<Book>
 
-    @get:Query("SELECT * FROM books where type & ${BookType.local} = 0 and canUpdate = 1")
-    val hasUpdateBooks: List<Book>
+    @get:Query("SELECT bookUrl FROM books where type & ${BookType.local} = 0 and canUpdate = 1")
+    val hasUpdateBookUrls: List<String>
 
     @get:Query("SELECT * FROM books")
     val all: List<Book>

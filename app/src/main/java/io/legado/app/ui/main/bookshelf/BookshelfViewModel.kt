@@ -942,7 +942,7 @@ class BookshelfViewModel(
     }
     fun upAllBookToc() {
         execute {
-            addToWaitUp(bookRepository.getHasUpdateBooks())
+            addToWaitUp(bookRepository.getHasUpdateBookUrls())
         }
     }
 
@@ -958,8 +958,7 @@ class BookshelfViewModel(
     ) {
         execute(context = updateDispatcher) {
             val bookUrls = books.filter { !it.isLocal && it.canUpdate }.map { it.bookUrl }
-            val fullBooks = bookUrls.mapNotNull { bookRepository.getBook(it) }
-            addToWaitUp(fullBooks)
+            addToWaitUp(bookUrls)
         }.onError {
             if (resetRefreshWhenIdle) {
                 isRefreshingFlow.value = false
@@ -971,13 +970,13 @@ class BookshelfViewModel(
         }
     }
 
-    private fun addToWaitUp(books: List<Book>) {
+    private fun addToWaitUp(bookUrls: List<String>) {
         synchronized(updateQueueLock) {
-            books.forEach { book ->
-                if (!waitUpTocBooks.contains(book.bookUrl) &&
-                    !onUpTocBooks.contains(book.bookUrl)
+            bookUrls.forEach { url ->
+                if (!waitUpTocBooks.contains(url) &&
+                    !onUpTocBooks.contains(url)
                 ) {
-                    waitUpTocBooks.add(book.bookUrl)
+                    waitUpTocBooks.add(url)
                 }
             }
             if (upTocJob == null && waitUpTocBooks.isNotEmpty()) {
