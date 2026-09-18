@@ -128,6 +128,12 @@ interface BookDao {
     @Query("SELECT * FROM books order by durChapterTime desc")
     fun flowAll(): Flow<List<Book>>
 
+    @Query(
+        """SELECT name, author, totalChapterNum, durChapterIndex, durChapterPos
+        FROM books"""
+    )
+    fun flowAllSummary(): Flow<List<BookSummary>>
+
     @Query("SELECT * FROM books")
     suspend fun getAll(): List<Book>
 
@@ -745,8 +751,8 @@ interface BookDao {
     @get:Query("SELECT * FROM books where type & ${BookType.local} = 0")
     val webBooks: List<Book>
 
-    @get:Query("SELECT * FROM books where type & ${BookType.local} = 0 and canUpdate = 1")
-    val hasUpdateBooks: List<Book>
+    @get:Query("SELECT bookUrl FROM books where type & ${BookType.local} = 0 and canUpdate = 1")
+    val hasUpdateBookUrls: List<String>
 
     @get:Query("SELECT * FROM books")
     val all: List<Book>
@@ -1148,3 +1154,12 @@ interface BookDao {
     )
     fun flowBookShelfPreviewByUserGroup(groupId: Long): Flow<List<BookShelfItem>>
 }
+
+/** Lightweight book summary for read-record aggregation — avoids CursorWindow overflow. */
+data class BookSummary(
+    val name: String,
+    val author: String,
+    val totalChapterNum: Int,
+    val durChapterIndex: Int,
+    val durChapterPos: Int,
+)
