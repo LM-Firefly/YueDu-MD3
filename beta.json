@@ -1,49 +1,49 @@
 {
-  "tag_name": "3.26.16-beta.19",
-  "name": "Pre-release 3.26.16-beta.19",
-  "body": "**此版本为测试版，会存在不稳定问题。**\n### [发布页](https://t.me/materado)\n### [反馈群组](https://t.me/+Yn1_v5PZqddmMjQ1)\n\n### 更新内容\n\n* chore: 优化阅读记录总览与书架朗读逻辑\n* Bump cronet from 128.0.6613.40 to 151.0.7922.173 - Changes in the [Git log](https://chromium.googlesource.com/chromium/src/+log/128.0.6613.40..151.0.7922.173)\n* refactor: update auto-imports and component declarations, adjust tsconfig paths, and clean up vite config\n* rename",
+  "tag_name": "3.26.16-beta.20",
+  "name": "Pre-release 3.26.16-beta.20",
+  "body": "**此版本为测试版，会存在不稳定问题。**\n### [发布页](https://t.me/materado)\n### [反馈群组](https://t.me/+Yn1_v5PZqddmMjQ1)\n\n### 更新内容\n\n* feat: 油滑\n* feat: 适配Android 17的ACCESS_LOCAL_NETWORK权限\n* fix: 收掉 main 上的 CI 红灯并修正 Web 产物自动提交触发器 (#2281)\n* Bump web v3.26.091821\n* fix(web): 自动翻页章末与交互边界修正\n* fix(reader): Latin 换行回退不再制造行尾禁则违规\n* feat: 听书增加按章节定时，默认后台播放，全局播放胶囊等神秘功能\n* feat: 听书相关问题\n* feat: 增强章节编辑功能\n* Bump web v3.26.091800\n* feat: 添加 Xbox 手柄 LB 和 RB 按键支持，增加翻页功能\n* fix(reader): preserve Latin word boundaries when wrapping\n* feat(reader): 预置 excludeActionImages 排版能力——带动作脚本的图片（段评气泡）可在测量层整体剔除\n* fix(app): 崩溃重启改走 launcher 组件解析——图标别名切换会禁用 MainActivity，显式 Intent 启动即崩\n* feat(web): 补全 BookChapter.vue 自动翻页核心逻辑（rAF 滚动 + 暂停恢复状态机）\n* feat(web): 阅读界面新增自动翻页功能（滚动模式）",
   "prerelease": true,
-  "created_at": "2026-09-19T07:13:43Z",
+  "created_at": "2026-09-19T08:08:58Z",
   "assets": [
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.19/mapping.txt",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.20/mapping.txt",
       "content_type": "text/plain",
-      "created_at": "2026-09-19T07:36:06Z",
+      "created_at": "2026-09-19T08:24:43Z",
       "download_count": 0,
-      "id": 574318115,
+      "id": 574387412,
       "name": "mapping.txt",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/574318115"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/574387412"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.19/YueDu.MD3-3.26.16-beta.19-arm64-v8a.apk",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.20/YueDu.MD3-3.26.16-beta.20-arm64-v8a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-09-19T07:36:06Z",
+      "created_at": "2026-09-19T08:24:43Z",
       "download_count": 0,
-      "id": 574318116,
-      "name": "YueDu.MD3-3.26.16-beta.19-arm64-v8a.apk",
+      "id": 574387413,
+      "name": "YueDu.MD3-3.26.16-beta.20-arm64-v8a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/574318116"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/574387413"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.19/YueDu.MD3-3.26.16-beta.19-armeabi-v7a.apk",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.20/YueDu.MD3-3.26.16-beta.20-armeabi-v7a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-09-19T07:36:06Z",
+      "created_at": "2026-09-19T08:24:43Z",
       "download_count": 0,
-      "id": 574318114,
-      "name": "YueDu.MD3-3.26.16-beta.19-armeabi-v7a.apk",
+      "id": 574387415,
+      "name": "YueDu.MD3-3.26.16-beta.20-armeabi-v7a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/574318114"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/574387415"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.19/YueDu.MD3-3.26.16-beta.19.apk",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.20/YueDu.MD3-3.26.16-beta.20.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-09-19T07:36:06Z",
+      "created_at": "2026-09-19T08:24:43Z",
       "download_count": 0,
-      "id": 574318113,
-      "name": "YueDu.MD3-3.26.16-beta.19.apk",
+      "id": 574387411,
+      "name": "YueDu.MD3-3.26.16-beta.20.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/574318113"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/574387411"
     }
   ]
 }
