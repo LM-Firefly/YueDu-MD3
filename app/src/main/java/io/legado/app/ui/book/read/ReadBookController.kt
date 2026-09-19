@@ -1136,6 +1136,7 @@ class ReadBookController(
             append(',').append(contentPadding.right).append(',').append(contentPadding.bottom)
             append('|').append(resolvedPaginationStyle.columnCount(width, height))
             append('|').append(resolvedPaginationStyle.isScroll)
+            append('|').append(resolvedPaginationStyle.excludeActionImages)
             append('|').append(resolvedPaginationStyle.textBottomJustify)
             append('|').append(resolvedPaginationStyle.pageUnderline)
             append('|').append(resolvedPaginationStyle.emphasisUnderlineStyle)
@@ -2247,6 +2248,8 @@ class ReadBookController(
             is ReadBookEffect.OpenSystemTtsSettings,
             ReadBookEffect.OpenTtsEnginesAndVoices,
             ReadBookEffect.OpenTtsCache,
+                // 朗读播放界面是 Navigation 3 目的地，由路由层导航，这里不处理
+            ReadBookEffect.OpenReadAloudPlayer,
             is ReadBookEffect.OpenBookVoiceCasting,
             is ReadBookEffect.OpenHighlightRuleImportPicker,
             is ReadBookEffect.OpenHighlightRuleExportPicker,

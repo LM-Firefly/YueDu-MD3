@@ -263,6 +263,8 @@ private fun BookInfoScreenContent(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    // 资源串在 composable 作用域内解析：LocalContext.current.getString 不感知配置变化，
+    // 语言/字体缩放切换后可能拿到过期值（LocalContextGetResourceValueCall）。
     val jumpToAnotherAppMessage = stringResource(R.string.jump_to_another_app)
     val confirmLabel = stringResource(R.string.confirm)
     val jumpToAnotherApp: (Uri) -> Unit = { uri ->
