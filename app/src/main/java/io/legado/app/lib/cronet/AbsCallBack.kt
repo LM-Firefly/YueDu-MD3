@@ -200,6 +200,10 @@ abstract class AbsCallBack(
     override fun onCanceled(request: UrlRequest?, info: UrlResponseInfo?) {
         if (followRedirect) {
             followRedirect = false
+            // 清空旧请求残留的回调数据，防止新请求读到脏数据
+            callbackResults.clear()
+            finished.set(false)
+            canceled.set(false)
             if (enableCookieJar) {
                 val newRequest = CookieManager.loadRequest(redirectRequest!!)
                 buildRequest(newRequest, this)?.start()
@@ -477,18 +481,15 @@ abstract class AbsCallBack(
             return when (result.callbackStep) {
                 CallbackStep.ON_FAILED -> {
                     finished.set(true)
-                    buffer = null
                     throw IOException(result.exception)
                 }
 
                 CallbackStep.ON_SUCCESS -> {
                     finished.set(true)
-                    buffer = null
                     -1
                 }
 
                 CallbackStep.ON_CANCELED -> {
-                    buffer = null
                     throw IOException("Request Canceled")
                 }
 
