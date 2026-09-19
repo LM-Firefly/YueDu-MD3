@@ -1,0 +1,49 @@
+{
+  "tag_name": "3.26.16-beta.19",
+  "name": "Pre-release 3.26.16-beta.19",
+  "body": "**此版本为测试版，会存在不稳定问题。**\n### [发布页](https://t.me/materado)\n### [反馈群组](https://t.me/+Yn1_v5PZqddmMjQ1)\n\n### 更新内容\n\n* chore: 优化阅读记录总览与书架朗读逻辑\n* Bump cronet from 128.0.6613.40 to 151.0.7922.173 - Changes in the [Git log](https://chromium.googlesource.com/chromium/src/+log/128.0.6613.40..151.0.7922.173)\n* refactor: update auto-imports and component declarations, adjust tsconfig paths, and clean up vite config\n* rename",
+  "prerelease": true,
+  "created_at": "2026-09-19T07:13:43Z",
+  "assets": [
+    {
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.19/mapping.txt",
+      "content_type": "text/plain",
+      "created_at": "2026-09-19T07:36:06Z",
+      "download_count": 0,
+      "id": 574318115,
+      "name": "mapping.txt",
+      "state": "uploaded",
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/574318115"
+    },
+    {
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.19/YueDu.MD3-3.26.16-beta.19-arm64-v8a.apk",
+      "content_type": "application/vnd.android.package-archive",
+      "created_at": "2026-09-19T07:36:06Z",
+      "download_count": 0,
+      "id": 574318116,
+      "name": "YueDu.MD3-3.26.16-beta.19-arm64-v8a.apk",
+      "state": "uploaded",
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/574318116"
+    },
+    {
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.19/YueDu.MD3-3.26.16-beta.19-armeabi-v7a.apk",
+      "content_type": "application/vnd.android.package-archive",
+      "created_at": "2026-09-19T07:36:06Z",
+      "download_count": 0,
+      "id": 574318114,
+      "name": "YueDu.MD3-3.26.16-beta.19-armeabi-v7a.apk",
+      "state": "uploaded",
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/574318114"
+    },
+    {
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.19/YueDu.MD3-3.26.16-beta.19.apk",
+      "content_type": "application/vnd.android.package-archive",
+      "created_at": "2026-09-19T07:36:06Z",
+      "download_count": 0,
+      "id": 574318113,
+      "name": "YueDu.MD3-3.26.16-beta.19.apk",
+      "state": "uploaded",
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/574318113"
+    }
+  ]
+}
