@@ -6,6 +6,10 @@ on:
     - cron: 0 1 * * 1
   workflow_dispatch:
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,11 +30,21 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
         if: ${{ env.cronet == 'ok' }}
 
+      # 与 verify.yml / auto-release.yml 同一处理：settings.gradle 的 aliyun 镜像在 GitHub runner 上 502
+      - name: Remove Aliyun mirrors (unreliable in CI)
+        if: ${{ env.cronet == 'ok' }}
+        run: sed -i '/maven.aliyun.com/d' settings.gradle
+
       - name: Download Cronet
         if: ${{ env.cronet == 'ok' }}
         run: |
           chmod +x gradlew
           ./gradlew app:downloadCronet
+
+      # 版本升级可能拆分 jar 或变更 proguard cfg，构建门禁确保不产出无法打包的 PR
+      - name: Verify release build with the new Cronet
+        if: ${{ env.cronet == 'ok' }}
+        run: ./gradlew assembleAppRelease --no-configuration-cache --no-daemon
 
       - name: Create Pull Request
         if: ${{ env.cronet == 'ok' }}
@@ -46,7 +60,7 @@ jobs:
           branch: cronet
           delete-branch: true
           add-paths: |
-            *cronet*jar
+            app/cronetlib/
             *cronet.json
             *updateLog.md
             *gradle.properties

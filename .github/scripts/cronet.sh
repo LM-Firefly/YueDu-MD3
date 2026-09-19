@@ -53,19 +53,44 @@ function write_github_env_variable() {
     echo "$1=$2" >> $GITHUB_ENV
 }
 
+function release_jar_list() {
+    # 发布桶中该版本的顶层 jar（排除 -src 源码包）
+    curl -fsSL "https://storage.googleapis.com/storage/v1/b/chromium-cronet/o?prefix=android/$1/Release/cronet/&maxResults=200" \
+        | jq -r '.items[].name' | grep -E 'Release/cronet/[^/]+\.jar$' | grep -v -- '-src\.jar$' | sed 's|.*/||' | sort
+}
+
+function check_jar_list() {
+    # 发布 jar 集合与 downloadJar 清单对齐检查：上游拆分/新增 jar（如 155 的 httpengine/sentinel）时必须人工同步 download.gradle
+    # fake（测试用）与 util（纯 Java impl 专用）刻意不打包
+    local remote_jars=$(release_jar_list "$lastest_cronet_version" | grep -v -x -F -e cronet_impl_fake_java.jar -e cronet_impl_util_java.jar)
+    local local_jars=$(grep -oE '[a-z0-9_]+\.jar' "$GITHUB_WORKSPACE/app/download.gradle" | sort -u)
+    if [ "$remote_jars" != "$local_jars" ]; then
+        echo "download.gradle jar list is out of sync with the $lastest_cronet_version release folder:"
+        diff <(echo "$remote_jars") <(echo "$local_jars") || true
+        echo "please update app/download.gradle and sync_proguard_rules accordingly, then re-run"
+        exit 1
+    fi
+}
+
 function sync_proguard_rules() {
-    local raw_github_git="https://raw.githubusercontent.com/chromium/chromium/$lastest_cronet_version"
+    # 取与 downloadJar 打包 jar 配套的发布 cfg（已展平 include）；不要用可能滞后的 combined golden 文件
+    local base_url="https://storage.googleapis.com/chromium-cronet/android/$lastest_cronet_version/Release/cronet"
     local proguard_paths=(
-      components/cronet/android/cronet_combined_impl_native_proguard_golden.cfg
+      cronet_impl_common_proguard.cfg
+      cronet_impl_native_proguard.cfg
+      cronet_shared_proguard.cfg
+      httpengine_native_provider_proguard.cfg
     )
     local proguard_rules_path="$GITHUB_WORKSPACE/app/cronet-proguard-rules.pro"
-    rm -f $proguard_rules_path
-    echo "fetch cronet proguard rules from upstream $raw_github_git"
+    local tmp_file="$proguard_rules_path.tmp"
+    rm -f "$tmp_file"
+    echo "fetch cronet proguard rules from $base_url"
     for path in ${proguard_paths[@]}
     do
         echo "fetching $path ..."
-        curl "$raw_github_git/$path" >> $proguard_rules_path
+        curl -fsSL "$base_url/$path" >> "$tmp_file" || { echo "failed to fetch $path"; rm -f "$tmp_file"; exit 1; }
     done
+    mv "$tmp_file" "$proguard_rules_path"
 }
 ##########
 # 获取本地cronet版本
@@ -80,7 +105,8 @@ if version_compare $current_cronet_version $lastest_cronet_version; then
     # 更新gradle.properties
     sed -i s/CronetVersion=.*/CronetVersion=$lastest_cronet_version/ $path
     sed -i s/CronetMainVersion=.*/CronetMainVersion=$lastest_cronet_main_version/ $path
-    # 更新cronet_proguard_rules.pro
+    # 校验 jar 清单一致后更新cronet_proguard_rules.pro
+    check_jar_list
     sync_proguard_rules
     # 更新cronet版本
     sed -i "s/## cronet版本: .*/## cronet版本: $lastest_cronet_version/" $GITHUB_WORKSPACE/app/src/main/assets/updateLog.md
