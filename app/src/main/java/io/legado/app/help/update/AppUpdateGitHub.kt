@@ -20,9 +20,10 @@ import java.time.format.DateTimeFormatter
 
 object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
 
+    private const val repoPath = "LM-Firefly/YueDu-MD3"
+
     private val otherSettingsGateway get() = org.koin.core.context.GlobalContext.get().get<io.legado.app.domain.gateway.OtherSettingsGateway>()
 
-    private const val repoPath = "LM-Firefly/YueDu-MD3"
     private const val githubApiBaseUrl = "https://api.github.com/repos/$repoPath/releases"
     private const val updateManifestBaseUrl =
         "https://raw.githubusercontent.com/$repoPath/update-manifests"
