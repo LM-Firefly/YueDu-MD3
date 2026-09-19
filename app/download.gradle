@@ -8,24 +8,6 @@ def libPath = projectDir.toString() + "/cronetlib"
 def soPath = projectDir.toString() + "/so"
 
 /**
- * 从文件生成MD5
- * @param file
- * @return
- */
-static def generateMD5(final file) {
-    MessageDigest digest = MessageDigest.getInstance("MD5")
-    file.withInputStream() { is ->
-        byte[] buffer = new byte[1024]
-        //noinspection GroovyUnusedAssignment
-        int numRead = 0
-        while ((numRead = is.read(buffer)) > 0) {
-            digest.update(buffer, 0, numRead)
-        }
-    }
-    return String.format("%032x", new BigInteger(1, digest.digest())).toLowerCase()
-}
-
-/**
  * 下载Cronet相关的jar
  */
 tasks.register('downloadJar', Download) {
@@ -33,8 +15,10 @@ tasks.register('downloadJar', Download) {
             BASE_PATH + "cronet_api.jar",
             BASE_PATH + "cronet_impl_common_java.jar",
             BASE_PATH + "cronet_impl_native_java.jar",
+            BASE_PATH + "cronet_impl_native_sentinel_java.jar",
             BASE_PATH + "cronet_impl_platform_java.jar",
-            BASE_PATH + "cronet_shared_java.jar"
+            BASE_PATH + "cronet_shared_java.jar",
+            BASE_PATH + "httpengine_native_provider_java.jar"
     ])
     dest libPath
     overwrite true
@@ -85,14 +69,30 @@ tasks.register('downloadX86', Download) {
 tasks.register('downloadCronet') {
     dependsOn downloadJar, downloadARM64, downloadARMv7, downloadX86_64, downloadX86
 
+    // 配置缓存下 doLast 闭包丢失脚本 owner，脚本方法/属性不可用，需在配置期捕获、执行期自包含
+    def cronetVersion = CronetVersion
+
     doLast {
+        def generateMD5 = { final file ->
+            MessageDigest digest = MessageDigest.getInstance("MD5")
+            file.withInputStream() { is ->
+                byte[] buffer = new byte[1024]
+                //noinspection GroovyUnusedAssignment
+                int numRead = 0
+                while ((numRead = is.read(buffer)) > 0) {
+                    digest.update(buffer, 0, numRead)
+                }
+            }
+            String.format("%032x", new BigInteger(1, digest.digest())).toLowerCase()
+        }
+
         StringBuilder sb = new StringBuilder("{")
         def files = new File(soPath).listFiles()
         for (File file : files) {
             println file.name.replace(".so", "")
             sb.append("\"").append(file.name.replace(".so", "")).append("\":\"").append(generateMD5(file)).append("\",")
         }
-        sb.append("\"version\":\"").append(CronetVersion).append("\"}")
+        sb.append("\"version\":\"").append(cronetVersion).append("\"}")
 
         println sb.toString()
 
@@ -108,5 +108,3 @@ tasks.register('downloadCronet') {
 
 
 }
-
-

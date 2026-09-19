@@ -172,9 +172,6 @@ class App : Application(), SingletonImageLoader.Factory {
         super.onCreate()
 //        FirebaseManager.init(this)
         CrashHandler(this)
-        if (isDebuggable) {
-            ThreadUtils.setThreadAssertsDisabledForTesting(true)
-        }
         registerActivityLifecycleCallbacks(LifecycleHelp)
         // Rhino 的全局 ContextFactory 必须在任何线程执行 Context.enter() 之前安装：
         // 它只在 RhinoScriptEngine 的 object init 里通过 ContextFactory.initGlobal 生效，
