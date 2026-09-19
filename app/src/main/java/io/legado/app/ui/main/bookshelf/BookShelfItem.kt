@@ -49,25 +49,10 @@ data class BookShelfItem(
     fun getUnreadChapterNum() = max(totalChapterNum - durChapterIndex - 1, 0)
 
     /**
-     * 将 DTO 转换为专为 Compose 设计的 UI 状态
+     * 将 DTO 转换为专为 Compose 设计的 UI 状态。
+     * displayTags 懒加载，避免批量转换时的临时分配。
      */
-    fun toUiItem(): BookUiItem {
-        val tagList = mutableListOf<String>()
-        customTag?.splitNotBlank(",", "\n")?.filter { it.isNotBlank() }?.let {
-            tagList.addAll(it)
-        }
-        kind?.splitNotBlank(",", "\n")?.filter { it.isNotBlank() }?.let {
-            tagList.addAll(it.filterNot(tagList::contains))
-        }
-        if (!wordCount.isNullOrBlank() && !tagList.contains(wordCount)) {
-            tagList.add(wordCount)
-        }
-
-        return BookUiItem(
-            book = this,
-            displayTags = tagList.toImmutableList()
-        )
-    }
+    fun toUiItem() = BookUiItem(book = this)
 }
 
 /**
@@ -76,8 +61,33 @@ data class BookShelfItem(
 @Stable
 data class BookUiItem(
     val book: BookShelfItem,
-    val displayTags: ImmutableList<String>
+    // 懒加载：300+ 本书同时加载时避免大量 ImmutableList 临时分配。
+    // displayTags 仅在 UI 渲染时按需计算。
+    private val _displayTags: Lazy<ImmutableList<String>> = lazy {
+        val tagList = mutableListOf<String>()
+        book.customTag?.splitNotBlank(",", "\n")?.filter { it.isNotBlank() }?.let {
+            tagList.addAll(it)
+        }
+        book.kind?.splitNotBlank(",", "\n")?.filter { it.isNotBlank() }?.let {
+            tagList.addAll(it.filterNot(tagList::contains))
+        }
+        if (!book.wordCount.isNullOrBlank() && !tagList.contains(book.wordCount)) {
+            tagList.add(book.wordCount)
+        }
+        tagList.toImmutableList()
+    }
 ) {
+    val displayTags: ImmutableList<String> get() = _displayTags.value
+
+    // 仅比较 book（身份标识），避免 displayTags 深度结构比较导致 OOM。
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is BookUiItem) return false
+        return book == other.book
+    }
+
+    override fun hashCode(): Int = book.hashCode()
+
     fun matches(key: String): Boolean {
         return book.name.contains(key, true) ||
                 book.author.contains(key, true) ||
