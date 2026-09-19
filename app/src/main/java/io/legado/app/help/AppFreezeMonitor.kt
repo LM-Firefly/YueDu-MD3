@@ -28,10 +28,12 @@ object AppFreezeMonitor {
 
     private var registeredReceiver = false
     private var monitorRunnable: Runnable? = null
+    private var cachedRecordLog: Boolean? = null
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     fun init(context: Context) {
-        if (!otherGateway.currentSettings.recordLog) {
+        cachedRecordLog = otherGateway.currentSettings.recordLog
+        if (!cachedRecordLog!!) {
             if (registeredReceiver) {
                 registeredReceiver = false
                 context.unregisterReceiver(screenStatusReceiver)
@@ -63,7 +65,7 @@ object AppFreezeMonitor {
 
                 previous = current
 
-                if (otherGateway.currentSettings.recordLog) {
+                if (cachedRecordLog == true) {
                     handler.postDelayed(this, 3000)
                 } else {
                     monitorRunnable = null
@@ -83,7 +85,10 @@ object AppFreezeMonitor {
 
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
-                Intent.ACTION_SCREEN_ON -> LogUtils.d(TAG, "SCREEN_ON")
+                Intent.ACTION_SCREEN_ON -> {
+                    cachedRecordLog = otherGateway.currentSettings.recordLog
+                    LogUtils.d(TAG, "SCREEN_ON")
+                }
                 Intent.ACTION_SCREEN_OFF -> LogUtils.d(TAG, "SCREEN_OFF")
             }
         }
