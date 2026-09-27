@@ -3,6 +3,7 @@ package io.legado.app.ui.main.bookshelf
 import androidx.compose.runtime.Stable
 import io.legado.app.constant.BookType
 import io.legado.app.data.entities.Book
+import io.legado.app.domain.model.PrivateAccessState
 import io.legado.app.utils.splitNotBlank
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -51,14 +52,26 @@ data class BookShelfItem(
     /**
      * 将 DTO 转换为专为 Compose 设计的 UI 状态。
      * displayTags 懒加载，避免批量转换时的临时分配。
+     *
+     * [isPrivate] 由书架在内存侧算出并集（单本标记 ∪ 所属私密分组），
+     * 这里只负责带上结果，不做判定。
      */
-    fun toUiItem() = BookUiItem(book = this)
+    fun toUiItem(isPrivate: Boolean = false) = BookUiItem(book = this, isPrivate = isPrivate)
 }
 
 /**
  * 理想实现：专为 UI 设计的状态类
  */
 @Stable
+        /**
+         * 这本书此刻是否处于锁定态（需要脱敏）。
+         *
+         * 唯一实现：凡是判断"某本书要不要遮"的地方都走这里，
+         * 避免 UiState 与 ViewModel 各自复制一份谓词后漂移。
+         */
+fun BookUiItem.isLocked(access: PrivateAccessState, verifyOnOpenBook: Boolean): Boolean =
+    isPrivate && verifyOnOpenBook && !access.isTargetGranted(book.bookUrl, book.group)
+
 data class BookUiItem(
     val book: BookShelfItem,
     // 懒加载：300+ 本书同时加载时避免大量 ImmutableList 临时分配。
@@ -75,11 +88,11 @@ data class BookUiItem(
             tagList.add(book.wordCount)
         }
         tagList.toImmutableList()
-    }
+    },
+    val isPrivate: Boolean = false
 ) {
     val displayTags: ImmutableList<String> get() = _displayTags.value
-
-    // 仅比较 book（身份标识），避免 displayTags 深度结构比较导致 OOM。
+ // 仅比较 book（身份标识），避免 displayTags 深度结构比较导致 OOM。
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is BookUiItem) return false

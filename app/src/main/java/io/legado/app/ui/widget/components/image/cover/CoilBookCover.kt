@@ -13,6 +13,7 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +32,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
@@ -51,8 +54,19 @@ import org.koin.compose.koinInject
 import io.legado.app.model.BookCover as BookCoverModel
 
 private const val SharedCoverRadiusCacheMaxSize = 256
-private const val DefaultCoverPath = "use_default_cover"
+
+/** 用户在换封面页选的“默认封面”，与空地址一样表示这本书没有真实封面。 */
+internal const val DefaultCoverPath = "use_default_cover"
 private val sharedCoverRadiusCache = mutableStateMapOf<String, Dp>()
+
+/**
+ * 这本书是否有真实封面地址可加载。
+ *
+ * 与 [usesDefaultBookCover] 的区别：这里只看地址本身，不读 Compose 配置，
+ * 因此预热这类非组合场景也能复用同一判定。
+ */
+internal fun isDefaultCoverPath(path: String?): Boolean =
+    path.isNullOrBlank() || path == DefaultCoverPath
 
 /**
  * 封面在源页面的圆角缓存读取入口：封面离开源页面（Visible→Visible 定格）时写入，
@@ -63,9 +77,7 @@ internal fun sharedCoverSourceRadius(sharedCoverKey: String?): Dp? =
 
 @Composable
 internal fun usesDefaultBookCover(path: String?): Boolean {
-    return LocalAppUiConfiguration.current.cover.useDefaultCover ||
-            path.isNullOrBlank() ||
-            path == DefaultCoverPath
+    return LocalAppUiConfiguration.current.cover.useDefaultCover || isDefaultCoverPath(path)
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -186,9 +198,11 @@ fun BookCoverImage(
                     sourceOrigin = sourceOrigin,
                     loadOnlyWifi = coverSettings.loadOnlyOnWifi,
                     crossfade = showLoadingPlaceholder,
-                    memoryCacheKey = sharedCoverKey?.let {
-                        "$it:cover:${memoryCacheKey ?: finalPath}"
-                    } ?: memoryCacheKey ?: finalPath,
+                    memoryCacheKey = coverMemoryCacheKey(
+                        sharedCoverKey = sharedCoverKey,
+                        explicitKey = memoryCacheKey,
+                        path = finalPath,
+                    ),
                     bookUrl = bookUrl,
                     preferCache = preferCache,
                     configure = requestBuilder,
@@ -238,6 +252,20 @@ fun CoilBookCover(
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
     sharedCoverKey: String? = null,
+    /**
+     * 内容模糊半径，作用于封面图与占位文字这些**共享元素内部的子节点**。
+     *
+     * 之所以要传进来而不是让调用方在外面套 `Modifier.blur`：共享元素转场时，
+     * overlay 只会搬运 sharedBounds 节点自己的内容，加在祖先上的模糊会被落下，
+     * 表现就是"动画一开始模糊突然没了"。
+     */
+    contentBlur: Dp = 0.dp,
+    /**
+     * 盖在封面之上的叠加层（遮罩、点阵、锁标…），渲染在共享节点**内部**。
+     *
+     * 放成兄弟节点的话转场时不会被 overlay 带走，会出现"装饰停在原地、只有封面在飞"。
+     */
+    overlayContent: (@Composable BoxScope.() -> Unit)? = null,
 ) {
     val coverSettings = LocalAppUiConfiguration.current.cover
     val isNight = LegadoTheme.isDark
@@ -273,6 +301,11 @@ fun CoilBookCover(
         animatedVisibilityScope = animatedVisibilityScope
     )
     val shape = remember(transitionRadius) { RoundedCornerShape(transitionRadius) }
+    val contentBlurModifier = if (contentBlur > 0.dp) {
+        Modifier.blur(contentBlur, BlurredEdgeTreatment.Unbounded)
+    } else {
+        Modifier
+    }
 
     Box(
         modifier = modifier
@@ -305,7 +338,9 @@ fun CoilBookCover(
             name = name,
             author = author,
             path = path,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .then(contentBlurModifier),
             sourceOrigin = sourceOrigin,
             bookUrl = bookUrl,
             preferCache = preferCache,
@@ -334,19 +369,34 @@ fun CoilBookCover(
                     !isOnlineCoverLoaded
                 )
         ) {
-            CoverTextOverlay(
-                name = name,
-                author = author,
-                isNight = isNight
-            )
+            // 占位文字（默认封面上的书名/作者）也一起模糊：
+            // 它露的是真实字符串，锁定态不能比正常态更清晰
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(contentBlurModifier)
+            ) {
+                CoverTextOverlay(
+                    name = name,
+                    author = author,
+                    isNight = isNight
+                )
+            }
         }
+
+        // 遮罩/点阵/锁标等叠加层渲染在共享节点内部，转场时会随封面一起移动
+        overlayContent?.invoke(this)
     }
 }
 
 
+/**
+ * 转场两端的圆角：起点用源页面缓存下来的圆角，终点用本节点的 [radius]，
+ * 期间随转场进度插值，避免两端圆角不一致时跳变。脱敏封面复用同一实现。
+ */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-private fun rememberSharedCoverTransitionRadius(
+internal fun rememberSharedCoverTransitionRadius(
     sharedCoverKey: String?,
     radius: Dp,
     animatedVisibilityScope: AnimatedVisibilityScope?

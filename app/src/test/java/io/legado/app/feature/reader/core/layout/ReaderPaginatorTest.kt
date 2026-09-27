@@ -501,6 +501,44 @@ class ReaderPaginatorTest {
         assertEquals(frameBounds.right, glyphs[2].bounds.left, 0f)
     }
 
+    /** 放行标记按「绘制用实例」比较：同图连续才续接，换一张图就要断开。 */
+    @Test
+    fun backgroundRunContinuesOnlyAcrossEqualDrawnImages() {
+        val frame = ReaderTextBackgroundImage(
+            source = "frame.png",
+            fit = 3,
+            scale = 1f,
+            contentInsetLeftPx = 3f,
+            contentInsetRightPx = 4f,
+        )
+        val framed = style.copy(backgroundImage = frame)
+        val reframed = style.copy(backgroundImage = frame.copy(source = "other.png"))
+        val page = ReaderPaginator.paginateBlocks(
+            listOf(
+                ReaderMeasuredBlock.InlineParagraph(
+                    items = listOf(
+                        ReaderMeasuredInlineItem.Text("甲", 10f, style, 0),
+                        ReaderMeasuredInlineItem.Text("乙", 10f, framed, 1),
+                        ReaderMeasuredInlineItem.Text("丙", 10f, framed, 2),
+                        ReaderMeasuredInlineItem.Text("丁", 10f, reframed, 3),
+                        ReaderMeasuredInlineItem.Text("戊", 10f, reframed, 4),
+                    ),
+                    indentCharacters = 0,
+                    alignment = ReaderTextAlignment.START,
+                    lineHeightPx = 20f,
+                    baselineOffsetPx = 15f,
+                    baseTextSizePx = 10f,
+                )
+            ),
+            config.copy(viewportWidthPx = 200, viewportHeightPx = 100),
+        ).single()
+
+        assertEquals(
+            listOf(false, false, true, false, true),
+            page.elements.filterIsInstance<ReaderElement.Text>().map { it.continuesBackgroundRun },
+        )
+    }
+
     @Test
     fun nineSliceReflowDoesNotStrandTheRemainderOfAnOriginalLine() {
         val frame = ReaderTextBackgroundImage(
@@ -739,6 +777,47 @@ class ReaderPaginatorTest {
     }
 
     /**
+     * 标题行距收紧到 1.0（设置值 10）时，本段行距留白为 0，但九宫格上下两条边不能整条消失：
+     * 纵向预算回落到正文行距——旧 View 的预算取自全局 `ChapterProvider.lineSpacingExtra`，
+     * 标题与正文共用一份。只有正文行距同样为 1.0 时才退回上一条用例的「中心 + 左右两条边」。
+     */
+    @Test
+    fun tightTitleLineSpacingStillBudgetsTheNineSliceVerticalEdges() {
+        val framedStyle = style.copy(
+            backgroundImage = ReaderTextBackgroundImage(
+                "frame.png", 3, 1f,
+                contentInsetLeftPx = 3f,
+                contentInsetRightPx = 4f,
+                contentInsetTopPx = 8f,
+                contentInsetBottomPx = 8f,
+            )
+        )
+        val page = ReaderPaginator.paginateBlocks(
+            listOf(
+                ReaderMeasuredBlock.InlineParagraph(
+                    items = listOf(ReaderMeasuredInlineItem.Text("字", 10f, framedStyle, 0)),
+                    indentCharacters = 0,
+                    alignment = ReaderTextAlignment.START,
+                    lineHeightPx = 20f,
+                    baselineOffsetPx = 15f,
+                    baseTextSizePx = 10f,
+                    emphasized = true,
+                    lineSpacingMultiplier = 1f,
+                )
+            ),
+            config.copy(viewportHeightPx = 100, lineSpacingMultiplier = 1.5f),
+        ).single()
+
+        val glyph = page.elements.single() as ReaderElement.Text
+        // 正文行距 1.5 ⇒ 留白 10px，够按原图厚度画满 8px 的上下边。
+        assertEquals(8f, glyph.backgroundFrameTopPx, 0.001f)
+        assertEquals(8f, glyph.backgroundFrameBottomPx, 0.001f)
+        val run = page.textBackgroundRuns().single()
+        assertEquals(glyph.bounds.top - 8f, run.bounds.top, 0.001f)
+        assertEquals(glyph.bounds.bottom + 8f, run.bounds.bottom, 0.001f)
+    }
+
+    /**
      * 章末页的堆叠高度额外加 [ReaderPaginationConfig.chapterEndPaddingPx]：旧
      * `TextChapterLayout.setTypeText` 收尾时 `height = max(height, durY + 20dp)`，让下一章
      * 正文与本章末尾之间留一段空档。中间页不受影响。
@@ -808,6 +887,39 @@ class ReaderPaginatorTest {
         val runs = page.textBackgroundRuns()
         assertEquals(1, runs.size)
         assertEquals(34f, runs.single().contentBounds.right, 0f)
+    }
+
+    /**
+     * 高亮规则命中的段落走富文本路径（逐 item 样式），背景图 fit=1（拉伸）/0（平铺）/2（裁剪）
+     * 不参与九宫格预算，但放行标记必须照发：默认字间距 0.1em 远大于 1px 的几何相邻阈值，
+     * 少发标记就会把一条连续气泡切成逐字绘制（issue #2286）。
+     */
+    @Test
+    fun stretchedBackgroundMergesAcrossLetterSpacingOnRichTextRow() {
+        val stretched = ReaderTextBackgroundImage("bubble.png", fit = 1, scale = 1f)
+        val stretchedStyle = style.copy(backgroundImage = stretched)
+        val page = ReaderPaginator.paginateBlocks(
+            listOf(
+                ReaderMeasuredBlock.InlineParagraph(
+                    items = (0 until 3).map { index ->
+                        ReaderMeasuredInlineItem.Text("字", 10f, stretchedStyle, index)
+                    },
+                    indentCharacters = 0,
+                    alignment = ReaderTextAlignment.START,
+                    lineHeightPx = 20f,
+                    baselineOffsetPx = 15f,
+                    baseTextSizePx = 10f,
+                )
+            ),
+            config.copy(viewportWidthPx = 100, viewportHeightPx = 100, letterSpacingPx = 5f),
+        ).single()
+
+        val glyphs = page.elements.filterIsInstance<ReaderElement.Text>()
+        // 字间距在每个字之间留下 5f 间隙，几何相邻判定必然失败。
+        assertEquals(listOf(0f, 15f, 30f), glyphs.map { it.bounds.left })
+        val run = page.textBackgroundRuns().single()
+        assertEquals(0f, run.contentBounds.left, 0f)
+        assertEquals(40f, run.contentBounds.right, 0f)
     }
 
     /**

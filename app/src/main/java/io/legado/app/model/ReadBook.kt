@@ -22,6 +22,7 @@ import io.legado.app.feature.reader.legacy.LegacyReaderChapterPaginator
 import io.legado.app.feature.reader.legacy.LegacyReaderPageDecorationFactory
 import io.legado.app.feature.reader.platform.AndroidReaderHtmlSemanticTextResolver
 import io.legado.app.feature.reader.platform.ReaderAndroidPaginationStyle
+import io.legado.app.feature.reader.platform.ReaderPerfTrace
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
@@ -780,13 +781,24 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
     }
 
     fun uploadProgress(toast: Boolean = false, successAction: (() -> Unit)? = null) {
-        book?.let {
+        book?.let { uploadingBook ->
             launch(IO) {
-                AppWebDav.uploadBookProgress(it, toast) {
+                AppWebDav.uploadBookProgress(uploadingBook, toast) {
+                    ensureActive()
+                    onProgressUploaded(uploadingBook)
                     successAction?.invoke()
                 }
-                ensureActive()
-                it.update()
+            }
+        }
+    }
+
+    /** 上传期间可能重入阅读器并替换 Book 实例，完成时只能保存上传实际修改的同步时间。 */
+    internal fun onProgressUploaded(uploadedBook: Book) {
+        val syncTime = uploadedBook.syncTime
+        appDb.bookDao.upSyncTime(uploadedBook.bookUrl, syncTime)
+        synchronized(this) {
+            book?.takeIf { it.bookUrl == uploadedBook.bookUrl }?.let { currentBook ->
+                currentBook.syncTime = maxOf(currentBook.syncTime, syncTime)
             }
         }
     }
@@ -813,8 +825,10 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
             ) {
                 // 服务器没有进度或者进度比服务器快，上传现有进度
                 Coroutine.async {
-                    AppWebDav.uploadBookProgress(book, onSuccess = uploadSuccessAction)
-                    book.update()
+                    AppWebDav.uploadBookProgress(book) {
+                        onProgressUploaded(book)
+                        uploadSuccessAction?.invoke()
+                    }
                 }
             } else if (progress.durChapterIndex > book.durChapterIndex ||
                 progress.durChapterPos > book.durChapterPos
@@ -837,10 +851,16 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
 
     fun initReadTime() {
         synchronized(this) {
-            val currentBookName = book?.name ?: return
-            val currentBookAuthor = book?.author ?: ""
+            val currentBook = book ?: return
+            val currentBookUrl = currentBook.bookUrl
+            val currentBookName = currentBook.name
+            val currentBookAuthor = currentBook.author
             if (currentActiveSession != null &&
-                (currentActiveSession!!.bookName != currentBookName || currentActiveSession!!.bookAuthor != currentBookAuthor)
+                currentActiveSession!!.matchesBook(
+                    currentBookUrl,
+                    currentBookName,
+                    currentBookAuthor
+                ).not()
             ) {
                 commitReadSession()
             }
@@ -851,6 +871,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
                     deviceId = "",
                     bookName = currentBookName,
                     bookAuthor = currentBookAuthor,
+                    bookUrl = currentBookUrl,
                     startTime = readStartTime,
                     endTime = readStartTime,
                     words = durChapterIndex.toLong()
@@ -861,14 +882,19 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
 
     fun upReadTime() {
         synchronized(this) {
+            val currentBook = book ?: return
             val currentLength = currentReadLength
-            val currentBookName = book?.name ?: return
-            val currentBookAuthor = book?.author ?: ""
+            val currentBookUrl = currentBook.bookUrl
+            val currentBookName = currentBook.name
+            val currentBookAuthor = currentBook.author
             val endTime = System.currentTimeMillis()
 
             if (currentActiveSession == null ||
-                currentActiveSession!!.bookName != currentBookName ||
-                currentActiveSession!!.bookAuthor != currentBookAuthor
+                currentActiveSession!!.matchesBook(
+                    currentBookUrl,
+                    currentBookName,
+                    currentBookAuthor
+                ).not()
             ) {
                 initReadTime()
                 return
@@ -933,8 +959,11 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
         synchronized(this) {
             val current = currentActiveSession
             if (current != null &&
-                current.bookName == sessionToSave.bookName &&
-                current.bookAuthor == sessionToSave.bookAuthor
+                current.matchesBook(
+                    sessionToSave.bookUrl,
+                    sessionToSave.bookName,
+                    sessionToSave.bookAuthor
+                )
             ) {
                 currentActiveSession = current.copy(
                     startTime = sessionToSave.endTime,
@@ -1277,7 +1306,9 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
         if (BaseReadAloudService.isRun) return
         if (book?.bookUrl == bookUrl && readerChapterInputWindow.current != null) return
         ioScope.launch {
-            val book = appDb.bookDao.getBook(bookUrl) ?: return@launch
+            val book = ReaderPerfTrace.suspendSection("prefetch.book-lookup") {
+                appDb.bookDao.getBook(bookUrl)
+            } ?: return@launch
             // 需要联网补目录、本地文件缺失或已改动的, 都交给阅读页的完整初始化流程
             if (!book.isLocal && book.tocUrl.isEmpty()) return@launch
             if (book.isLocal) {
@@ -1287,12 +1318,17 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
                 }.isSuccess
                 if (!readable) return@launch
             }
-            if (appDb.bookChapterDao.getChapterCount(bookUrl) == 0) return@launch
+            val chapterCount = ReaderPerfTrace.suspendSection("prefetch.chapter-check") {
+                appDb.bookChapterDao.getChapterCount(bookUrl)
+            }
+            if (chapterCount == 0) return@launch
             if (callBack != null) return@launch
-            resetData(book)
+            ReaderPerfTrace.section("prefetch.reset") { resetData(book) }
             // 不能走 loadContent: Coroutine.async 会先派发到主线程,
             // 而导航动画和阅读页组合正把主线程占满, 预加载会排到几百毫秒之后.
-            loadContentAwait(durChapterIndex, resetPageOffset = true)
+            ReaderPerfTrace.suspendSection("prefetch.content") {
+                loadContentAwait(durChapterIndex, resetPageOffset = true)
+            }
         }
     }
 
@@ -1434,19 +1470,26 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
         if (addLoading(index)) {
             try {
                 val book = book!!
-                val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, index)!!
-                val content = if (book.getTranslationMode()) {
-                    TranslationManager.getCachedTranslation(book, chapter)
-                        ?: run {
-                            TranslationManager.startTranslation(book, chapter)?.let { taskFlow ->
-                                startTranslationObserver(taskFlow, book, chapter)
+                val chapter = ReaderPerfTrace.suspendSection("content.chapter-lookup") {
+                    appDb.bookChapterDao.getChapter(book.bookUrl, index)
+                }!!
+                val content = ReaderPerfTrace.suspendSection("content.resolve") {
+                    if (book.getTranslationMode()) {
+                        TranslationManager.getCachedTranslation(book, chapter)
+                            ?: run {
+                                TranslationManager.startTranslation(book, chapter)
+                                    ?.let { taskFlow ->
+                                        startTranslationObserver(taskFlow, book, chapter)
+                                    }
+                                BookHelp.getContent(book, chapter) ?: downloadAwait(chapter)
                             }
-                            BookHelp.getContent(book, chapter) ?: downloadAwait(chapter)
-                        }
-                } else {
-                    BookHelp.getContent(book, chapter) ?: downloadAwait(chapter)
+                    } else {
+                        BookHelp.getContent(book, chapter) ?: downloadAwait(chapter)
+                    }
                 }
-                contentLoadFinishAwait(book, chapter, content, upContent, resetPageOffset)
+                ReaderPerfTrace.suspendSection("content.layout-and-publish") {
+                    contentLoadFinishAwait(book, chapter, content, upContent, resetPageOffset)
+                }
                 success?.invoke()
             } catch (e: Exception) {
                 AppLog.put("加载正文出错\n${e.localizedMessage}")
@@ -1631,8 +1674,9 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
             book.getUseReplaceRule(otherSettingsGateway.currentSettings.replaceEnableDefault),
             chineseConverterType = readSettingsGateway.currentSettings.chineseConverterType,
         )
-        val contents = contentProcessor
-            .getContent(book, chapter, content, includeTitle = false)
+        val contents = ReaderPerfTrace.section("content.process") {
+            contentProcessor.getContent(book, chapter, content, includeTitle = false)
+        }
         ensureActive()
         wholeBookPageCoordinator.updateChapterContent(
             chapterIndex = chapter.index,
@@ -1647,14 +1691,16 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
             },
             layoutGeneration = pageEstimateGeneration,
         )
-        val readerSource = ReaderChapterSourceParser.parse(
-            chapterIndex = chapter.index,
-            title = displayTitle,
-            paragraphs = contents.textList,
-            includeTitle = ReadBookConfig.titleMode != 2 || chapter.isVolume || contents.textList.isEmpty(),
-            adaptSpecialStyle = readSettingsGateway.currentSettings.adaptSpecialStyle,
-            htmlSemanticTextResolver = AndroidReaderHtmlSemanticTextResolver,
-        )
+        val readerSource = ReaderPerfTrace.section("content.source-parse") {
+            ReaderChapterSourceParser.parse(
+                chapterIndex = chapter.index,
+                title = displayTitle,
+                paragraphs = contents.textList,
+                includeTitle = ReadBookConfig.titleMode != 2 || chapter.isVolume || contents.textList.isEmpty(),
+                adaptSpecialStyle = readSettingsGateway.currentSettings.adaptSpecialStyle,
+                htmlSemanticTextResolver = AndroidReaderHtmlSemanticTextResolver,
+            )
+        }
         val readerChapterInput = ReaderChapterInput(
             book = book,
             bookSource = bookSource,

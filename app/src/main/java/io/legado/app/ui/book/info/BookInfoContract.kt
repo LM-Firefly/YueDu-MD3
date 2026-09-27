@@ -7,6 +7,9 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.data.entities.readRecord.ReadRecordTimelineDay
+import io.legado.app.domain.model.BookshelfConflict
+import io.legado.app.domain.model.ConflictBookSummary
+import io.legado.app.domain.model.PrivateAccessState
 import io.legado.app.domain.usecase.ChangeSourceMigrationOptions
 import io.legado.app.ui.widget.components.variable.VariableEditorUiState
 import kotlinx.collections.immutable.ImmutableList
@@ -52,6 +55,30 @@ data class BookInfoUiState(
     val defaultCover: String = "",
     val defaultCoverDark: String = "",
     val showMangaUi: Boolean = true,
+    /** 加入书架时发现的疑似重复；非空时由冲突 Sheet 决定共存还是迁移。 */
+    val shelfConflict: BookshelfConflict? = null,
+    val isResolvingShelfConflict: Boolean = false,
+
+    /**
+     * 书架里同一部作品的**其他**副本（不含本书自身）。
+     *
+     * 两种用途：
+     * - 本书**未入架**且非空：入架会弹冲突 Sheet，书架按钮提前标成冲突态；
+     * - 本书**已入架**且非空：由「书架操作」Sheet 列出，供用户切到另一个副本。
+     *
+     * 判定口径与 [shelfConflict] 完全一致（同一个用例），因此「按钮是冲突态」⟺「点击真的会
+     * 弹冲突 Sheet」；具体是哪几本仍由点击后的 Sheet 给出。
+     */
+    val shelfDuplicates: ImmutableList<ConflictBookSummary> = persistentListOf(),
+    /** 本书是否私密（单本标记 ∪ 所属私密分组）；菜单里"标记/取消私密"读它 */
+    val bookPrivate: Boolean = false,
+    /** 进入本页时这本书是否需要验证（页面内刚标记私密不会立刻脱敏） */
+    val privateLockedByEntry: Boolean = false,
+    /** 本书为私密书籍且尚未解锁：详情页只显示锁定态 */
+    val privateLocked: Boolean = false,
+    val privateAccess: PrivateAccessState = PrivateAccessState(),
+    /** 应用内密码解锁弹窗（生物不可用或用户选择密码时） */
+    val showPrivatePasswordDialog: Boolean = false,
 )
 
 @Stable
@@ -115,6 +142,8 @@ sealed interface BookInfoSheet {
     data object None : BookInfoSheet
     data object CoverPicker : BookInfoSheet
     data object GroupPicker : BookInfoSheet
+    /** 已入架书籍的操作面板：其他副本 / 分组 / 删除。 */
+    data object ShelfActions : BookInfoSheet
     data class SourcePicker(val oldBook: Book) : BookInfoSheet
     data object ReadRecord : BookInfoSheet
     data class WebFiles(val openAfterImport: Boolean) : BookInfoSheet
@@ -186,6 +215,27 @@ sealed interface BookInfoIntent {
         val toc: List<BookChapter>,
     ) : BookInfoIntent
 
+    data object DismissShelfConflict : BookInfoIntent
+    data class OpenShelfConflictBook(val summary: ConflictBookSummary) : BookInfoIntent
+
+    /** 「书架操作」Sheet：切到同名同作者的其他副本。 */
+    data class OpenShelfDuplicate(val summary: ConflictBookSummary) : BookInfoIntent
+
+    /** 「书架操作」Sheet：改分组（进入原有的分组选择 Sheet）。 */
+    data object ShelfActionsGroup : BookInfoIntent
+
+    /** 「书架操作」Sheet：删除本书（仍走原有的确认框 / 删除前提醒设置）。 */
+    data object ShelfActionsDelete : BookInfoIntent
+    data class CoexistWithShelfConflict(
+        val existingBookUrl: String,
+        val options: ChangeSourceMigrationOptions,
+    ) : BookInfoIntent
+
+    data class MigrateShelfConflict(
+        val existingBookUrl: String,
+        val options: ChangeSourceMigrationOptions,
+    ) : BookInfoIntent
+
     data class ReplaceConflictingBook(
         val oldBook: Book,
         val source: BookSource,
@@ -225,10 +275,22 @@ sealed interface BookInfoIntent {
 
     /** 简介 HTML 图片长按。 */
     data class IntroImageLongClick(val source: String) : BookInfoIntent
+
+    /** 私密书籍未解锁时的验证入口 */
+    data object RequestPrivateUnlock : BookInfoIntent
+    data object ShowPrivatePassword : BookInfoIntent
+    data class SubmitPrivatePassword(val password: String) : BookInfoIntent
+    data object DismissPrivatePassword : BookInfoIntent
 }
 
 sealed interface BookInfoEffect {
     data class ShowMessage(val message: String) : BookInfoEffect
+
+    /** 交给宿主弹出系统生物验证框（需要 FragmentActivity） */
+    data object RequestBiometricUnlock : BookInfoEffect
+
+    /** 私密功能需要本地密码：引导去设置页 */
+    data object NavigateToLocalPasswordSettings : BookInfoEffect
 
     data class Finish(
         val resultCode: Int? = null,
@@ -322,4 +384,5 @@ enum class BookInfoMenuAction {
     ToggleDeleteAlert,
     ClearCache,
     ShowLog,
+    TogglePrivate,
 }

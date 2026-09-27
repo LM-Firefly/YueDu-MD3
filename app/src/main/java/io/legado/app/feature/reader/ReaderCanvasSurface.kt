@@ -117,6 +117,7 @@ import io.legado.app.feature.reader.core.readaloud.ReaderVisibleTextPosition
 import io.legado.app.feature.reader.core.readaloud.ReaderVisibleTextPositionPolicy
 import io.legado.app.feature.reader.core.selection.ReaderPageChangeOrigin
 import io.legado.app.feature.reader.core.selection.ReaderSelection
+import io.legado.app.feature.reader.core.selection.ReaderSelectionDragState
 import io.legado.app.feature.reader.core.selection.ReaderSelectionEndpoint
 import io.legado.app.feature.reader.core.selection.ReaderSelectionLifecyclePolicy
 import io.legado.app.feature.reader.core.selection.ReaderSelectionMenuAnchor
@@ -136,6 +137,7 @@ import io.legado.app.feature.reader.core.transition.ReaderHorizontalDrag
 import io.legado.app.feature.reader.core.transition.ReaderPageTransform
 import io.legado.app.feature.reader.core.transition.ReaderPageTransition
 import io.legado.app.feature.reader.core.transition.ReaderPageTransitionPolicy
+import io.legado.app.feature.reader.core.transition.ReaderPageTurnSpeed
 import io.legado.app.feature.reader.core.transition.ReaderProgrammaticTurnPolicy
 import io.legado.app.feature.reader.core.transition.ReaderScrollCrossing
 import io.legado.app.feature.reader.core.transition.ReaderScrollPolicy
@@ -178,6 +180,8 @@ private const val SelectionHandleFadeInMillis = 140
 fun ReaderCanvasSurface(
     hostPages: ReaderPageWindow,
     transitionMode: ReaderTransitionMode,
+    /** 翻页动画速度挡位；只改折算基准时长，不改变动画种类与几何。 */
+    pageTurnSpeed: ReaderPageTurnSpeed,
     backgroundColor: Color,
     backgroundImage: Drawable?,
     backgroundRevision: Long,
@@ -289,6 +293,8 @@ fun ReaderCanvasSurface(
     val latestTapAction by rememberUpdatedState(onTapAction)
     val latestReaderInteraction by rememberUpdatedState(onReaderInteraction)
     val latestNoAnimationScrollPage by rememberUpdatedState(noAnimationScrollPage)
+    // 手势协程长驻，速度挡位必须现读，否则改挡后要等下次重组/手势重启才生效。
+    val latestPageTurnSpeed by rememberUpdatedState(pageTurnSpeed)
     var bookmarkOffset by remember { mutableFloatStateOf(0f) }
     var bookmarkArmed by remember { mutableStateOf(false) }
     var bookmarkWillRemove by remember { mutableStateOf(false) }
@@ -472,15 +478,19 @@ fun ReaderCanvasSurface(
         val targetCurlX = transition.direction?.let {
             ReaderCurlTouchPolicy.settledX(it, decision.commit, transition.pageExtentPx)
         } ?: curlTouchX
+        // 速度挡位只换折算基准：提交判定、目标位移与折页几何都不变。
+        val baseDurationMillis = latestPageTurnSpeed.baseDurationMillis
         val durationMillis = if (transitionMode == ReaderTransitionMode.SIMULATION) {
             ReaderCurlTouchPolicy.settleDurationMillis(
                 curlTouchX,
                 targetCurlX,
                 transition.pageExtentPx,
+                baseDurationMillis = baseDurationMillis,
             )
         } else {
             ReaderPageTransitionPolicy.settleDurationMillis(
                 transitionMode, displayOffset, decision.targetOffsetPx, transition.pageExtentPx,
+                baseDurationMillis = baseDurationMillis,
             )
         }
         if (durationMillis == 0) {
@@ -637,6 +647,7 @@ fun ReaderCanvasSurface(
                 val durationMillis = ReaderScrollPolicy.stepDurationMillis(
                     distance,
                     page.scrollViewportExtentPx(),
+                    animationSpeedMillis = latestPageTurnSpeed.baseDurationMillis,
                 )
                 var lastValue = 0f
                 Animatable(0f).animateTo(
@@ -899,6 +910,10 @@ fun ReaderCanvasSurface(
                 viewConfiguration.touchSlop,
                 configuredTouchSlopPx,
             )
+            // 长按后进拖选的阈值不跟随 pageTouchSlop：后者是防误触翻页设置，可配到 1000px。
+            val selectionDragSlop = ReaderGestureSettingsPolicy.selectionDragSlopPx(
+                viewConfiguration.touchSlop,
+            )
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false)
                 latestReaderInteraction()
@@ -929,6 +944,7 @@ fun ReaderCanvasSurface(
                 var scrollHitBoundary: ReaderTurnDirection? = null
                 var movedPastSlop = false
                 var longPressed = false
+                var selectionDragState = ReaderSelectionDragState()
                 var grabbingStart = false
                 var grabbingEnd = false
                 var grabbedEndpoint: ReaderSelectionEndpoint? = null
@@ -1052,6 +1068,22 @@ fun ReaderCanvasSurface(
                         if (longPressed || grabbingStart || grabbingEnd) {
                             val selection = textSelection
                             val movingEndpoint = grabbedEndpoint ?: ReaderSelectionEndpoint.FOCUS
+                            // 长按刚成立时的手抖不该破坏整词选区：越过拖选阈值前保持初始
+                            // selection，只更新放大镜位置。把手拖动不受阈值限制（见
+                            // ReaderSelectionDragState.handleGrabbed）。
+                            selectionDragState = selectionDragState.update(
+                                longPressed = longPressed,
+                                handleGrabbed = grabbingStart || grabbingEnd,
+                                distancePx = total.getDistance(),
+                                dragSlopPx = selectionDragSlop,
+                            )
+                            if (!selectionDragState.started) {
+                                selectionMagnifierSource = selection?.let {
+                                    selectionCursorCenter(it, movingEndpoint)
+                                }
+                                change.consume()
+                                continue
+                            }
                             // PointerInput 会先派发一个与 DOWN 位置相同的事件。把手尚未移动时
                             // 不能再用行底去 hit-test，否则该边界可能直接吸附到下一行。
                             if (grabbedEndpoint != null && !handleHasMoved) {
@@ -1708,6 +1740,11 @@ private val batteryClassicTypeface: android.graphics.Typeface? by lazy {
     runCatching {
         android.graphics.Typeface.createFromAsset(appCtx.assets, "font/number.ttf")
     }.getOrNull()
+}
+
+/** View 版 `BatteryView` 使用的轮廓；绘制时复用原有 `ic_battery` 矢量资源。 */
+private val batteryOutlineState: Drawable.ConstantState? by lazy {
+    appCtx.getDrawable(R.drawable.ic_battery)?.constantState
 }
 
 private fun ReaderPage.scrollViewportExtentPx(): Float =
@@ -2925,31 +2962,27 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBatteryGlyph(
     fillInner: Boolean,
 ) {
     val unit = density
-    val bodyWidth = 22f * unit
-    val bodyHeight = 10f * unit
-    val top = baseline + (paint.fontMetrics.ascent + paint.fontMetrics.descent) / 2f - bodyHeight / 2f
-    val bodyLeft = left + 2f * unit
-    val outline = Paint(paint).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = unit.coerceAtLeast(1f)
-        alpha = 194
+    val iconTop = baseline + (paint.fontMetrics.ascent + paint.fontMetrics.descent) / 2f - 6f * unit
+    // 旧 ImageView 为 28×12dp centerCrop：24dp 矢量放大到 28dp，垂直裁去两侧各 8dp。
+    batteryOutlineState?.newDrawable(appCtx.resources)?.mutate()?.apply {
+        setTint(paint.color)
+        alpha = 194 // 旧 BatteryView.batteryIcon.alpha = 0.76
+        setBounds(
+            left.toInt(),
+            (iconTop - 8f * unit).toInt(),
+            (left + 28f * unit).toInt(),
+            (iconTop + 20f * unit).toInt(),
+        )
+        draw(canvas)
     }
-    val fill = Paint(paint).apply { style = Paint.Style.FILL; alpha = 194 }
-    canvas.drawRoundRect(bodyLeft, top, bodyLeft + bodyWidth, top + bodyHeight, unit, unit, outline)
-    canvas.drawRect(
-        bodyLeft + bodyWidth,
-        top + bodyHeight / 3f,
-        bodyLeft + bodyWidth + 2f * unit,
-        top + bodyHeight * 2f / 3f,
-        fill,
-    )
-    val innerWidth = (bodyWidth - 4f * unit) * batteryPercent.coerceIn(0, 100) / 100f
+    val innerWidth = 17f * unit * batteryPercent.coerceIn(0, 100) / 100f
     if (fillInner && innerWidth > 0f) {
+        val fill = Paint(paint).apply { style = Paint.Style.FILL }
         canvas.drawRoundRect(
-            bodyLeft + 2f * unit,
-            top + 2f * unit,
-            bodyLeft + 2f * unit + innerWidth,
-            top + bodyHeight - 2f * unit,
+            left + 4.2f * unit,
+            iconTop + 2f * unit,
+            left + 4.2f * unit + innerWidth,
+            iconTop + 10f * unit,
             unit,
             unit,
             fill,
@@ -2957,14 +2990,15 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBatteryGlyph(
     }
     if (drawNumberInside) {
         val numberPaint = Paint(paint).apply {
-            textSize = minOf(textSize * .72f, 8f * unit)
+            textSize = 8f * unit
             textAlign = Paint.Align.CENTER
             isFakeBoldText = true
         }
-        val centerY = top + bodyHeight / 2f - (numberPaint.fontMetrics.ascent + numberPaint.fontMetrics.descent) / 2f
+        val centerY =
+            iconTop + 6f * unit - (numberPaint.fontMetrics.ascent + numberPaint.fontMetrics.descent) / 2f
         canvas.drawText(
             batteryPercent.coerceIn(0, 100).toString(),
-            bodyLeft + bodyWidth / 2f,
+            left + 12.8f * unit,
             centerY,
             numberPaint,
         )

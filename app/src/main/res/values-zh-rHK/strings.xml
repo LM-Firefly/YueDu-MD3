@@ -481,6 +481,11 @@
     <string name="page_anim_simulation">仿真</string>
     <string name="page_anim_scroll">滾動</string>
     <string name="page_anim_none">無動畫</string>
+    <string name="page_anim_speed">翻頁動畫速度</string>
+    <string name="page_anim_speed_fastest">極速</string>
+    <string name="page_anim_speed_fast">快速</string>
+    <string name="page_anim_speed_moderate">適中</string>
+    <string name="page_anim_speed_elegant">優雅</string>
     <string name="up_change_source_last_chapter_t">後台更新換源最新章節</string>
     <string name="up_change_source_last_chapter_s">開啟則會在軟件打開 1 分鐘後開始更新</string>
     <string name="behavior_main_t">書架 ToolBar 自動隱藏</string>
@@ -1272,7 +1277,7 @@
     <string name="allow_drop_down_refresh">允许下拉刷新</string>
     <string name="private_group">設為私隱分組</string>
     <string name="disable_private_group">關閉私隱分組</string>
-    <string name="private_group_desc">開啟後，本分組內嘅書籍將從公開書架隱藏</string>
+    <string name="private_group_desc">開啟後，本分組內嘅書籍唔會喺公開書架出現，入該分組需要驗證。單本標記為私密嘅書唔同：佢仲喺書架度，封面同文字會被遮住，驗證後先顯示。</string>
     <string name="text_underline">文字下划线</string>
     <string name="select_new_source">选中新增源</string>
     <string name="select_update_source">选中更新源</string>
@@ -1437,6 +1442,7 @@
     <string name="miuix_monet_summary">為 Miuix 使用 Monet 演算法生成配色。目前主題為動態主題且系統為 Android 12 或以上時，會優先使用系統取色；否則使用下方種子色。</string>
     <string name="bookshelf_total_count">共%1$d本</string>
     <string name="bookshelf_selected_count">已選%1$d本</string>
+    <string name="bookshelf_edit_subtitle">%1$s · %2$s</string>
     <string name="bookshelf_empty_global_search">沒有書籍，嘗試全局搜索</string>
     <string name="global_search">全局搜索</string>
     <string name="cache_management">緩存管理</string>
@@ -1917,6 +1923,7 @@
     <string name="highlight_bg_image">背景圖片</string>
     <string name="highlight_bg_image_scale">圖片縮放</string>
     <string name="highlight_rule_config">高亮規則</string>
+    <string name="highlight_rule_presets">預設規則</string>
     <string name="highlight_tag_add_rule">添加規則</string>
     <string name="highlight_tag_config">標籤規則</string>
     <string name="highlight_tag_display_mode">顯示模式</string>
@@ -2559,6 +2566,7 @@
     <string name="long_press_select_mode">點按項目選擇，返回退出</string>
     <string name="confirm_delete_read_record">刪除閱讀記錄？</string>
     <string name="delete_read_record_message">確定要刪除這條記錄嗎？</string>
+    <string name="delete_reading_period_message">確定要刪除這個閱讀時段嗎？該行連續的所有會話（包括其他裝置的會話）都會被刪除。</string>
     <string name="delete_selected_read_records_message">確定要刪除所選的 %1$d 條閱讀記錄嗎？</string>
     <string name="clear_read_records">清空閱讀記錄</string>
     <string name="clear_read_records_summary">刪除全部閱讀記錄、每日明細和時間線閱讀時段記錄</string>
@@ -2581,6 +2589,14 @@
     <string name="read_record_repair">修復閱讀記錄</string>
     <string name="read_record_repair_summary">合併可確定歸屬的記錄，並清理欄位完全相同的閱讀時段記錄</string>
     <string name="operation_failed">操作失敗</string>
+    <string name="do_not_remind_again_this_page">本次開啟不再提示</string>
+    <string name="do_not_remind_again_long_term">今後不再提醒</string>
+    <string name="restore_delete_confirmation">恢復刪除確認</string>
+    <string name="restore_delete_confirmation_summary">刪除閱讀記錄前再次進行確認</string>
+    <string name="delete_confirmation_restored">已恢復刪除確認</string>
+    <string name="read_record_deleted">已刪除閱讀記錄</string>
+    <string name="read_records_cleared">已清空閱讀記錄</string>
+    <string name="read_records_merged">已合併閱讀記錄</string>
     <string name="merge_read_records_message">將選取的閱讀記錄合併到「%1$s」/%2$s。</string>
     <string name="merge_read_record_candidate">%1$s / %2$s（%3$s）</string>
     <string name="no_merge_candidates">沒有可合併的其他閱讀記錄</string>

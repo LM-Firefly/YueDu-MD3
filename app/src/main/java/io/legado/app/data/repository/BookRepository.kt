@@ -7,6 +7,7 @@ import io.legado.app.data.dao.BookSummary
 import io.legado.app.data.dao.GroupBookCount
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.data.entities.ShelfBookSummary
 import io.legado.app.ui.main.bookshelf.BookShelfItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +18,11 @@ class BookRepository(
     private val bookChapterDao: BookChapterDao,
     private val appDb: AppDatabase,
 ) {
+
+    private companion object {
+        const val SQLITE_MAX_BIND_PARAMETERS = 900
+    }
+
     fun flowBook(bookUrl: String): Flow<Book?> {
         return bookDao.flowGetBook(bookUrl)
     }
@@ -61,9 +67,23 @@ class BookRepository(
         }
     }
 
-    suspend fun getShelfBookConflict(name: String, author: String): Book? {
+    /**
+     * 批量取书，用于把跨分组选中的 bookUrl 解析成实体。
+     * 分批是因为 `IN (:bookUrls)` 会展开成绑定参数，单次上限由 SQLite 决定（默认 999）。
+     */
+    suspend fun getBooksByUrls(bookUrls: Set<String>): List<Book> = withContext(Dispatchers.IO) {
+        if (bookUrls.isEmpty()) return@withContext emptyList()
+        if (bookUrls.size <= SQLITE_MAX_BIND_PARAMETERS) {
+            return@withContext bookDao.getBooksByUrls(bookUrls)
+        }
+        bookUrls.chunked(SQLITE_MAX_BIND_PARAMETERS).flatMap { chunk ->
+            bookDao.getBooksByUrls(chunk.toSet())
+        }
+    }
+
+    suspend fun getShelfBookSummaries(): List<ShelfBookSummary> {
         return withContext(Dispatchers.IO) {
-            bookDao.getShelfBookConflict(name, author)
+            bookDao.getShelfBookSummaries()
         }
     }
 

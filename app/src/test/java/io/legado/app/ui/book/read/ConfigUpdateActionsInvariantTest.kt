@@ -164,6 +164,10 @@ class ConfigUpdateActionsInvariantTest {
             "ReadingAnchorEnabled",
             // 只写 DataStore 的 readAloudDetachReminderEnabled，由 readPreferences 反应式驱动
             "ReadAloudDetachReminderEnabled",
+            // 翻页速度挡位只改翻页动画的折算基准时长，下一次翻页现读挡位；不改变动画种类、
+            // 页高或排版，因此没有需要命令式驱动的渲染副作用。它写的是排版配置而非 DataStore，
+            // 快照经 `ReadStyleGateway.publishState` 反应式刷新，故同样落在这里。
+            "PageAnimSpeed",
         )
     }
 }
