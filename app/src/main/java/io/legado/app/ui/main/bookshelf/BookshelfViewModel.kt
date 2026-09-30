@@ -65,7 +65,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flatMapLatest
@@ -353,21 +352,40 @@ class BookshelfViewModel(
                     sortConfig = sortConfig
                 )
             }
-        }
-        // 刷新期间 Room flow 频繁触发（每本书更新一次），debounce 批量合并，避免主线程频繁重组。
-        // 空闲时不 debounce，保持即时响应。
-        .let { flow ->
-            isRefreshingFlow.flatMapLatest { refreshing ->
-                if (refreshing) flow.debounce(1000L) else flow
-            }
-        }
-        .distinctUntilChanged { a, b -> a === b }
+        }.distinctUntilChanged()
         .flowOn(Dispatchers.Default)
         .shareIn(viewModelScope, SharingStarted.WhileSubscribed(5000), replay = 1)
 
     val booksFlow: Flow<List<BookUiItem>> = selectedGroupBooksFlow
         .map { it.books }
-        .distinctUntilChanged { a, b -> a === b }
+        .distinctUntilChanged()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val allGroupBooksImmutableFlow: Flow<ImmutableMap<Long, ImmutableList<BookUiItem>>> =
+        combine(groupsFlow, sortConfigFlow, privateMarkersFlow) { groups, sortConfig, markers ->
+            Triple(groups, sortConfig, markers)
+        }.flatMapLatest { (groups, sortConfig, markers) ->
+            if (groups.isEmpty()) {
+                flowOf(persistentMapOf())
+            } else {
+                val flows = groups.map { group ->
+                    bookRepository.flowBookShelfByGroup(group.groupId).map { books ->
+                        group.groupId to bookshelfRepository.sortBooks(
+                            books,
+                            group,
+                            sortConfig.sort,
+                            sortConfig.sortOrder
+                        ).map { it.toUiItem(markers.isPrivate(it)) }.toImmutableList()
+                    }
+                }
+                combine(flows) { results ->
+                    results.fold(persistentMapOf<Long, ImmutableList<BookUiItem>>()) { acc, (id, list) ->
+                        acc.putting(id, list)
+                    }
+                }
+            }
+        }.distinctUntilChanged()
+            .flowOn(Dispatchers.Default)
 
     private val selectedBooksStateFlow: Flow<SelectedBooksState> = combine(
         selectedGroupBooksFlow,
@@ -392,13 +410,11 @@ class BookshelfViewModel(
             isSearchMode = isSearchMode,
             sortConfig = selectedGroup.sortConfig
         )
-    }.distinctUntilChanged { a, b -> a === b }
-    // filterBooks() 遍历全部书籍，必须在 Default 执行
-    .flowOn(Dispatchers.Default)
+    }.distinctUntilChanged()
 
     private val visibleBooksFlow: Flow<List<BookUiItem>> = selectedBooksStateFlow
         .map { it.visibleBooks }
-        .distinctUntilChanged { a, b -> a === b }
+        .distinctUntilChanged()
 
     private val selectedGroupCanReorderFlow = combine(
         isEditModeFlow,
@@ -472,11 +488,7 @@ class BookshelfViewModel(
                 GroupPreviewState(previews, counts, allBookCount)
             }
         }
-    }.let { flow ->
-        isRefreshingFlow.flatMapLatest { refreshing ->
-            if (refreshing) flow.debounce(1000L) else flow
-        }
-    }.distinctUntilChanged { a, b -> a === b }.flowOn(Dispatchers.Default)
+    }.distinctUntilChanged().flowOn(Dispatchers.Default)
 
     private val internalStateFlow = combine(
         groupIdFlow,
@@ -492,11 +504,6 @@ class BookshelfViewModel(
             upBooksCount = upBooksCount,
             pendingOpenBookUrl = pendingOpenBookUrl
         )
-    // updatingBooks/upBooksCount 在刷新期间高频变化，debounce 防止穿透到 contentUiState
-    }.let { flow ->
-        isRefreshingFlow.flatMapLatest { refreshing ->
-            if (refreshing) flow.debounce(500L) else flow
-        }
     }
 
     private data class InternalState(
@@ -558,21 +565,33 @@ class BookshelfViewModel(
         groupPreviewsStateFlow,
         internalStateFlow
     ) { selectedBooks, groups, allGroups, previews, internal ->
+        BookshelfDataCore(selectedBooks, groups, allGroups, previews, internal)
+    }.combine(allGroupBooksImmutableFlow) { core, allGroupBooks ->
         BookshelfDataState(
-            selectedBooks = selectedBooks,
-            groups = groups.map { it.toBookGroupUi() },
-            allGroups = allGroups.map { it.toBookGroupUi() },
-            previews = previews,
-            internal = internal
+            selectedBooks = core.selectedBooks,
+            groups = core.groups.map { it.toBookGroupUi() },
+            allGroups = core.allGroups.map { it.toBookGroupUi() },
+            previews = core.previews,
+            internal = core.internal,
+            allGroupBooks = allGroupBooks
         )
-    }.flowOn(Dispatchers.Default)
+    }
+
+    private data class BookshelfDataCore(
+        val selectedBooks: SelectedBooksState,
+        val groups: List<BookGroup>,
+        val allGroups: List<BookGroup>,
+        val previews: GroupPreviewState,
+        val internal: InternalState
+    )
 
     private data class BookshelfDataState(
         val selectedBooks: SelectedBooksState,
         val groups: List<BookGroupUi>,
         val allGroups: List<BookGroupUi>,
         val previews: GroupPreviewState,
-        val internal: InternalState
+        val internal: InternalState,
+        val allGroupBooks: ImmutableMap<Long, ImmutableList<BookUiItem>>
     )
 
     private val contentUiState: Flow<BookshelfUiState> = combine(
@@ -591,8 +610,25 @@ class BookshelfViewModel(
         val allGroups = data.allGroups
         val previews = data.previews
         val internal = data.internal
-        val books = selectedBooks.books
-        val filteredBooks = selectedBooks.visibleBooks
+        val visibleGroupBooks =
+            if (!selectedBooks.isSearchMode || selectedBooks.searchKey.isBlank()) {
+                data.allGroupBooks
+            } else {
+                data.allGroupBooks.mapValues { (_, books) ->
+                    filterBooks(
+                        books = books,
+                        searchKey = selectedBooks.searchKey,
+                        isSearchMode = true,
+                        hidePrivate = hidePrivateFromSearch
+                    ).toImmutableList()
+                }.toImmutableMap()
+            }
+        val books = data.allGroupBooks[internal.groupId]
+            ?: selectedBooks.books.takeIf { selectedBooks.groupId == internal.groupId }
+            ?: emptyList()
+        val filteredBooks = visibleGroupBooks[internal.groupId]
+            ?: selectedBooks.visibleBooks.takeIf { selectedBooks.groupId == internal.groupId }
+            ?: emptyList()
         val selectedGroupIndex = groups.indexOfFirst { it.groupId == internal.groupId }
             .coerceAtLeast(0)
         val currentGroup = allGroups.firstOrNull { it.groupId == internal.groupId }
@@ -661,18 +697,12 @@ class BookshelfViewModel(
             currentGroupName = currentGroupName,
             draggingBooks = interaction.draggingBooks?.toImmutableList(),
             pendingSavedBooks = interaction.pendingSavedBooks?.toImmutableList(),
-            visibleGroupBooks = if (selectedBooks.groupId == internal.groupId) {
-                persistentMapOf(internal.groupId to filteredBooks.toImmutableList())
-            } else {
-                persistentMapOf()
-            },
+            visibleGroupBooks = visibleGroupBooks,
             privateAccess = privateAccess,
             privateSettings = privateSettings,
             pendingOpenBookUrl = internal.pendingOpenBookUrl,
         )
-    // contentUiState 的 combine lambda 包含大量集合分配（toImmutableList/toImmutableSet/filter/indexOfFirst），
-    // 必须在 Default 线程执行，否则刷新期间会阻塞 Main 线程导致 UI 卡顿。
-    }.flowOn(Dispatchers.Default)
+    }
 
     val uiState: StateFlow<BookshelfUiState> = combine(
         contentUiState,
@@ -1109,7 +1139,7 @@ class BookshelfViewModel(
     }
     fun upAllBookToc() {
         execute {
-            addToWaitUp(bookRepository.getHasUpdateBookUrls())
+            addToWaitUp(bookRepository.getHasUpdateBooks())
         }
     }
 
@@ -1125,7 +1155,8 @@ class BookshelfViewModel(
     ) {
         execute(context = updateDispatcher) {
             val bookUrls = books.filter { !it.isLocal && it.canUpdate }.map { it.bookUrl }
-            addToWaitUp(bookUrls)
+            val fullBooks = bookUrls.mapNotNull { bookRepository.getBook(it) }
+            addToWaitUp(fullBooks)
         }.onError {
             if (resetRefreshWhenIdle) {
                 isRefreshingFlow.value = false
@@ -1137,13 +1168,13 @@ class BookshelfViewModel(
         }
     }
 
-    private fun addToWaitUp(bookUrls: List<String>) {
+    private fun addToWaitUp(books: List<Book>) {
         synchronized(updateQueueLock) {
-            bookUrls.forEach { url ->
-                if (!waitUpTocBooks.contains(url) &&
-                    !onUpTocBooks.contains(url)
+            books.forEach { book ->
+                if (!waitUpTocBooks.contains(book.bookUrl) &&
+                    !onUpTocBooks.contains(book.bookUrl)
                 ) {
-                    waitUpTocBooks.add(url)
+                    waitUpTocBooks.add(book.bookUrl)
                 }
             }
             if (upTocJob == null && waitUpTocBooks.isNotEmpty()) {

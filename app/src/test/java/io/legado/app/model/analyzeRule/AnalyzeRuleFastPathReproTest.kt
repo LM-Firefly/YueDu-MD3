@@ -32,7 +32,7 @@ import splitties.init.injectAsAppCtx
  * 用例跑在 Robolectric 上：见 [setUp] 关于 `appCtx` 的说明。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(application = Application::class, sdk = [35])
+@Config(application = Application::class, sdk = [34])
 class AnalyzeRuleFastPathReproTest {
 
     /**

@@ -424,18 +424,7 @@ abstract class BaseReadAloudService : BaseService(),
         prepareReadAloudJob?.cancel()
         prepareReadAloudJob = execute(executeContext = IO) {
             val input = ReadBook.readerChapterInputWindow.current ?: return@execute
-            // 分页快照可能尚未从 Compose 渲染层落地，短暂等待而非直接放弃
-            var pagination = ReadBook.readerPagination(input.chapter.index)
-            if (pagination == null) {
-                AppLog.putDebug("朗读等待分页：chapterIndex=${input.chapter.index}")
-                repeat(20) { // 最多等2秒（20 × 100ms）
-                    delay(100)
-                    if (generation != prepareReadAloudGeneration) return@execute
-                    pagination = ReadBook.readerPagination(input.chapter.index)
-                    if (pagination != null) return@repeat
-                }
-            }
-            if (pagination == null) {
+            val pagination = ReadBook.readerPagination(input.chapter.index) ?: run {
                 AppLog.put("启动朗读失败：章节分页未完成 chapterIndex=${input.chapter.index}")
                 return@execute
             }
@@ -734,19 +723,10 @@ abstract class BaseReadAloudService : BaseService(),
         if (targetPageIndex == pageIndex) return false
         // 页面脱离朗读位置（用户手动翻页）后不再驱动可见页面，仅推进朗读内部页游标
         val follow = sessionStore.state.value.followReadAloudPosition
-        if (targetPageIndex > pageIndex) {
-            repeat(targetPageIndex - pageIndex) {
-                pageIndex++
-                if (follow) {
-                    withSpeechNavigation { ReadBook.moveToNextPage() }
-                }
-            }
-        } else {
-            repeat(pageIndex - targetPageIndex) {
-                pageIndex--
-                if (follow) {
-                    withSpeechNavigation { ReadBook.moveToPrevPage() }
-                }
+        repeat(targetPageIndex - pageIndex) {
+            pageIndex++
+            if (follow) {
+                withSpeechNavigation { ReadBook.moveToNextPage() }
             }
         }
         return true
@@ -1533,8 +1513,6 @@ abstract class BaseReadAloudService : BaseService(),
         toLast = false
         resumeReadAloudInternal()
         withSpeechNavigation { ReadBook.moveToPrevChapter(true, toLast = false) }
-        // curPageChanged 内 shouldRestartReadAloudAfterContentLoad 因章节索引不匹配返回 false，不会触发 readAloud；必须显式重启朗读以加载新章节内容。
-        newReadAloud(play = !pause, requestedPageIndex = ReadBook.durPageIndex, requestedStartPos = 0, requestedChapterPosition = null)
     }
 
     open fun nextChapter() {
@@ -1544,9 +1522,7 @@ abstract class BaseReadAloudService : BaseService(),
         resumeReadAloudInternal()
         if (!withSpeechNavigation { ReadBook.moveToNextChapter(true) }) {
             stopReadAloudService()
-            return
         }
-        newReadAloud(play = !pause, requestedPageIndex = ReadBook.durPageIndex, requestedStartPos = 0, requestedChapterPosition = null)
     }
 
     /** Handles a playback engine's natural chapter boundary atomically with timer expiry. */

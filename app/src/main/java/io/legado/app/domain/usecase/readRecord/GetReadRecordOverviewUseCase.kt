@@ -1,6 +1,6 @@
 package io.legado.app.domain.usecase.readRecord
 
-import io.legado.app.data.dao.BookSummary
+import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.readRecord.ReadRecord
 import io.legado.app.data.entities.readRecord.ReadRecordDetail
 import io.legado.app.ui.book.readRecord.ReadBookRanking
@@ -18,7 +18,7 @@ class GetReadRecordOverviewUseCase {
         refDate: LocalDate,
         details: List<ReadRecordDetail>,
         latestRecords: List<ReadRecord>,
-        allBooks: List<BookSummary>
+        allBooks: List<Book>
     ): ReadRecordOverviewUiState {
         val (startDate, endDate) = getPeriodRange(period, refDate)
 
@@ -49,10 +49,10 @@ class GetReadRecordOverviewUseCase {
 
         val shelfBooksMap = latestRecords.associateBy { it.bookName to it.bookAuthor }
         val allShelfBooksMap = allBooks.associateBy { it.name to it.author }
-        
+
         var readingCount = 0
         var finishedCount = 0
-        
+
         periodBooks.keys.forEach { key ->
             if (shelfBooksMap.containsKey(key)) {
                 readingCount++
@@ -90,10 +90,10 @@ class GetReadRecordOverviewUseCase {
         val dailyTimeData = if (period == ReadPeriod.ALL) {
             emptyList()
         } else if (period == ReadPeriod.YEAR) {
-            val dateToTime = filteredDetails.groupBy { 
+            val dateToTime = filteredDetails.groupBy {
                 LocalDate.parse(it.date, DateTimeFormatter.ISO_LOCAL_DATE).with(TemporalAdjusters.firstDayOfMonth())
             }.mapValues { it.value.sumOf { d -> d.readTime } }
-            
+
             val monthList = mutableListOf<Pair<LocalDate, Long>>()
             var curr = startDate.with(TemporalAdjusters.firstDayOfMonth())
             while (!curr.isAfter(endDate)) {
