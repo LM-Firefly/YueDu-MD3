@@ -44,7 +44,6 @@ coroutines = "1.11.0"
 kotlinxDatetime = "0.8.0"
 lifecycleViewmodelCompose = "2.11.0"
 liveeventbus = "1.8.14"
-markdownRenderer = "0.41.0"
 navigation3 = "1.2.0"
 # NavigationEvent 1.2 修复了预测式返回事件发往已分离输入时的崩溃；
 # 显式保持 1.2 系列，避免回退到尚未包含该修复的稳定版 1.1.2。

@@ -113,7 +113,7 @@ interface BookDao {
             `group`,
             `order`,
             canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro,
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro,
             kind,
             customTag,
             wordCount
@@ -129,12 +129,6 @@ interface BookDao {
 
     @Query("SELECT * FROM books order by durChapterTime desc")
     fun flowAll(): Flow<List<Book>>
-
-    @Query(
-        """SELECT name, author, totalChapterNum, durChapterIndex, durChapterPos
-        FROM books"""
-    )
-    fun flowAllSummary(): Flow<List<BookSummary>>
 
     @Query("SELECT * FROM books")
     suspend fun getAll(): List<Book>
@@ -161,7 +155,7 @@ interface BookDao {
         `group`,
         `order`,
         canUpdate,
-        substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro,
+        ifnull(customIntro, ifnull(listIntro, intro)) as intro,
         kind,
         customTag,
         wordCount
@@ -197,7 +191,7 @@ interface BookDao {
             `group`,
             `order`,
             canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro,
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro,
             kind,
             customTag,
             wordCount
@@ -233,7 +227,7 @@ interface BookDao {
             `group`,
             `order`,
             canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro,
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro,
             kind,
             customTag,
             wordCount
@@ -274,7 +268,7 @@ interface BookDao {
             `group`,
             `order`,
             canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro,
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro,
             kind,
             customTag,
             wordCount
@@ -316,7 +310,7 @@ interface BookDao {
             `group`,
             `order`,
             canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro,
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro,
             kind,
             customTag,
             wordCount
@@ -353,7 +347,7 @@ interface BookDao {
             `group`,
             `order`,
             canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro,
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro,
             kind,
             customTag,
             wordCount
@@ -391,7 +385,7 @@ interface BookDao {
             `group`,
             `order`,
             canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro,
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro,
             kind,
             customTag,
             wordCount
@@ -428,7 +422,7 @@ interface BookDao {
             `group`,
             `order`,
             canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro,
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro,
             kind,
             customTag,
             wordCount
@@ -465,7 +459,7 @@ interface BookDao {
             `group`,
             `order`,
             canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro,
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro,
             kind,
             customTag,
             wordCount
@@ -501,7 +495,7 @@ interface BookDao {
             `group`,
             `order`,
             canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro,
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro,
             kind,
             customTag,
             wordCount
@@ -539,7 +533,7 @@ interface BookDao {
             `group`,
             `order`,
             canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro,
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro,
             kind,
             customTag,
             wordCount
@@ -577,7 +571,7 @@ interface BookDao {
             `group`,
             `order`,
             canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro,
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro,
             kind,
             customTag,
             wordCount
@@ -613,7 +607,7 @@ interface BookDao {
             `group`,
             `order`,
             canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro,
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro,
             kind,
             customTag,
             wordCount
@@ -649,7 +643,7 @@ interface BookDao {
             `group`,
             `order`,
             canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro,
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro,
             kind,
             customTag,
             wordCount
@@ -685,7 +679,7 @@ interface BookDao {
             `group`,
             `order`,
             canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro,
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro,
             kind,
             customTag,
             wordCount
@@ -775,8 +769,8 @@ interface BookDao {
     @get:Query("SELECT * FROM books where type & ${BookType.local} = 0")
     val webBooks: List<Book>
 
-    @get:Query("SELECT bookUrl FROM books where type & ${BookType.local} = 0 and canUpdate = 1")
-    val hasUpdateBookUrls: List<String>
+    @get:Query("SELECT * FROM books where type & ${BookType.local} = 0 and canUpdate = 1")
+    val hasUpdateBooks: List<Book>
 
     @get:Query("SELECT * FROM books")
     val all: List<Book>
@@ -930,7 +924,7 @@ interface BookDao {
             durChapterPos, latestChapterTitle, latestChapterTime,
             lastCheckCount, totalChapterNum, durChapterIndex,
             type, `group`, `order`, canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro, kind, customTag, wordCount
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro, kind, customTag, wordCount
         FROM books
         WHERE $PUBLIC_BOOK_FILTER
         ORDER BY durChapterTime DESC
@@ -946,7 +940,7 @@ interface BookDao {
             durChapterPos, latestChapterTitle, latestChapterTime,
             lastCheckCount, totalChapterNum, durChapterIndex,
             type, `group`, `order`, canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro, kind, customTag, wordCount
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro, kind, customTag, wordCount
         FROM books
         WHERE type & ${BookType.text} > 0 AND type & ${BookType.local} = 0
             AND ($PUBLIC_GROUP_MASK & `group`) = 0
@@ -965,7 +959,7 @@ interface BookDao {
             durChapterPos, latestChapterTitle, latestChapterTime,
             lastCheckCount, totalChapterNum, durChapterIndex,
             type, `group`, `order`, canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro, kind, customTag, wordCount
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro, kind, customTag, wordCount
         FROM books
         WHERE type & ${BookType.local} > 0
             AND $PUBLIC_BOOK_FILTER
@@ -982,7 +976,7 @@ interface BookDao {
             durChapterPos, latestChapterTitle, latestChapterTime,
             lastCheckCount, totalChapterNum, durChapterIndex,
             type, `group`, `order`, canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro, kind, customTag, wordCount
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro, kind, customTag, wordCount
         FROM books
         WHERE type & ${BookType.audio} > 0
             AND $PUBLIC_BOOK_FILTER
@@ -999,7 +993,7 @@ interface BookDao {
             durChapterPos, latestChapterTitle, latestChapterTime,
             lastCheckCount, totalChapterNum, durChapterIndex,
             type, `group`, `order`, canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro, kind, customTag, wordCount
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro, kind, customTag, wordCount
         FROM books
         WHERE type & ${BookType.audio} = 0 AND type & ${BookType.local} = 0
             AND ($PUBLIC_GROUP_MASK & `group`) = 0
@@ -1017,7 +1011,7 @@ interface BookDao {
             durChapterPos, latestChapterTitle, latestChapterTime,
             lastCheckCount, totalChapterNum, durChapterIndex,
             type, `group`, `order`, canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro, kind, customTag, wordCount
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro, kind, customTag, wordCount
         FROM books
         WHERE type & ${BookType.local} > 0
             AND ($PUBLIC_GROUP_MASK & `group`) = 0
@@ -1035,7 +1029,7 @@ interface BookDao {
             durChapterPos, latestChapterTitle, latestChapterTime,
             lastCheckCount, totalChapterNum, durChapterIndex,
             type, `group`, `order`, canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro, kind, customTag, wordCount
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro, kind, customTag, wordCount
         FROM books
         WHERE type & ${BookType.image} > 0
             AND $PUBLIC_BOOK_FILTER
@@ -1052,7 +1046,7 @@ interface BookDao {
             durChapterPos, latestChapterTitle, latestChapterTime,
             lastCheckCount, totalChapterNum, durChapterIndex,
             type, `group`, `order`, canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro, kind, customTag, wordCount
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro, kind, customTag, wordCount
         FROM books
         WHERE type & ${BookType.text} > 0
             AND $PUBLIC_BOOK_FILTER
@@ -1069,7 +1063,7 @@ interface BookDao {
             durChapterPos, latestChapterTitle, latestChapterTime,
             lastCheckCount, totalChapterNum, durChapterIndex,
             type, `group`, `order`, canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro, kind, customTag, wordCount
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro, kind, customTag, wordCount
         FROM books
         WHERE type & ${BookType.updateError} > 0
             AND $PUBLIC_BOOK_FILTER
@@ -1086,7 +1080,7 @@ interface BookDao {
             durChapterPos, latestChapterTitle, latestChapterTime,
             lastCheckCount, totalChapterNum, durChapterIndex,
             type, `group`, `order`, canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro, kind, customTag, wordCount
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro, kind, customTag, wordCount
         FROM books
         WHERE durChapterIndex = 0 AND durChapterPos = 0
             AND $PUBLIC_BOOK_FILTER
@@ -1103,7 +1097,7 @@ interface BookDao {
             durChapterPos, latestChapterTitle, latestChapterTime,
             lastCheckCount, totalChapterNum, durChapterIndex,
             type, `group`, `order`, canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro, kind, customTag, wordCount
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro, kind, customTag, wordCount
         FROM books
         WHERE totalChapterNum > 0 AND durChapterIndex > 0 AND durChapterIndex < totalChapterNum - 1
             AND $PUBLIC_BOOK_FILTER
@@ -1120,7 +1114,7 @@ interface BookDao {
             durChapterPos, latestChapterTitle, latestChapterTime,
             lastCheckCount, totalChapterNum, durChapterIndex,
             type, `group`, `order`, canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro, kind, customTag, wordCount
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro, kind, customTag, wordCount
         FROM books
         WHERE totalChapterNum > 0 AND durChapterIndex >= totalChapterNum - 1
             AND $PUBLIC_BOOK_FILTER
@@ -1137,7 +1131,7 @@ interface BookDao {
             durChapterPos, latestChapterTitle, latestChapterTime,
             lastCheckCount, totalChapterNum, durChapterIndex,
             type, `group`, `order`, canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro, kind, customTag, wordCount
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro, kind, customTag, wordCount
         FROM books
         WHERE totalChapterNum > 0 AND durChapterIndex >= totalChapterNum - 1 AND canUpdate = 1
             AND $PUBLIC_BOOK_FILTER
@@ -1154,7 +1148,7 @@ interface BookDao {
             durChapterPos, latestChapterTitle, latestChapterTime,
             lastCheckCount, totalChapterNum, durChapterIndex,
             type, `group`, `order`, canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro, kind, customTag, wordCount
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro, kind, customTag, wordCount
         FROM books
         WHERE totalChapterNum > 0 AND durChapterIndex >= totalChapterNum - 1 AND canUpdate = 0
             AND $PUBLIC_BOOK_FILTER
@@ -1171,7 +1165,7 @@ interface BookDao {
             durChapterPos, latestChapterTitle, latestChapterTime,
             lastCheckCount, totalChapterNum, durChapterIndex,
             type, `group`, `order`, canUpdate,
-            substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, 500) as intro, kind, customTag, wordCount
+            ifnull(customIntro, ifnull(listIntro, intro)) as intro, kind, customTag, wordCount
         FROM books
         WHERE (`group` & :groupId) > 0
             AND ((SELECT isPrivate FROM book_groups WHERE groupId = :groupId) = 1 OR $PUBLIC_BOOK_FILTER)
@@ -1209,12 +1203,3 @@ interface BookDao {
     @Query("UPDATE books SET isPrivate = :isPrivate WHERE bookUrl IN (:bookUrls)")
     suspend fun setBooksPrivate(bookUrls: Set<String>, isPrivate: Boolean)
 }
-
-/** Lightweight book summary for read-record aggregation — avoids CursorWindow overflow. */
-data class BookSummary(
-    val name: String,
-    val author: String,
-    val totalChapterNum: Int,
-    val durChapterIndex: Int,
-    val durChapterPos: Int,
-)

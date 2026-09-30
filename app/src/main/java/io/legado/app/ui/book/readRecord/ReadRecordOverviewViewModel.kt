@@ -54,7 +54,7 @@ class ReadRecordOverviewViewModel(
         _referenceDate,
         repository.getAllRecordDetails(""),
         repository.getLatestReadRecords(""),
-        bookRepository.flowAllBookSummaries()
+        bookRepository.getAllBooks()
     ) { period, refDate, details, latestRecords, allBooks ->
         getReadRecordOverviewUseCase(period, refDate, details, latestRecords, allBooks)
     }.stateIn(
