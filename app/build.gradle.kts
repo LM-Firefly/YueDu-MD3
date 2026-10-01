@@ -56,7 +56,11 @@ val hasReleaseSigning = listOf(
 ).all { !it.isNullOrEmpty() }
 
 android {
-    compileSdk = 37
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 2
+        }
+    }
     namespace = "io.legado.app"
 
     signingConfigs {
