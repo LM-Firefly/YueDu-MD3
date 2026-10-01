@@ -1,6 +1,9 @@
 package io.legado.app.lib.cronet
 
+import android.annotation.SuppressLint
+import android.os.Build
 import androidx.annotation.Keep
+import androidx.annotation.RequiresApi
 import okhttp3.Call
 import okhttp3.Request
 import okhttp3.Response
@@ -9,7 +12,9 @@ import java.io.IOException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
+@SuppressLint("ObsoleteSdkInt")
 @Keep
+@RequiresApi(api = Build.VERSION_CODES.N)
 class NewCallBack(originalRequest: Request, mCall: Call, readTimeoutMillis: Int) :
     AbsCallBack(originalRequest, mCall, readTimeoutMillis) {
 
@@ -17,13 +22,15 @@ class NewCallBack(originalRequest: Request, mCall: Call, readTimeoutMillis: Int)
 
     @Throws(IOException::class)
     override fun waitForDone(urlRequest: UrlRequest): Response {
-        startCheckCancelJob(urlRequest)
         urlRequest.start()
+        startCheckCancelJob(urlRequest)
+        //DebugLog.i(javaClass.simpleName, "start ${originalRequest.method} ${originalRequest.url}")
         return if (mCall.timeout().timeoutNanos() > 0) {
             responseFuture.get(mCall.timeout().timeoutNanos(), TimeUnit.NANOSECONDS)
         } else {
-            responseFuture.get()
+            return responseFuture.get()
         }
+
     }
 
     /**
