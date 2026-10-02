@@ -85,4 +85,27 @@ class BookShelfIntroQueryTest {
         assertEquals(listIntro, saved.listIntro)
         assertEquals(detailIntro, saved.intro)
     }
+
+    @Test
+    fun giantIntroIsCappedInShelfProjection() {
+        // 超大单行文本会让 CursorWindow 整行读不出（IllegalStateException: Couldn't read row）
+        val giant = "x".repeat(BOOK_SHELF_INTRO_LIMIT + 5_000)
+        db.bookDao.insert(newBook().apply {
+            listIntro = null
+            intro = giant
+        })
+
+        val intro = shelfIntro()!!
+        assertEquals(BOOK_SHELF_INTRO_LIMIT, intro.length)
+        assertEquals(giant.take(BOOK_SHELF_INTRO_LIMIT), intro)
+    }
+
+    @Test
+    fun giantNameIsCappedInShelfProjection() {
+        val giant = "n".repeat(BOOK_SHELF_TEXT_LIMIT + 999)
+        db.bookDao.insert(newBook().apply { name = giant })
+
+        val name = runBlocking { db.bookDao.flowBookShelf().first().single().name }
+        assertEquals(BOOK_SHELF_TEXT_LIMIT, name.length)
+    }
 }
