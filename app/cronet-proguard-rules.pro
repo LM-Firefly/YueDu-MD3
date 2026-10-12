@@ -1,114 +1,3 @@
-# -------- Config Path: base/android/proguard/shared_with_cronet.flags --------
-# Copyright 2016 The Chromium Authors
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
-
-# Contains flags that we want to apply not only to Chromium APKs, but also to
-# third-party apps that bundle the Cronet library.
-
-# WARNING: rules in this file are applied to entire third-party APKs, not just
-# Chromium code. They MUST be scoped appropriately to avoid side effects on app
-# code that we do not own.
-
-# Keep all CREATOR fields within Parcelable that are kept.
--keepclassmembers class !cr_allowunused,org.chromium.** implements android.os.Parcelable {
-  public static *** CREATOR;
-}
-
-# Don't obfuscate Parcelables as they might be marshalled outside Chrome.
-# If we annotated all Parcelables that get put into Bundles other than
-# for saveInstanceState (e.g. PendingIntents), then we could actually keep the
-# names of just those ones. For now, we'll just keep them all.
--keepnames,allowaccessmodification class !cr_allowunused,org.chromium.** implements android.os.Parcelable {}
-
-# Keep all enum values and valueOf methods. See
-# http://proguard.sourceforge.net/index.html#manual/examples.html
-# for the reason for this. Also, see http://crbug.com/248037.
--keepclassmembers enum !cr_allowunused,org.chromium.** {
-    public static **[] values();
-}
-
-# Required to remove fields until b/274802355 is resolved.
--assumevalues class !cr_allowunused,** {
-  final org.chromium.base.ThreadUtils$ThreadChecker * return _NONNULL_;
-}
-# -------- Config Path: build/android/chromium_annotations.flags --------
-# Copyright 2022 The Chromium Authors
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
-
-# Contains flags related to annotations in //build/android that can be safely
-# shared with Cronet, and thus would be appropriate for third-party apps to
-# include.
-
-# Keep all annotation related attributes that can affect runtime
--keepattributes RuntimeVisible*Annotations
--keepattributes AnnotationDefault
-
-# Keeps for class level annotations.
--keep,allowaccessmodification @internal.org.chromium.build.annotations.UsedByReflection class ** {}
-
-# Keeps for method level annotations.
--keepclasseswithmembers,allowaccessmodification class ** {
-  @internal.org.chromium.build.annotations.UsedByReflection <methods>;
-}
--keepclasseswithmembers,allowaccessmodification class ** {
-  @internal.org.chromium.build.annotations.UsedByReflection <fields>;
-}
-
-# Never inline classes, methods, or fields with this annotation, but allow
-# shrinking and obfuscation.
-# Relevant to fields that are needed to store strong references to objects
-# that are held as weak references by native code.
--if @internal.org.chromium.build.annotations.DoNotInline class * {
-    *** *(...);
-}
--keep,allowobfuscation,allowaccessmodification class <1> {
-    *** <2>(...);
-}
--keepclassmembers,allowobfuscation,allowaccessmodification class * {
-   @internal.org.chromium.build.annotations.DoNotInline <methods>;
-}
--keepclassmembers,allowobfuscation,allowaccessmodification class * {
-   @internal.org.chromium.build.annotations.DoNotInline <fields>;
-}
-
--alwaysinline class * {
-    @internal.org.chromium.build.annotations.AlwaysInline *;
-}
-
-# Keep all logs (Log.VERBOSE = 2). R8 does not allow setting to 0.
--maximumremovedandroidloglevel 1 class ** {
-   @internal.org.chromium.build.annotations.DoNotStripLogs <methods>;
-}
--maximumremovedandroidloglevel 1 @internal.org.chromium.build.annotations.DoNotStripLogs class ** {
-   <methods>;
-}
-
-# Never merge classes horizontally or vertically with this annotation.
-# Relevant to classes being used as a key in maps or sets.
--keep,allowaccessmodification,allowobfuscation,allowshrinking @internal.org.chromium.build.annotations.DoNotClassMerge class *
-
-# Mark members annotated with IdentifierNameString as identifier name strings
--identifiernamestring class * {
-    @internal.org.chromium.build.annotations.IdentifierNameString *;
-}
-
-# Mark fields with this to help R8 figure out that they cannot be null.
-# Use assumevalues in addition to assumenosideeffects block because Google3 proguard cannot parse
-# assumenosideeffects blocks which overwrite return value.
--assumevalues class ** {
-  @internal.org.chromium.build.annotations.OptimizeAsNonNull *** *(...) return _NONNULL_;
-}
--assumenosideeffects class ** {
-  @internal.org.chromium.build.annotations.OptimizeAsNonNull *** *(...);
-}
--assumevalues class ** {
-  @internal.org.chromium.build.annotations.OptimizeAsNonNull *** * return _NONNULL_;
-}
--assumenosideeffects class ** {
-  @internal.org.chromium.build.annotations.OptimizeAsNonNull *** *;
-}
 # -------- Config Path: components/cronet/android/cronet_impl_common_proguard.cfg --------
 # Proguard config for apps that depend on cronet_impl_common_java.jar.
 
@@ -180,6 +69,144 @@
 # them.
 -dontwarn internal.org.chromium.build.NativeLibraries
 -dontwarn org.chromium.base.version_info.VersionConstantsBridgeJni
+# -------- Config Path: third_party/jni_zero/proguard.flags --------
+# Copyright 2023 The Chromium Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Keeps for method level annotations.
+-keepclasseswithmembers,allowaccessmodification class ** {
+  @**org.jni_zero.AccessedByNative <fields>;
+}
+-keepclasseswithmembers,includedescriptorclasses,allowaccessmodification,allowoptimization class ** {
+  @**org.jni_zero.CalledByNative <methods>;
+}
+-keepclasseswithmembers,includedescriptorclasses,allowaccessmodification,allowoptimization class ** {
+  @**org.jni_zero.CalledByNativeUnchecked <methods>;
+}
+
+# Allow unused native methods to be removed, but prevent renaming on those that
+# are kept.
+# TODO(crbug.com/315973491): Restrict the broad scope of this rule.
+-keepclasseswithmembernames,includedescriptorclasses,allowaccessmodification class ** {
+  native <methods>;
+}
+
+# Used when multiplexing. We don't package our own @UsedByReflection, so using this instead.
+-keepclasseswithmembers class !cr_allowunused,**J.N {
+  public long *_HASH;
+}
+# -------- Config Path: base/android/proguard/shared_with_cronet.flags --------
+# Copyright 2016 The Chromium Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Contains flags that we want to apply not only to Chromium APKs, but also to
+# third-party apps that bundle the Cronet library.
+
+# WARNING: rules in this file are applied to entire third-party APKs, not just
+# Chromium code. They MUST be scoped appropriately to avoid side effects on app
+# code that we do not own.
+
+# Keep all CREATOR fields within Parcelable that are kept.
+-keepclassmembers class !cr_allowunused,org.chromium.** implements android.os.Parcelable {
+  public static *** CREATOR;
+}
+
+# Don't obfuscate Parcelables as they might be marshalled outside Chrome.
+# If we annotated all Parcelables that get put into Bundles other than
+# for saveInstanceState (e.g. PendingIntents), then we could actually keep the
+# names of just those ones. For now, we'll just keep them all.
+-keepnames,allowaccessmodification class !cr_allowunused,org.chromium.** implements android.os.Parcelable {}
+
+# Keep all enum values and valueOf methods. See
+# http://proguard.sourceforge.net/index.html#manual/examples.html
+# for the reason for this. Also, see http://crbug.com/248037.
+-keepclassmembers enum !cr_allowunused,org.chromium.** {
+    public static **[] values();
+}
+
+# Required to remove fields until b/274802355 is resolved.
+-assumevalues class !cr_allowunused,** {
+  final org.chromium.base.ThreadUtils$ThreadChecker * return _NONNULL_;
+}
+# -------- Config Path: build/android/chromium_annotations.flags --------
+# Copyright 2022 The Chromium Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Contains flags related to annotations in //build/android that can be safely
+# shared with Cronet, and thus would be appropriate for third-party apps to
+# include.
+
+# Keep all annotation related attributes that can affect runtime
+-keepattributes RuntimeVisible*Annotations
+-keepattributes AnnotationDefault
+
+# Keeps for class level annotations.
+-keep,allowaccessmodification @internal.org.chromium.build.annotations.UsedByReflection class ** {}
+
+# Keeps for method level annotations.
+-keepclasseswithmembers,allowaccessmodification class ** {
+  @internal.org.chromium.build.annotations.UsedByReflection <methods>;
+}
+-keepclasseswithmembers,allowaccessmodification class ** {
+  @internal.org.chromium.build.annotations.UsedByReflection <fields>;
+}
+
+# Never inline classes, methods, or fields with this annotation, but allow
+# shrinking and obfuscation.
+# Relevant to fields when they are needed to store strong references to objects
+# that are held as weak references by native code.
+-if @internal.org.chromium.build.annotations.DoNotInline class * {
+    *** *(...);
+}
+-keep,allowobfuscation,allowaccessmodification class <1> {
+    *** <2>(...);
+}
+-keepclassmembers,allowobfuscation,allowaccessmodification class * {
+   @internal.org.chromium.build.annotations.DoNotInline <methods>;
+}
+-keepclassmembers,allowobfuscation,allowaccessmodification class * {
+   @internal.org.chromium.build.annotations.DoNotInline <fields>;
+}
+
+-alwaysinline class * {
+    @internal.org.chromium.build.annotations.AlwaysInline *;
+}
+
+# Keep all logs (Log.VERBOSE = 2). R8 does not allow setting to 0.
+-maximumremovedandroidloglevel 1 class ** {
+   @internal.org.chromium.build.annotations.DoNotStripLogs <methods>;
+}
+-maximumremovedandroidloglevel 1 @internal.org.chromium.build.annotations.DoNotStripLogs class ** {
+   <methods>;
+}
+
+# Never merge classes horizontally or vertically with this annotation.
+# Relevant to classes being used as a key in maps or sets.
+-keep,allowaccessmodification,allowobfuscation,allowshrinking @internal.org.chromium.build.annotations.DoNotClassMerge class *
+
+# Mark members annotated with IdentifierNameString as identifier name strings
+-identifiernamestring class * {
+    @internal.org.chromium.build.annotations.IdentifierNameString *;
+}
+
+# Mark fields with this to help R8 figure out that they cannot be null.
+# Use assumevalues in addition to assumenosideeffects block because Google3 proguard cannot parse
+# assumenosideeffects blocks which overwrite return value.
+-assumevalues class ** {
+  @internal.org.chromium.build.annotations.OptimizeAsNonNull *** *(...) return _NONNULL_;
+}
+-assumenosideeffects class ** {
+  @internal.org.chromium.build.annotations.OptimizeAsNonNull *** *(...);
+}
+-assumevalues class ** {
+  @internal.org.chromium.build.annotations.OptimizeAsNonNull *** * return _NONNULL_;
+}
+-assumenosideeffects class ** {
+  @internal.org.chromium.build.annotations.OptimizeAsNonNull *** *;
+}
 # -------- Config Path: components/cronet/android/cronet_shared_proguard.cfg --------
 # Proguard config for apps that depend on cronet_shared_java.jar (which should
 # be all apps that depend on any part of Cronet)
@@ -224,33 +251,6 @@
 
 -keepclassmembers class * extends org.chromium.net.internal.com.google.protobuf.GeneratedMessageLite {
   <fields>;
-}
-# -------- Config Path: third_party/jni_zero/proguard.flags --------
-# Copyright 2023 The Chromium Authors
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
-
-# Keeps for method level annotations.
--keepclasseswithmembers,allowaccessmodification class ** {
-  @**org.jni_zero.AccessedByNative <fields>;
-}
--keepclasseswithmembers,includedescriptorclasses,allowaccessmodification,allowoptimization class ** {
-  @**org.jni_zero.CalledByNative <methods>;
-}
--keepclasseswithmembers,includedescriptorclasses,allowaccessmodification,allowoptimization class ** {
-  @**org.jni_zero.CalledByNativeUnchecked <methods>;
-}
-
-# Allow unused native methods to be removed, but prevent renaming on those that
-# are kept.
-# TODO(crbug.com/315973491): Restrict the broad scope of this rule.
--keepclasseswithmembernames,includedescriptorclasses,allowaccessmodification class ** {
-  native <methods>;
-}
-
-# Used when multiplexing. We don't package our own @UsedByReflection, so using this instead.
--keepclasseswithmembers class !cr_allowunused,**J.N {
-  public long *_HASH;
 }
 # -------- Config Path: components/cronet/android/httpengine_native_provider_proguard.cfg --------
 # Proguard config for apps that depend on httpengine_native_provider_java.jar.
