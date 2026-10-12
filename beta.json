@@ -1,49 +1,49 @@
 {
-  "tag_name": "3.26.16-beta.37",
-  "name": "Pre-release 3.26.16-beta.37",
-  "body": "**此版本为测试版，会存在不稳定问题。**\n### [发布页](https://t.me/materado)\n### [反馈群组](https://t.me/+Yn1_v5PZqddmMjQ1)\n\n### 更新内容\n\n* Bump cronet from 155.0.8059.30 to 156.0.8078.25 - Changes in the [Git log](https://chromium.googlesource.com/chromium/src/+log/155.0.8059.30..156.0.8078.25)\n* Bump web v3.26.101209\n* feat: 更新依赖版本\n* Bump web v3.26.101209\n\n## What's Changed\n* Bump cronet from 155.0.8059.30 to 156.0.8078.25 by @github-actions[bot] in https://github.com/LM-Firefly/YueDu-MD3/pull/243\n\n\n**Full Changelog**: https://github.com/LM-Firefly/YueDu-MD3/compare/3.26.16-beta.36...3.26.16-beta.37",
+  "tag_name": "3.26.16-beta.38",
+  "name": "Pre-release 3.26.16-beta.38",
+  "body": "**此版本为测试版，会存在不稳定问题。**\n### [发布页](https://t.me/materado)\n### [反馈群组](https://t.me/+Yn1_v5PZqddmMjQ1)\n\n### 更新内容\n\n* Update package-lock.json\n\n**Full Changelog**: https://github.com/LM-Firefly/YueDu-MD3/compare/3.26.16-beta.37...3.26.16-beta.38",
   "prerelease": true,
-  "created_at": "2026-10-12T02:06:20Z",
+  "created_at": "2026-10-12T07:04:21Z",
   "assets": [
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.37/mapping.txt",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.38/mapping.txt",
       "content_type": "text/plain",
-      "created_at": "2026-10-12T02:28:35Z",
+      "created_at": "2026-10-12T07:21:45Z",
       "download_count": 0,
-      "id": 632422280,
+      "id": 633009401,
       "name": "mapping.txt",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/632422280"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/633009401"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.37/YueDu.MD3-3.26.16-beta.37-arm64-v8a.apk",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.38/YueDu.MD3-3.26.16-beta.38-arm64-v8a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-10-12T02:28:35Z",
+      "created_at": "2026-10-12T07:21:45Z",
       "download_count": 0,
-      "id": 632422277,
-      "name": "YueDu.MD3-3.26.16-beta.37-arm64-v8a.apk",
+      "id": 633009402,
+      "name": "YueDu.MD3-3.26.16-beta.38-arm64-v8a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/632422277"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/633009402"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.37/YueDu.MD3-3.26.16-beta.37-armeabi-v7a.apk",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.38/YueDu.MD3-3.26.16-beta.38-armeabi-v7a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-10-12T02:28:35Z",
+      "created_at": "2026-10-12T07:21:45Z",
       "download_count": 0,
-      "id": 632422278,
-      "name": "YueDu.MD3-3.26.16-beta.37-armeabi-v7a.apk",
+      "id": 633009399,
+      "name": "YueDu.MD3-3.26.16-beta.38-armeabi-v7a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/632422278"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/633009399"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.37/YueDu.MD3-3.26.16-beta.37.apk",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.38/YueDu.MD3-3.26.16-beta.38.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-10-12T02:28:35Z",
+      "created_at": "2026-10-12T07:21:45Z",
       "download_count": 0,
-      "id": 632422279,
-      "name": "YueDu.MD3-3.26.16-beta.37.apk",
+      "id": 633009397,
+      "name": "YueDu.MD3-3.26.16-beta.38.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/632422279"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/633009397"
     }
   ]
 }
