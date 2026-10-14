@@ -67,6 +67,9 @@ private const val BOOK_SHELF_ITEM_COLUMNS = """
 @Dao
 interface BookDao {
 
+    @Query("UPDATE books SET disableReadRecord = :disabled WHERE bookUrl = :bookUrl")
+    fun setReadRecordDisabled(bookUrl: String, disabled: Boolean)
+
     fun flowByGroup(groupId: Long): Flow<List<Book>> {
         return when (groupId) {
             BookGroup.IdRoot -> flowRoot()
