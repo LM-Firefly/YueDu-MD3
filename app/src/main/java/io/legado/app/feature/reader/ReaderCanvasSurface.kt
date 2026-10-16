@@ -364,10 +364,12 @@ fun ReaderCanvasSurface(
     val scrollOffsetState = remember { mutableFloatStateOf(0f) }
     var scrollOffset by scrollOffsetState
     val latestVisibleBodyTextPosition by rememberUpdatedState {
+        // 滚动模式要按当前滚动偏移算「屏幕上第一行」；翻页模式整页就是可见内容，
+        // 取当前页第一条正文。两条都必须给值，否则点朗读只能退回按 durChapterPos 反查页码。
         if (transitionMode == ReaderTransitionMode.SCROLL) {
             ReaderVisibleTextPositionPolicy.firstVisibleBodyText(currentPageWindow(), scrollOffset)
         } else {
-            null
+            ReaderVisibleTextPositionPolicy.firstBodyTextOfCurrentPage(currentPageWindow())
         }
     }
     DisposableEffect(onVisibleBodyTextPositionProvider) {
@@ -1258,7 +1260,7 @@ fun ReaderCanvasSurface(
                             scrollDrag = transitionMode == ReaderTransitionMode.SCROLL &&
                                     ReaderMainAxisPolicy.isVerticalDominant(total.x, total.y)
                             horizontalTurn = !bookmarkDrag && !scrollDrag &&
-                                    ReaderMainAxisPolicy.isHorizontalDominant(total.x, total.y)
+                                    ReaderMainAxisPolicy.canStartPageTurn(total.x, transitionMode)
                             if (horizontalTurn) {
                                 horizontalDrag = ReaderHorizontalDrag.capture(total.x)
                                 horizontalCapturedY = change.position.y
@@ -1287,7 +1289,7 @@ fun ReaderCanvasSurface(
                                 bookmarkArmed = false
                                 bookmarkOffset = 0f
                                 horizontalTurn =
-                                    ReaderMainAxisPolicy.isHorizontalDominant(total.x, total.y)
+                                    ReaderMainAxisPolicy.canStartPageTurn(total.x, transitionMode)
                                 if (horizontalTurn) {
                                     horizontalDrag = ReaderHorizontalDrag.capture(total.x)
                                     horizontalCapturedY = change.position.y

@@ -40,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -47,6 +48,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -61,6 +64,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -129,9 +135,6 @@ import me.saket.telephoto.zoomable.zoomable
 import org.koin.compose.koinInject
 import kotlin.math.ceil
 import kotlin.math.floor
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import kotlin.math.roundToInt
 
 private val LocalReaderViewportSize = staticCompositionLocalOf { IntSize.Zero }
@@ -193,7 +196,15 @@ fun MangaReaderScreen(
     BackHandler(enabled = canHandleBack && !canMorphBack) { onIntent(MangaReaderIntent.BackPressed) }
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     var viewportOrigin by remember { mutableStateOf(Offset.Zero) }
-    val aspectRatios = remember(state.bookUrl) { mutableStateMapOf<String, Float>() }
+    val viewportAnchor =
+        rememberSaveable(state.bookUrl, saver = MangaWebtoonViewportAnchor.saver(state.bookUrl)) {
+            MangaWebtoonViewportAnchor()
+        }
+    val aspectRatios = remember(state.bookUrl) {
+        mutableStateMapOf<String, Float>().apply {
+            viewportAnchor.savedAspectRatio()?.let { (key, ratio) -> put(key, ratio) }
+        }
+    }
     var applyPageResize by remember(state.bookUrl) {
         mutableStateOf<((String, () -> Unit) -> Unit)?>(
             null
@@ -297,7 +308,16 @@ fun MangaReaderScreen(
                     MangaScrollMode.PAGE_LEFT_TO_RIGHT,
                     MangaScrollMode.PAGE_RIGHT_TO_LEFT -> HorizontalMangaPager(state, onIntent, imageLoader)
                     MangaScrollMode.PAGE_TOP_TO_BOTTOM -> VerticalMangaPager(state, onIntent, imageLoader)
-                    else -> WebtoonMangaList(state, onIntent, imageLoader) { applyPageResize = it }
+                    // 恢复像素偏移前先取得真实视口宽度；1 px 临时宽度会把长图缩成几像素，
+                    // LazyColumn 随即把保存的偏移钳制到下一张图，后续宽度恢复也无法还原。
+                    else -> if (viewportSize.width > 0 && viewportSize.height > 0) {
+                        WebtoonMangaList(
+                            state,
+                            onIntent,
+                            imageLoader,
+                            viewportAnchor
+                        ) { applyPageResize = it }
+                    }
                 }
             }
 
@@ -459,6 +479,7 @@ private fun WebtoonMangaList(
     state: MangaReaderUiState,
     onIntent: (MangaReaderIntent) -> Unit,
     imageLoader: ImageLoader,
+    viewportAnchor: MangaWebtoonViewportAnchor,
     onResizeHandlerChanged: (((String, () -> Unit) -> Unit)?) -> Unit,
 ) {
     val prefetchEnabled by rememberUpdatedState(state.settings.preDownloadCount > 0)
@@ -474,7 +495,8 @@ private fun WebtoonMangaList(
     }
     val listState =
         rememberLazyListState(cacheWindow, initialFirstVisibleItemIndex = state.currentItemIndex)
-    val viewportAnchor = remember(state.bookUrl) { MangaWebtoonViewportAnchor() }
+    var appliedNavigationId by remember(state.bookUrl) { mutableStateOf<Long?>(null) }
+    var pendingViewportLayout by remember(state.bookUrl) { mutableStateOf<LazyListLayoutInfo?>(null) }
     // 单张图片的加载状态会更新整个 UiState.pages。可见页监听不能因此重启：重启会
     // 丢失 distinctUntilChanged 的上一条记录，并把 LazyColumn 尚未完成重测时保留的
     // 旧视口重新上报为当前页，进而使章节/页码跳回去。
@@ -487,6 +509,22 @@ private fun WebtoonMangaList(
     val aspectRatios = LocalMangaAspectRatios.current
     val resizeQueue = remember(state.bookUrl) { MangaWebtoonResizeQueue() }
     var zoomAnchorLayout by remember { mutableStateOf<LazyListLayoutInfo?>(null) }
+    fun recordViewportAnchor(layout: LazyListLayoutInfo = listState.layoutInfo) {
+        if (pendingViewportLayout != null) return
+        val reader = latestReaderState
+        val matching =
+            layout.visibleItemsInfo.filter { reader.pages.getOrNull(it.index)?.key == it.key }
+        // 过渡卡片的身份会随 Loading/Ready 变化，优先保存视口里的真实图片。
+        val anchor = matching.firstOrNull { reader.pages[it.index] is MangaReaderItemUi.Page }
+            ?: matching.firstOrNull() ?: return
+        viewportAnchor.record(
+            reader.pages,
+            anchor.index,
+            anchor.key,
+            -anchor.offset,
+            aspectRatios[anchor.key]
+        )
+    }
     val applyResize: (() -> Unit) -> Unit = { resize ->
         val layout = listState.layoutInfo
         // 布局与当前条目集合不一致（列表刚重建）时不做像素锚点补偿：那会把旧布局里的
@@ -495,7 +533,7 @@ private fun WebtoonMangaList(
             latestReaderState.pages.getOrNull(info.index)?.key == info.key
         } != false
         val anchor =
-            if (zoomAnchorLayout != null || listState.isScrollInProgress ||
+            if (zoomAnchorLayout != null || pendingViewportLayout != null || listState.isScrollInProgress ||
             latestReaderState.scrollRequest != null || !layoutConsistent ||
             latestReaderState.bookUrl != state.bookUrl
         ) null else {
@@ -526,7 +564,10 @@ private fun WebtoonMangaList(
             // 视口上方条目的高度变化不会移动当前图片，不为它们发起滚动位置请求。
             resizeQueue.update(key, listState.isScrollInProgress, visible, resize, apply)
         }
-        onDispose { onResizeHandlerChanged(null) }
+        onDispose {
+            onResizeHandlerChanged(null)
+            onIntent(MangaReaderIntent.PagerScrollChanged(false))
+        }
     }
     LaunchedEffect(listState, state.bookUrl, resizeQueue) {
         snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
@@ -542,13 +583,22 @@ private fun WebtoonMangaList(
             if (zoomAnchorLayout != null && measured !== zoomAnchorLayout) zoomAnchorLayout = null
             // 缩放/图片高度补偿可只改变项内偏移，不改变下标或 isScrollInProgress。
             // 跟随每次实际布局更新锚点，不能依赖可见下标流去采样它。
-            measured.visibleItemsInfo.firstOrNull()?.let {
-                viewportAnchor.record(latestReaderState.pages, it.index, it.key, -it.offset)
+            val reader = latestReaderState
+            val consistent = measured.totalItemsCount == reader.pages.size &&
+                    measured.visibleItemsInfo.all { reader.pages.getOrNull(it.index)?.key == it.key }
+            if (measured !== pendingViewportLayout && consistent) {
+                pendingViewportLayout = null
+                recordViewportAnchor(measured)
             }
         }
     }
-    var zoom by remember { mutableFloatStateOf(1f) }
-    var pan by remember { mutableStateOf(Offset.Zero) }
+    var zoom by rememberSaveable(state.bookUrl) { mutableFloatStateOf(1f) }
+    var pan by rememberSaveable(
+        state.bookUrl, stateSaver = listSaver(
+            save = { value: Offset -> listOf(value.x, value.y) },
+            restore = { Offset(it[0], it[1]) },
+        )
+    ) { mutableStateOf(Offset.Zero) }
     val fraction = 1f - state.settings.sidePaddingPercent.coerceIn(0, 45) * 2f / 100f
 
     // 估算自然内容高度（放大后用于限制平移范围）；未加载的图片用整屏高度兜底
@@ -670,13 +720,9 @@ private fun WebtoonMangaList(
             }
         }
 
-    fun recordViewportAnchor() {
-        val first = listState.layoutInfo.visibleItemsInfo.firstOrNull() ?: return
-        viewportAnchor.record(latestReaderState.pages, first.index, first.key, -first.offset)
-    }
-
     fun reportWebtoonVisibleItem(forcedItemIndex: Int? = null) {
         val currentState = latestReaderState
+        if (pendingViewportLayout != null) return
         // Programmatic scrolling also emits a scroll-idle event. That event must not clear the
         // request before the target's actual layout has been confirmed below.
         if (forcedItemIndex == null && currentState.scrollRequest != null) return
@@ -696,6 +742,8 @@ private fun WebtoonMangaList(
             (currentState.pages.getOrNull(visibleItem.index) as? MangaReaderItemUi.Page)
                 ?.chapterIndex == currentState.chapterIndex
         }
+        // 完成显式导航会更新 navigationId，先记录实际目标，避免随后保位使用导航前的锚点。
+        if (forcedItemIndex != null) recordViewportAnchor()
         onIntent(
             MangaReaderIntent.VisibleItemChanged(
                 itemIndex = focusedItemIndex,
@@ -719,12 +767,12 @@ private fun WebtoonMangaList(
         snapshotFlow { listState.isScrollInProgress }
             .distinctUntilChanged()
             .collect { scrolling ->
+                // 新组合的 idle 也要清除旧组合可能遗留的滚动标志。
+                onIntent(MangaReaderIntent.PagerScrollChanged(scrolling))
                 if (scrolling) {
                     wasScrolling = true
-                    onIntent(MangaReaderIntent.PagerScrollChanged(true))
                 } else if (wasScrolling) {
                     wasScrolling = false
-                    onIntent(MangaReaderIntent.PagerScrollChanged(false))
                     recordViewportAnchor()
                     reportWebtoonVisibleItem()
                 }
@@ -733,11 +781,17 @@ private fun WebtoonMangaList(
 
     LaunchedEffect(listState) {
         snapshotFlow {
-            listState.isScrollInProgress to
-                    listState.layoutInfo.visibleItemsInfo.map { it.index }
-        }.distinctUntilChanged().collect { (scrolling, visibleIndices) ->
-            if (!scrolling) return@collect
+            Triple(
+                listState.isScrollInProgress,
+                pendingViewportLayout != null,
+                listState.layoutInfo.visibleItemsInfo.map { it.index to it.key },
+            )
+        }.distinctUntilChanged().collect { (scrolling, restoring, visibleItems) ->
+            if (!scrolling || restoring) return@collect
             val currentState = latestReaderState
+            val visibleIndices = visibleItems.mapNotNull { (index, key) ->
+                index.takeIf { currentState.pages.getOrNull(it)?.key == key }
+            }
             visibleIndices.forEach { index ->
                 val info = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }
                 val transition = currentState.pages.getOrNull(index)
@@ -763,13 +817,18 @@ private fun WebtoonMangaList(
         }
     }
 
-    // 条目集合（navigationId 表示 key 集合变化）重建后，按记录的锚点自己在同一次重测里还原：
-    // 前缀整段前移超过 key→下标映射窗口时，LazyColumn 会保留旧下标，画面落到约一章之后。
-    LaunchedEffect(state.navigationId) {
-        // 显式跳章/内容恢复会自己下发 scrollRequest，此处不与它抢定位。
-        if (state.scrollRequest != null || listState.isScrollInProgress) return@LaunchedEffect
-        viewportAnchor.positionIn(latestReaderState.pages)?.let { (index, offset) ->
-            listState.requestScrollToItem(index, offset)
+    // 在新条目集合提交后、下一次重测前同步请求保位，不能等异步 Effect 看见错误布局后再补偿。
+    // 滑动中的结构变化由 ViewModel 延后；显式导航仍由 scrollRequest 定位。
+    SideEffect {
+        if (appliedNavigationId != state.navigationId) {
+            pendingViewportLayout = null
+            if (state.scrollRequest == null) {
+                viewportAnchor.positionIn(state.pages)?.let { (index, offset) ->
+                    pendingViewportLayout = listState.layoutInfo
+                    listState.requestScrollToItem(index, offset)
+                }
+            }
+            appliedNavigationId = state.navigationId
         }
     }
 
@@ -782,9 +841,10 @@ private fun WebtoonMangaList(
         if (request.animated) listState.animateScrollToItem(request.itemIndex)
         else listState.scrollToItem(request.itemIndex)
         snapshotFlow {
-            listState.layoutInfo.visibleItemsInfo.any {
-                it.index == request.itemIndex && it.key == targetKey
-            }
+            pendingViewportLayout == null &&
+                    listState.layoutInfo.visibleItemsInfo.any {
+                        it.index == request.itemIndex && it.key == targetKey
+                    }
         }.first { it }
         reportWebtoonVisibleItem(request.itemIndex)
     }
@@ -987,11 +1047,11 @@ private fun HorizontalMangaPager(
     }
     var spreadLayoutReady by remember(state.bookUrl) { mutableStateOf(false) }
     var reconciledSpreads by remember(state.bookUrl) { mutableStateOf(emptyList<MangaPageSpread>()) }
-    LaunchedEffect(spreads, state.currentItemIndex) {
+    LaunchedEffect(spreads, state.currentItemIndex, state.scrollRequest?.id) {
         snapshotFlow { pagerState.isScrollInProgress }.first { !it }
         spreadLayoutReady = false
         val target = mangaSpreadReconcileTarget(
-            spreads, state.currentItemIndex,
+            spreads, state.scrollRequest?.itemIndex ?: state.currentItemIndex,
             pendingSpreadKey.takeIf { state.scrollRequest == null })
         pendingSpreadKey = null
         if (target >= 0 && target != pagerState.currentPage) pagerState.scrollToPage(target)
@@ -1002,11 +1062,13 @@ private fun HorizontalMangaPager(
         snapshotFlow {
             val reader = latestReaderState
             val spread = latestSpreads.getOrNull(pagerState.currentPage)
+            val measuredKey = pagerState.layoutInfo.visiblePagesInfo
+                .firstOrNull { it.index == pagerState.currentPage }?.key
             val indices = spread?.itemIndices.orEmpty()
             val itemIndex = reader.scrollRequest?.itemIndex?.takeIf { it in indices }
                 ?: indices.firstOrNull()
             // 新布局提交与 Pager 按 key 重测之间，不能把旧页码映射到新 spread 上报。
-            if (!spreadLayoutReady || latestSpreads != reconciledSpreads) null
+            if (!spreadLayoutReady || latestSpreads != reconciledSpreads || measuredKey != spread?.key) null
             // 滚动中不切章：随 fling 越过章节边界时延迟到落定再上报，避免窗口重建期误切。
             // 把 isScrollInProgress 并入快照，滚动结束会产生新值从而重发聚焦页。
             else Triple(pagerState.isScrollInProgress, indices, itemIndex)
@@ -1283,13 +1345,33 @@ private fun VerticalMangaPager(
         pageCount = { state.pages.size.coerceAtLeast(1) },
     )
     val latestReaderState by rememberUpdatedState(state)
+    var reconciledNavigationId by remember(state.bookUrl) { mutableStateOf<Long?>(null) }
+    LaunchedEffect(pagerState, state.bookUrl, state.navigationId) {
+        snapshotFlow { pagerState.isScrollInProgress }.first { !it }
+        val reader = latestReaderState
+        if (reader.navigationId != state.navigationId) return@LaunchedEffect
+        if (reader.scrollRequest == null) pagerState.scrollToPage(reader.currentItemIndex)
+        // 大幅前插/移除超出 Pager 的 key 查找窗口时，先校正位置再允许上报页码。
+        snapshotFlow {
+            val current = latestReaderState
+            val target = current.scrollRequest?.itemIndex ?: current.currentItemIndex
+            pagerState.currentPage == target &&
+                    pagerState.layoutInfo.visiblePagesInfo.any {
+                        it.index == target && it.key == current.pages.getOrNull(target)?.key
+                    }
+        }.first { it }
+        reconciledNavigationId = state.navigationId
+    }
     LaunchedEffect(pagerState, state.bookUrl, state.navigationId) {
         snapshotFlow {
-            val item = latestReaderState.pages.getOrNull(pagerState.currentPage)
+            val measuredKey = pagerState.layoutInfo.visiblePagesInfo
+                .firstOrNull { it.index == pagerState.currentPage }?.key
             // 滚动中不切章：把 isScrollInProgress 并入快照，滚动结束产生新值从而重发聚焦页。
-            Triple(pagerState.isScrollInProgress, pagerState.currentPage, item?.key)
+            if (reconciledNavigationId != latestReaderState.navigationId) null
+            else Triple(pagerState.isScrollInProgress, pagerState.currentPage, measuredKey)
         }.distinctUntilChanged()
-            .collect { (isScrolling, page, key) ->
+            .collect { entry ->
+                val (isScrolling, page, key) = entry ?: return@collect
                 val reader = latestReaderState
                 if (reader.navigationId != state.navigationId) return@collect
                 val item = reader.pages.getOrNull(page)?.takeIf { it.key == key }
@@ -1879,7 +1961,7 @@ internal fun mangaPageDecodeSize(
     )
 }
 
-private fun MangaReaderItemUi.Page.imageRequest(
+internal fun MangaReaderItemUi.Page.imageRequest(
     settings: MangaReaderSettings,
     context: android.content.Context,
     decodeSize: Size,
@@ -1917,7 +1999,8 @@ private fun MangaReaderItemUi.Page.imageRequest(
         }
         .apply {
             if (settings.enableEInk) transformations(MangaEInkTransformation(settings.eInkThreshold))
-            crossfade(!settings.disableCrossFade)
+            // 首次显示保留淡入；已经显示过的页从磁盘重新解码时也不应再次露出底色。
+            crossfade(!settings.disableCrossFade && loadState != MangaPageLoadState.Ready)
         }
         .listener(onStart = { _ -> onStart() }, onError = { _, result ->
             onError(result.throwable.localizedMessage)

@@ -558,15 +558,26 @@ fun BookshelfScreen(
 
     val scrollBehavior = GlassTopAppBarDefaults.defaultScrollBehavior()
     var showTopBarMenu by remember { mutableStateOf(false) }
+    val toggleShelfFilter = {
+        toggleBookshelfFilter(
+            isSearch = uiState.isSearch,
+            selectedGroupId = uiState.selectedGroupId,
+            currentTabGroupId = currentTabGroupId,
+            onIntent = onIntent,
+        )
+    }
     val onSearchClick = {
         if (uiState.settings.bookshelfSearchActionDirectToSearch) {
             onNavigateToSearch(uiState.searchKey.trim())
         } else {
-            val active = !uiState.isSearch
-            onIntent(BookshelfIntent.SetSearchMode(active))
-            if (!active && uiState.selectedGroupId != currentTabGroupId) {
-                onIntent(BookshelfIntent.ChangeGroup(currentTabGroupId))
-            }
+            toggleShelfFilter()
+        }
+    }
+    val onSearchLongClick = {
+        if (uiState.settings.bookshelfSearchActionDirectToSearch) {
+            toggleShelfFilter()
+        } else {
+            onNavigateToSearch(uiState.searchKey.trim())
         }
     }
 
@@ -586,6 +597,7 @@ fun BookshelfScreen(
                 uiState = uiState,
                 scrollBehavior = scrollBehavior,
                 onSearchClick = onSearchClick,
+                onSearchLongClick = onSearchLongClick,
                 onSearchQueryChange = { onIntent(BookshelfIntent.SetSearchKey(it)) },
                 onSearchSubmit = { rawQuery ->
                     rawQuery.trim()
@@ -1300,11 +1312,25 @@ fun BookshelfScreen(
     )
 }
 
+internal fun toggleBookshelfFilter(
+    isSearch: Boolean,
+    selectedGroupId: Long,
+    currentTabGroupId: Long,
+    onIntent: (BookshelfIntent) -> Unit,
+) {
+    val active = !isSearch
+    onIntent(BookshelfIntent.SetSearchMode(active))
+    if (!active && selectedGroupId != currentTabGroupId) {
+        onIntent(BookshelfIntent.ChangeGroup(currentTabGroupId))
+    }
+}
+
 @Composable
 private fun BookshelfTopBar(
     uiState: BookshelfUiState,
     scrollBehavior: GlassTopAppBarScrollBehavior,
     onSearchClick: () -> Unit,
+    onSearchLongClick: () -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onSearchSubmit: (String) -> Unit,
     onClearSearch: () -> Unit,
@@ -1313,6 +1339,8 @@ private fun BookshelfTopBar(
     bottomContent: @Composable ColumnScope.() -> Unit = {}
 ) {
     val searchContentDescription = stringResource(R.string.search)
+    val filterContentDescription = stringResource(R.string.bookshelf_filter)
+    val searchFirst = uiState.settings.bookshelfSearchActionDirectToSearch
     val exitEditModeDescription = stringResource(R.string.cancel_select)
     GlassMediumFlexibleTopAppBar(
         modifier = Modifier.fillMaxWidth(),
@@ -1336,8 +1364,10 @@ private fun BookshelfTopBar(
         actions = {
             TopBarActionButton(
                 onClick = onSearchClick,
+                onLongClick = onSearchLongClick,
+                onLongClickLabel = if (searchFirst) filterContentDescription else searchContentDescription,
                 imageVector = AppIcons.Search,
-                contentDescription = searchContentDescription
+                contentDescription = if (searchFirst) searchContentDescription else filterContentDescription,
             )
             actions()
         },
