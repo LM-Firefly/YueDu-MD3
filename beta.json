@@ -1,49 +1,49 @@
 {
-  "tag_name": "3.26.16-beta.39",
-  "name": "Pre-release 3.26.16-beta.39",
-  "body": "**此版本为测试版，会存在不稳定问题。**\n### [发布页](https://t.me/materado)\n### [反馈群组](https://t.me/+Yn1_v5PZqddmMjQ1)\n\n### 更新内容\n\n* test(settings): cover previous chapter predownload mapping\n* fix(explore): detect paging expressions supported by URL rules\n* fix(toc): rescan cache with current book folder metadata\n* fix(manga): capture viewport offsets on every measured layout\n* fix(reader): force refresh all cached copies of an image URL\n* fix(book): synchronize recording preference by copy URL\n* feat(book): add persistent per-book reading record switch\n* fix(manga): honor offline switch and share directional prefetch settings\n* fix(manga): load adjacent chapters on boundary gestures with prefetch disabled\n* fix(reader): persist per-chapter duplicate-title preference\n* fix(reader): resolve chapter images for URL-only consumers\n* fix(cache): preserve legacy chapter text and image caches\n* fix: 条漫跨章不再抖动与落章错位（相邻章边界页提前取宽高比；内容重建时按 key 还原滚动位置）\n* fix: 修复漫画预取方向与章节主体透传（相邻章加载跟随向前/向后设置，向前=0 不再抓上一章；章节图片落到章节子目录）\n* fix: 修复缓存目录组织（章节正文与图片都按 <章节主体> 子目录存放，封面等无章节场景保持书级 images/）\n* feat: 支持按书独立关闭阅读记录（Book 新增 disableReadRecord，DB 131→132 自动迁移）\n* fix: 修复漫画目录已缓存章节不显示已缓存图标（缓存集合按 bookUrl 订阅 + 打开目录时重扫；显示判定放宽为\"有正文即算已缓存\"，下载判定仍保持严格）\n* fix: 条漫无缝模式下消除相邻页之间的 1px 白缝（占位高度向下取整、内容溢出 1px 由下一页盖住）\n* feat: 发现页支持跳转页码（顶栏显示当前页码，源支持分页时可跳页）\n* feat: 发现页按书源地址判定是否在书架（改名后仍识别）\n* feat: 预下载按设置生效，相邻章预取交还设置（向前=0 不抓上一章）\n* feat: 预下载拆分为「向前 / 向后」两项\n\n**Full Changelog**: https://github.com/LM-Firefly/YueDu-MD3/compare/3.26.16-beta.38...3.26.16-beta.39",
+  "tag_name": "3.26.16-beta.40",
+  "name": "Pre-release 3.26.16-beta.40",
+  "body": "**此版本为测试版，会存在不稳定问题。**\n### [发布页](https://t.me/materado)\n### [反馈群组](https://t.me/+Yn1_v5PZqddmMjQ1)\n\n### 更新内容\n\n* feat: 支持听书与阅读不同书籍\n* fix(web): preserve current service state and JSON error responses\n* fix(assets): use APK paths for bundled defaults and web assets\n* fix(web): handle duplicate books for Legado Reader plugin\n* feat: 阅读时闪烁\n* feat: 平板、折叠屏设备上的分屏。外观设置控制之\n\n**Full Changelog**: https://github.com/LM-Firefly/YueDu-MD3/compare/3.26.16-beta.39...3.26.16-beta.40",
   "prerelease": true,
-  "created_at": "2026-10-14T16:05:08Z",
+  "created_at": "2026-10-15T16:05:16Z",
   "assets": [
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.39/mapping.txt",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.40/mapping.txt",
       "content_type": "text/plain",
-      "created_at": "2026-10-15T08:14:13Z",
+      "created_at": "2026-10-16T13:31:13Z",
       "download_count": 0,
-      "id": 643182832,
+      "id": 647431791,
       "name": "mapping.txt",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/643182832"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/647431791"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.39/YueDu.MD3-3.26.16-beta.39-arm64-v8a.apk",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.40/YueDu.MD3-3.26.16-beta.40-arm64-v8a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-10-15T08:14:13Z",
+      "created_at": "2026-10-16T13:31:13Z",
       "download_count": 0,
-      "id": 643182834,
-      "name": "YueDu.MD3-3.26.16-beta.39-arm64-v8a.apk",
+      "id": 647431790,
+      "name": "YueDu.MD3-3.26.16-beta.40-arm64-v8a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/643182834"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/647431790"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.39/YueDu.MD3-3.26.16-beta.39-armeabi-v7a.apk",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.40/YueDu.MD3-3.26.16-beta.40-armeabi-v7a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-10-15T08:14:13Z",
+      "created_at": "2026-10-16T13:31:13Z",
       "download_count": 0,
-      "id": 643182831,
-      "name": "YueDu.MD3-3.26.16-beta.39-armeabi-v7a.apk",
+      "id": 647431792,
+      "name": "YueDu.MD3-3.26.16-beta.40-armeabi-v7a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/643182831"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/647431792"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.39/YueDu.MD3-3.26.16-beta.39.apk",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.16-beta.40/YueDu.MD3-3.26.16-beta.40.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-10-15T08:14:13Z",
+      "created_at": "2026-10-16T13:31:13Z",
       "download_count": 0,
-      "id": 643182835,
-      "name": "YueDu.MD3-3.26.16-beta.39.apk",
+      "id": 647431789,
+      "name": "YueDu.MD3-3.26.16-beta.40.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/643182835"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/647431789"
     }
   ]
 }
