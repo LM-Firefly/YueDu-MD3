@@ -34,6 +34,8 @@
     <string name="manual_contrast_value_label">手动值 [-1, 1]</string>
     <string name="manual_contrast_invalid">请输入 -1 到 1 之间的有效数字</string>
     <string name="predictive_back">预见性返回手势</string>
+    <string name="reader_shared_element">阅读界面共享元素动画</string>
+    <string name="reader_shared_element_summary">进入阅读界面时从封面展开，关闭后使用渐变过渡</string>
     <string name="predictive_back_summary">启用系统预见性返回手势</string>
     <string name="restart_to_apply">重启以应用</string>
     <string name="custom_theme">自定义主题</string>
@@ -3846,4 +3848,5 @@
     <string name="battery_optimization_dialog_title">后台保活与省电策略设置指引</string>
     <string name="battery_optimization_status_ignored">已开启无限制（点击可检查厂商后台策略）</string>
     <string name="battery_optimization_status_not_ignored">未开启无限制，后台可能被系统终止</string>
+    <string name="reader_paragraph_image_action_unsupported">此图片使用段落规则动作，当前版本尚不支持。</string>
 </resources>
