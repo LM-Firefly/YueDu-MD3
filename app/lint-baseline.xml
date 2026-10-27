@@ -843,7 +843,7 @@
             column="7"/>
     </issue>
 
-    <issue
+    <!--issue
         id="GradleDependency"
         message="A newer version of com.google.firebase:firebase-bom than 34.6.0 is available: 34.16.0"
         errorLine1="firebaseBom = &quot;34.6.0&quot;"
@@ -852,7 +852,7 @@
             file="../gradle/libs.versions.toml"
             line="28"
             column="15"/>
-    </issue>
+    </issue-->
 
     <issue
         id="GradleDependency"

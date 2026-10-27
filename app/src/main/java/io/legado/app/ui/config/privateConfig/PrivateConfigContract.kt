@@ -11,7 +11,7 @@ data class PrivateConfigUiState(
     val biometricEnabled: Boolean = false,
     val biometricStatus: PrivateBiometricStatus = PrivateBiometricStatus.Unavailable,
     val settings: PrivateAccessSettings = PrivateAccessSettings(),
-    val firebaseEnable: Boolean = true,
+//    val firebaseEnable: Boolean = true,
     val showPasswordDialog: Boolean = false,
     val isBatteryIgnored: Boolean = false,
 ) {
@@ -54,7 +54,7 @@ sealed interface PrivateConfigIntent {
 
     data object RequestNotificationPermission : PrivateConfigIntent
     data object RequestBatteryPermission : PrivateConfigIntent
-    data class SetFirebaseEnabled(val enabled: Boolean) : PrivateConfigIntent
+//    data class SetFirebaseEnabled(val enabled: Boolean) : PrivateConfigIntent
 }
 
 sealed interface PrivateConfigEffect {

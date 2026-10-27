@@ -1,13 +1,13 @@
-# Legado with MD3
+# YueDu-MD3
 
 <p align="left">
-  <a href="https://github.com/HapeLee/legado-with-MD3">简体中文</a> ｜ 
-  <a href="https://github.com/HapeLee/legado-with-MD3/blob/main/English.md">English</a>
+  <a href="https://github.com/LM-Firefly/YueDu-MD3">简体中文</a> ｜
+  <a href="https://github.com/LM-Firefly/YueDu-MD3/blob/main/English.md">English</a>
 </p>
 
 ## 📖 介绍
 
-**Legado with MD3** 是基于开源项目 [阅读 (Legado)](https://github.com/gedoor/legado) 开发的 Material
+**YueDu-MD3** 是基于开源项目 [阅读 (Legado)](https://github.com/gedoor/legado) 开发的 Material
 Design 3 风格重构版本。
 
 本项目在对 UI 进行重绘的基础上，加入了多项分支独有功能，并正在逐步从传统 View 迁移至 Jetpack Compose
@@ -48,9 +48,8 @@ Design 3 风格重构版本。
 
 ## 💬 交流
 
-* **Telegram 群组：** [Legado with MD3](https://t.me/materado)
 * **版本发布：**
-  最新版本会自动发布至群组，也可在 [GitHub Releases](https://github.com/HapeLee/legado-with-MD3/releases)
+  最新版本会自动发布在 [GitHub Releases](https://github.com/LM-Firefly/YueDu-MD3/releases)
   下载。
 
 ---
@@ -110,4 +109,3 @@ Design 3 风格重构版本。
 2. 用户应确保其使用本软件获取、处理或访问相关内容的行为符合适用法律法规及权利要求。
 3. 若权利人认为某些第三方规则存在涉嫌侵权情形，可依法向相关内容实际托管方主张权利。
 4. 权利人亦可向开发者提交包含身份证明、权属证明、具体规则信息及相关说明的有效通知。开发者将在合理技术能力范围内，对涉嫌违规规则采取必要处理措施。
-
