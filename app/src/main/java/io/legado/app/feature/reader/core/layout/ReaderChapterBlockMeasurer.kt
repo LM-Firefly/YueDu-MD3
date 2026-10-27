@@ -201,11 +201,13 @@ class ReaderChapterBlockMeasurer(
     ): ReaderChapterMeasureResult {
         val compiledStyleRanges = style.styleRanges.takeIf { it.isNotEmpty() }
             ?.let(ReaderCharacterStyleResolver::compile)
-        // `blocks += x` 就是 `add(x)`：覆写 add 即可在每个追加点回调，无需在六处追加点重复。
-        val blocks = object : ArrayList<ReaderMeasuredBlock>(source.blocks.size) {
+        // `blocks += x` is `add(x)`: override add to tap each append without repetition.
+        // Streaming path (onBlock != null) forwards blocks and drops them so measured
+        // items can be GC'd once paginated; batch path (tests) still collects them.
+        val blocks = object : ArrayList<ReaderMeasuredBlock>(if (onBlock == null) source.blocks.size else 0) {
             override fun add(element: ReaderMeasuredBlock): Boolean {
                 onBlock?.invoke(element)
-                return super.add(element)
+                return if (onBlock == null) super.add(element) else true
             }
         }
         val shapers = mutableMapOf<ReaderTextStyle, ReaderTextShaper>()
@@ -748,6 +750,11 @@ private fun ReaderTextStyle.merge(override: ReaderCharacterStyle?): ReaderTextSt
     return copy(
         colorArgb = override.colorArgb ?: colorArgb,
         backgroundArgb = override.backgroundArgb ?: backgroundArgb,
+        // 边框是一个整体：颜色给了就整套换掉，颜色为 null（HTML 来源、角色气泡都没这项）
+        // 就保留原来的，不出现「半径归 override、粗细归底样式」的拼装。
+        borderColorArgb = override.borderColorArgb ?: borderColorArgb,
+        borderWidthPx = if (override.borderColorArgb != null) override.borderWidthPx else borderWidthPx,
+        borderRadiusPx = if (override.borderColorArgb != null) override.borderRadiusPx else borderRadiusPx,
         underline = override.underline ?: underline,
         fontPath = override.fontPath ?: fontPath,
         fontWeight = override.fontWeight ?: fontWeight,
