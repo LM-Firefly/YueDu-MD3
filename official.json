@@ -1,49 +1,49 @@
 {
   "tag_name": "3.26.19",
   "name": "Release 3.26.19",
-  "body": "### 更新内容\n\n* fix(cast): 胶囊只剩两个（英文撇号钉死引号栈）+ 分配窗口加复制按钮 (#2479)\n* feat(explore): 发现顶栏改为单书源搜索入口，书源选择改为可筛选底部 sheet\n* fix(manga): 整章拼接超长条漫图拆段渲染，修复 Constraints 尺寸溢出崩溃 (#2475)\n* fix(book-info): 简介纯文本分支二次转义，& < > 显示为 HTML 实体 (#2466)\n* fix(reader): 开标点连同 Latin 单词整体换行，不再拆词\n* fix(book-info): useweb 简介经 FrameLayout 容器承载，规避 Vulkan drawVk 原生崩溃 (#2468)\n* feat(highlight): 高亮规则新增边框样式，预览渲染修复与示例句加长\n* feat(book-info): 关联书籍移至简介下方，支持无规则时按作者搜索兜底\n* fix(reader): 关联书籍位置\n* fix: 关联书籍调试之\n* opt: memory usage (#2478)\n* perf(reader): 排版宽度链路去装箱，字形级宽度改 FloatArray\n* feat(cast): AI 分配角色带上「过了几章没开口」与下一章开头 (#2476)\n* fix(cast): 人物档案读取被夹到 80 个，配音页与人物列表少列人 (#2474)\n* feat(ui): 搜索/发现/详情页封面按原图宽高比自适应（默认固定 5:7，设置可关） (#2473)\n* reader: cut pagination peak memory (streaming, merge, buffer release)\n* feat(reader): 可配置 AI 对话入口携带阅读上下文 & 修复换图标入口 IME 双重避让 (#2472)\n* feat(reader): add configurable AI chat entry with reading context\n* fix(ui): prevent double IME avoidance on alternate launcher activities\n* feat(reader): 阅读主题列表弹窗（网格/流式/管理/导入导出） (#2465)\n* feat(reader): 分页失败原因带上异常 message 与栈顶\n* fix(reader): 引号跨段时角色气泡不再把整章排版打挂\n* feat: 内置词典规则更新为汉典并清理失效的百度汉语规则 (#2450)\n* 咕噜噜\n* feat: 阅读界面优化\n* feat: 添加阻止书源打开选项 在搞基里\n* feat:优化听书界面\n* fix(about): 优化检测更新弹窗，将更新按钮移至底部常驻 (#2447)\n* fix(test): 移除ReadBookViewModel多余空行以满足2748行架构测试上限\n* fix(readaloud): 修复HTTP朗读在当前章未完成时抢占预合成导致的断流卡顿\n* fix(about): 优化检测更新弹窗，将更新按钮移至底部常驻\n* fix(reader): keep word spaces at line end when wrapping English text\n* feat: 呱\n* feat: 呱\n* feat: 优化\n* feat: 优化\n* fix(read-aloud): preserve pause across paragraph resume\n* fix(reader): 角色胶囊与整串标点不再把一行顶出空洞\n* fix(read-aloud): 段落间隔不再重建本章合成任务，纯符号段不再被跳过\n\n**Full Changelog**: https://github.com/LM-Firefly/YueDu-MD3/compare/3.26.16...3.26.19",
+  "body": "### 更新内容\n\n* fix(shelf): 书架多行列表 Flow 加事务，修跨 CursorWindow 补窗并发竞争崩溃\n* fix(cast): 胶囊只剩两个（英文撇号钉死引号栈）+ 分配窗口加复制按钮 (#2479)\n* feat(explore): 发现顶栏改为单书源搜索入口，书源选择改为可筛选底部 sheet\n* fix(manga): 整章拼接超长条漫图拆段渲染，修复 Constraints 尺寸溢出崩溃 (#2475)\n* fix(book-info): 简介纯文本分支二次转义，& < > 显示为 HTML 实体 (#2466)\n* fix(reader): 开标点连同 Latin 单词整体换行，不再拆词\n* fix(book-info): useweb 简介经 FrameLayout 容器承载，规避 Vulkan drawVk 原生崩溃 (#2468)\n* feat(highlight): 高亮规则新增边框样式，预览渲染修复与示例句加长\n* feat(book-info): 关联书籍移至简介下方，支持无规则时按作者搜索兜底\n* fix(reader): 关联书籍位置\n* fix: 关联书籍调试之\n* opt: memory usage (#2478)\n* perf(reader): 排版宽度链路去装箱，字形级宽度改 FloatArray\n* feat(cast): AI 分配角色带上「过了几章没开口」与下一章开头 (#2476)\n* fix(cast): 人物档案读取被夹到 80 个，配音页与人物列表少列人 (#2474)\n* feat(ui): 搜索/发现/详情页封面按原图宽高比自适应（默认固定 5:7，设置可关） (#2473)\n* reader: cut pagination peak memory (streaming, merge, buffer release)\n* feat(reader): 可配置 AI 对话入口携带阅读上下文 & 修复换图标入口 IME 双重避让 (#2472)\n* feat(reader): add configurable AI chat entry with reading context\n* fix(ui): prevent double IME avoidance on alternate launcher activities\n* feat(reader): 阅读主题列表弹窗（网格/流式/管理/导入导出） (#2465)\n* feat(reader): 分页失败原因带上异常 message 与栈顶\n* fix(reader): 引号跨段时角色气泡不再把整章排版打挂\n* feat: 内置词典规则更新为汉典并清理失效的百度汉语规则 (#2450)\n\n**Full Changelog**: https://github.com/LM-Firefly/YueDu-MD3/compare/3.26.18...3.26.19",
   "prerelease": false,
   "created_at": "2026-10-27T00:11:40Z",
   "assets": [
     {
       "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.19/mapping.txt",
       "content_type": "text/plain",
-      "created_at": "2026-10-27T00:22:12Z",
+      "created_at": "2026-10-27T02:47:10Z",
       "download_count": 0,
-      "id": 679929003,
+      "id": 680233570,
       "name": "mapping.txt",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/679929003"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/680233570"
     },
     {
       "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.19/YueDu.MD3-3.26.19-arm64-v8a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-10-27T00:22:12Z",
+      "created_at": "2026-10-27T02:47:10Z",
       "download_count": 0,
-      "id": 679929005,
+      "id": 680233567,
       "name": "YueDu.MD3-3.26.19-arm64-v8a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/679929005"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/680233567"
     },
     {
       "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.19/YueDu.MD3-3.26.19-armeabi-v7a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-10-27T00:22:12Z",
+      "created_at": "2026-10-27T02:47:10Z",
       "download_count": 0,
-      "id": 679929006,
+      "id": 680233569,
       "name": "YueDu.MD3-3.26.19-armeabi-v7a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/679929006"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/680233569"
     },
     {
       "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.19/YueDu.MD3-3.26.19.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-10-27T00:22:12Z",
+      "created_at": "2026-10-27T02:47:10Z",
       "download_count": 0,
-      "id": 679929002,
+      "id": 680233568,
       "name": "YueDu.MD3-3.26.19.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/679929002"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/680233568"
     }
   ]
 }
