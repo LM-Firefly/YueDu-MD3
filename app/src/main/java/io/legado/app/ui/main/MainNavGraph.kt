@@ -63,6 +63,7 @@ import io.legado.app.ui.book.audio.AudioPlayScreenContent
 import io.legado.app.ui.book.audio.AudioPlayViewModel
 import io.legado.app.ui.book.bookmark.AllBookmarkRouteScreen
 import io.legado.app.ui.book.cache.manage.BookCacheManageRouteScreen
+import io.legado.app.ui.book.cache.manage.CacheMaintenanceRouteScreen
 import io.legado.app.ui.book.explore.ExploreShowIntent
 import io.legado.app.ui.book.explore.ExploreShowRouteScreen
 import io.legado.app.ui.book.explore.ExploreShowViewModel
@@ -146,6 +147,7 @@ import io.legado.app.ui.config.ai.summary.AiSummaryConfigRouteScreen
 import io.legado.app.ui.config.backupConfig.BackupConfigRouteScreen
 import io.legado.app.ui.config.coverConfig.CoverAlbumManageRouteScreen
 import io.legado.app.ui.config.coverConfig.CoverConfigRouteScreen
+import io.legado.app.ui.config.bubble.BubbleConfigRouteScreen
 import io.legado.app.ui.config.customTheme.CustomThemeRouteScreen
 import io.legado.app.ui.config.downloadCacheConfig.DownloadCacheConfigRouteScreen
 import io.legado.app.ui.config.labConfig.LabConfigRouteScreen
@@ -671,7 +673,8 @@ fun MainActivity.mainEntryProvider(
             onNavigateToDownloadCache = { pushRoute(MainRouteSettingsDownloadCache) },
             onNavigateToTranslation = { pushRoute(MainRouteSettingsTranslation) },
             onNavigateToLab = { pushRoute(MainRouteSettingsLabConfig) },
-            onNavigateToPrivate = { pushRoute(MainRouteSettingsPrivate) }
+            onNavigateToPrivate = { pushRoute(MainRouteSettingsPrivate) },
+            onNavigateToBubble = { pushRoute(MainRouteSettingsBubble) }
         )
     }
 
@@ -781,7 +784,10 @@ fun MainActivity.mainEntryProvider(
     }
 
     entry<MainRouteSettingsDownloadCache> {
-        DownloadCacheConfigRouteScreen(onBackClick = { onNavigateBack() })
+        DownloadCacheConfigRouteScreen(
+            onBackClick = { onNavigateBack() },
+            onNavigateToMaintenance = { onNavigateToRoute(MainRouteCacheMaintenance) },
+        )
     }
 
     entry<MainRouteSettingsTranslation> {
@@ -811,6 +817,10 @@ fun MainActivity.mainEntryProvider(
 
     entry<MainRouteSettingsThemeManage> {
         ThemeManageRouteScreen(onBackClick = { onNavigateBack() })
+    }
+
+    entry<MainRouteSettingsBubble> {
+        BubbleConfigRouteScreen(onBackClick = { onNavigateBack() })
     }
 
     entry<MainRouteImportLocal> {
@@ -843,6 +853,12 @@ fun MainActivity.mainEntryProvider(
 
     entry<MainRouteBookCacheManage> {
         BookCacheManageRouteScreen(
+            onBackClick = { onNavigateBack() }
+        )
+    }
+
+    entry<MainRouteCacheMaintenance> {
+        CacheMaintenanceRouteScreen(
             onBackClick = { onNavigateBack() }
         )
     }
@@ -1031,6 +1047,10 @@ fun MainActivity.mainEntryProvider(
                 },
                 onOpenSourceEdit = { sourceUrl ->
                     onNavigateToRoute(MainRouteBookSourceEdit(sourceUrl))
+                },
+                // 阅读页里的「气泡管理」：push 设置子页，返回回到阅读界面（不要用 startActivity）
+                onOpenBubbleManage = {
+                    onNavigateToRoute(MainRouteSettingsBubble)
                 },
                 onNavigateBack = {
                     MainNavigator.navigateBack(

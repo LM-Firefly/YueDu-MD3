@@ -124,6 +124,9 @@ data object MainRouteSettingsCustomTheme : MainRoute
 data object MainRouteSettingsThemeManage : MainRoute
 
 @Serializable
+data object MainRouteSettingsBubble : MainRoute
+
+@Serializable
 data object MainRouteSettingsPrivate : MainRoute
 
 @Serializable
@@ -152,6 +155,9 @@ data class MainRouteCache(val groupId: Long) : MainRoute
 
 @Serializable
 data object MainRouteBookCacheManage : MainRoute
+
+@Serializable
+data object MainRouteCacheMaintenance : MainRoute
 
 @Serializable
 data class MainRouteReadBook(
@@ -354,6 +360,7 @@ object MainRouteConst {
     const val ROUTE_SETTINGS_AI_PROMPT = "settings/ai/prompt"
     const val ROUTE_AI_CHAT = "ai/chat"
     const val ROUTE_SETTINGS_CUSTOM_THEME = "settings/custom_theme"
+    const val ROUTE_SETTINGS_BUBBLE = "settings/bubble"
     const val ROUTE_SETTINGS_PRIVATE = "settings/private"
     const val ROUTE_SETTINGS_LAB_CONFIG = "settings/lab_config"
     const val ROUTE_SETTINGS_DOWNLOAD_CACHE = "settings/download_cache"
