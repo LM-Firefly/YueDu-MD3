@@ -207,6 +207,25 @@ plugins {
     alias(libs.plugins.download) apply false
     alias(libs.plugins.android.test) apply false
     alias(libs.plugins.baselineprofile) apply false
+    alias(libs.plugins.version.catalog.update)
+}
+
+// 依赖维护：./gradlew versionCatalogUpdate 更新 gradle/libs.versions.toml；
+// --check 只报告不写盘（可入 CI），--interactive 生成 libs.versions.updates.toml 人工筛选，
+// 再用 versionCatalogApplyUpdates 应用。版本策略集中在下面 pin 块。
+versionCatalogUpdate {
+    // 保留目录现有手工分组与条目顺序，不按 key 全量重排（需要规范化排序时改回 true）
+    sortByKey.set(false)
+    pin {
+        // AGENTS.md：jsoup 不得升到 1.16.2 以上（jsoup#2017 破坏 AnalyzeByJSoup.kt / JsoupXpath）
+        versions.add("jsoup")
+        // AGENTS.md：Hutool 固定 5.8.22（书源 JS 运行时加密库，勿升级）
+        versions.add("hutool")
+        // toml 中 #noinspection GradleDependency 的既有冻结意图（插件只识别
+        // noinspection NewerVersionAvailable / UnusedVersionCatalogEntry，故在此显式声明）
+        versions.add("recyclerview")
+        versions.add("uiViewbinding")
+    }
 }
 
 tasks.register<Delete>("clean") {

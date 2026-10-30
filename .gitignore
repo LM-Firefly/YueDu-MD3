@@ -1,6 +1,7 @@
 *.iml
 .gradle
 local.properties
+signing.properties
 .DS_Store
 /build
 build/
@@ -26,7 +27,6 @@ __pycache__/
 hs_err_pid*.log
 replay_pid*.log
 *.hprof
-signing.properties
 .gstack/
 
 # 本地测试书源，不入库
