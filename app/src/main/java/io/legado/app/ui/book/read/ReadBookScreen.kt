@@ -5,12 +5,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.core.net.toUri
@@ -30,7 +32,6 @@ import io.legado.app.ui.book.read.sheet.ContentEditSheet
 import io.legado.app.ui.book.read.sheet.DownloadSheet
 import io.legado.app.ui.book.read.sheet.BubbleStyleSheet
 import io.legado.app.ui.book.read.sheet.EyeProtectionConfigSheet
-import io.legado.app.ui.book.read.sheet.ParagraphReviewSheet
 import io.legado.app.ui.book.read.sheet.FloatingBarIconConfigSheet
 import io.legado.app.ui.book.read.sheet.HighlightRuleConfigSheet
 import io.legado.app.ui.book.read.sheet.MarkingSheet
@@ -58,6 +59,7 @@ import io.legado.app.ui.widget.components.changeSource.ChangeSourceSheet
 import io.legado.app.ui.widget.components.checkBox.CheckboxItem
 import io.legado.app.ui.widget.components.log.AppLogSheet
 import io.legado.app.ui.widget.components.modalBottomSheet.AppModalBottomSheet
+import io.legado.app.utils.openUrl
 import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.flow.collectLatest
 
@@ -158,7 +160,10 @@ fun ReadBookScreen(
     val skipDialog = state.activeDialog as? ReadBookDialog.ConfirmSkipToChapter
     val payDialog = state.activeDialog as? ReadBookDialog.ConfirmChapterPay
     val addToBookshelfDialog = state.activeDialog as? ReadBookDialog.ConfirmAddToBookshelf
+    val retranslateDialog = state.activeDialog as? ReadBookDialog.ConfirmRetranslate
     val readRecordAliasDialog = state.activeDialog as? ReadBookDialog.ReadRecordAliasConflict
+    val externalUrlDialog = state.activeDialog as? ReadBookDialog.ConfirmOpenExternalUrl
+    val context = LocalContext.current
     var rememberAliasChoice by remember(readRecordAliasDialog) { mutableStateOf(false) }
 
     AppAlertDialog(
@@ -264,6 +269,35 @@ fun ReadBookScreen(
         dismissText = stringResource(R.string.cancel),
         onDismiss = { onIntent(ReadBookIntent.ExitWithoutAddingCurrentBookToBookshelf) },
     )
+    AppAlertDialog(
+        show = externalUrlDialog != null,
+        onDismissRequest = { onIntent(ReadBookIntent.DismissDialog) },
+        title = stringResource(R.string.use_browser_open),
+        text = externalUrlDialog?.url.orEmpty(),
+        confirmText = stringResource(R.string.ok),
+        onConfirm = {
+            val url = externalUrlDialog?.url
+            onIntent(ReadBookIntent.DismissDialog)
+            if (!url.isNullOrBlank()) {
+                context.openUrl(url)
+            }
+        },
+        dismissText = stringResource(R.string.cancel),
+        onDismiss = { onIntent(ReadBookIntent.DismissDialog) },
+    )
+    AppAlertDialog(
+        show = retranslateDialog != null,
+        onDismissRequest = { onIntent(ReadBookIntent.DismissDialog) },
+        title = stringResource(R.string.retranslate_chapter),
+        text = stringResource(R.string.retranslate_confirm),
+        confirmText = stringResource(R.string.ok),
+        onConfirm = {
+            onIntent(ReadBookIntent.DismissDialog)
+            onIntent(ReadBookIntent.RetranslateCurrentChapter)
+        },
+        dismissText = stringResource(R.string.cancel),
+        onDismiss = { onIntent(ReadBookIntent.DismissDialog) },
+    )
 
     // 书签/笔记跳转前校验未通过的确认框
     val pendingTarget = state.pendingBookmarkTarget
@@ -276,6 +310,7 @@ fun ReadBookScreen(
                 is BookmarkTargetVerdict.SourceChanged ->
                     R.string.bookmark_target_source_changed
 
+                BookmarkTargetVerdict.ContentMismatch -> R.string.bookmark_target_content_mismatch
                 BookmarkTargetVerdict.TitleMismatch ->
                     R.string.bookmark_target_title_mismatch
 
@@ -292,7 +327,7 @@ fun ReadBookScreen(
     // Keep each layer keyed and mounted until its own sheet exit animation has finished.
     // Native modal windows must be created in stack order, including after recreation.
     val layers = remember { androidx.compose.runtime.mutableStateListOf<ReaderSheetLayer>() }
-    var nextLayerId by rememberSaveable { mutableStateOf(0L) }
+    var nextLayerId by rememberSaveable { mutableLongStateOf(0L) }
     var activeLayerIds by rememberSaveable { mutableStateOf<Map<String, Long>>(emptyMap()) }
     LaunchedEffect(state.sheetStack) {
         val previous = layers.filter { it.present }
@@ -542,14 +577,6 @@ private fun ReadBookSheetContent(
             },
         )
     }
-    if (state.activeSheet is ReadBookSheet.ParagraphReview) {
-        ParagraphReviewSheet(
-            show = visibleState.findSheet<ReadBookSheet.ParagraphReview>() != null,
-            request = visibleState.findSheet<ReadBookSheet.ParagraphReview>(),
-            onDismissRequest =
-                dismissSheet(visibleState.findSheet<ReadBookSheet.ParagraphReview>()),
-        )
-    }
     if (state.activeSheet is ReadBookSheet.EyeProtection) {
         EyeProtectionConfigSheet(
             show = visibleState.findSheet<ReadBookSheet.EyeProtection>() != null,
@@ -651,6 +678,7 @@ private fun ReadBookSheetContent(
         MoreConfigSheet(
             show = visibleState.findSheet<ReadBookSheet.MoreConfig>() != null,
             onDismissRequest = dismissSheet(visibleState.findSheet<ReadBookSheet.MoreConfig>()),
+            preferences = preferences,
             onIntent = onIntent,
             onOpenClickRegionalConfig = {
                 onIntent(ReadBookIntent.ShowSheet(ReadBookSheet.ClickActionConfig))
@@ -839,6 +867,10 @@ private fun ReadBookSheetContent(
 
                 is ReadBookSheet.Download -> {
                     DownloadSheet(
+                        preview = state.cacheRangePreview,
+                        onScanRange = { start, end ->
+                            onIntent(ReadBookIntent.ScanCacheRange(start, end))
+                        },
                         onDismissRequest = dismissSheet,
                         onDownload = { start, end ->
                             onIntent(ReadBookIntent.DismissSheet)

@@ -37,6 +37,22 @@ class MangaPageComposerTest {
         } finally { bitmap.recycle() }
     }
 
+    /**
+     * core 没有本地气泡检测，「AI 排版」一旦被扩框，居中基准就从原文字块挪到更大的空白区，
+     * 表现为整块译文偏移。AI 排版自带字号收敛，扩框在这里没有任何收益。
+     */
+    @Test fun `AI typesetting keeps its layout box when bubble geometry is missing`() {
+        val bitmap = Bitmap.createBitmap(300, 300, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.WHITE) }
+        try {
+            val text = "这是一段放不进小框的长译文".repeat(6)
+            val region = MangaTranslatedRegion("a", "原文", text, MangaTextBox(300f, 300f, 500f, 500f),
+                typesetting = MangaAiTypesetting(listOf(text), 200f))
+            val result = MangaPageComposer.planLayout(bitmap, MangaTranslationPlan(listOf(region)))
+            assertEquals(region.layoutBox, result.regions.single().layoutBox)
+            assertEquals(region.textBox, result.regions.single().textBox)
+        } finally { bitmap.recycle() }
+    }
+
     @Test fun `AI authored overlapping layouts shrink without moving source or changing lines`() {
         val bitmap = Bitmap.createBitmap(300, 200, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.WHITE) }
         try {

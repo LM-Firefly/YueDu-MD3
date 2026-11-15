@@ -14,6 +14,41 @@ import org.robolectric.annotation.GraphicsMode
 @Config(application = Application::class, sdk = [35])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class MangaContainerGeometryTest {
+    /** 模型给的气泡框不可信时宁可没有气泡，也不能让它进入擦除遮罩。 */
+    @Test fun `AI balloon box that does not cover the text is ignored`() {
+        val bitmap = Bitmap.createBitmap(300, 200, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.WHITE) }
+        try {
+            val text = MangaTextBox(300f, 300f, 500f, 500f)
+            fun plan(box: MangaTextBox?, id: String?) = MangaTranslationPlan(listOf(
+                MangaTranslatedRegion("r0", "原文", "译文", text,
+                    aiGeometry = MangaAiGeometry(containerId = id, containerBox = box))))
+            val outside = plan(MangaTextBox(600f, 600f, 900f, 900f), "c1")
+            assertNull(MangaContainerGeometry.attach(bitmap, outside, emptyList()).regions.single().bubbleShape)
+            val huge = plan(MangaTextBox(0f, 0f, 1000f, 1000f), "c1")
+            assertNull(MangaContainerGeometry.attach(bitmap, huge, emptyList()).regions.single().bubbleShape)
+            val unnamed = plan(MangaTextBox(200f, 200f, 600f, 600f), null)
+            assertNull(MangaContainerGeometry.attach(bitmap, unnamed, emptyList()).regions.single().bubbleShape)
+        } finally { bitmap.recycle() }
+    }
+
+    /** 「端侧检测」不采信识别框；识别框只在选择「AI 识别框」时进入几何。 */
+    @Test fun `device source ignores the model container while the ai source keeps it`() {
+        val bitmap = balloon()
+        try {
+            val text = MangaTextBox(375f, 466f, 625f, 554f)
+            val container = MangaTextBox(300f, 60f, 700f, 900f)
+            val plan = MangaTranslationPlan(listOf(MangaTranslatedRegion("r0", "HELLO", "你好", text,
+                aiGeometry = MangaAiGeometry(containerId = "c1", containerBox = container))))
+            val detected = listOf(MangaBubbleDetection(MangaShapeRect(96, 14, 224, 216), .9f, 0))
+            assertNull("端侧来源不接受识别框",
+                MangaPageComposer.prepare(bitmap, plan, emptyList(), 1f, MangaBubbleSource.DEVICE).regions.single().bubbleShape)
+            assertNotNull("识别框只在 AI 来源生效",
+                MangaPageComposer.prepare(bitmap, plan, emptyList(), 1f, MangaBubbleSource.AI).regions.single().bubbleShape)
+            assertNotNull("端侧来源仍然使用端侧框",
+                MangaPageComposer.prepare(bitmap, plan, detected, 1f, MangaBubbleSource.DEVICE).regions.single().bubbleShape)
+        } finally { bitmap.recycle() }
+    }
+
     @Test fun `OCR block spanning two bubbles is split before translation while rows in each bubble join`() {
         val a = MangaSourceLine("first", MangaTextBox(100f, 200f, 300f, 300f))
         val b = MangaSourceLine("part", MangaTextBox(100f, 400f, 300f, 500f))
@@ -82,5 +117,17 @@ class MangaContainerGeometryTest {
         assertNull(MangaTranslationPlan.parse(json).regions.single().bubbleShape)
         assertThrows(IllegalArgumentException::class.java) { shape.copy(runs = listOf(90, 20)).validate() }
         assertThrows(IllegalArgumentException::class.java) { shape.copy(runs = listOf(20, 10, 10, 20)).validate() }
+    }
+
+    /** 浅灰页面上的白底黑描边竖长气泡。 */
+    private fun balloon(): Bitmap = Bitmap.createBitmap(320, 240, Bitmap.Config.ARGB_8888).apply {
+        eraseColor(Color.LTGRAY)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        paint.style = Paint.Style.FILL; paint.color = Color.WHITE
+        Canvas(this).drawOval(RectF(94f, 14f, 226f, 222f), paint)
+        paint.style = Paint.Style.STROKE; paint.strokeWidth = 3f; paint.color = Color.BLACK
+        Canvas(this).drawOval(RectF(94f, 14f, 226f, 222f), paint)
+        paint.style = Paint.Style.FILL; paint.textSize = 24f
+        Canvas(this).drawText("HELLO", 124f, 132f, paint)
     }
 }

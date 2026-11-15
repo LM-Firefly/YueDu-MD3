@@ -71,6 +71,16 @@ data class MainRouteRssSourceDebug(val sourceUrl: String? = null) : MainRoute
 data object MainRouteSettings : MainRoute
 
 @Serializable
+data object MainRouteSettingsSearch : MainRoute
+
+@Serializable
+data class MainRouteSettingsTarget(val settingId: String) : MainRoute
+
+/** A separate key keeps saved stacks and legacy reading-settings entries compatible. */
+@Serializable
+data class MainRouteSettingsReadTarget(val settingId: String) : MainRoute
+
+@Serializable
 data object MainRouteSettingsOther : MainRoute
 
 @Serializable
@@ -346,6 +356,9 @@ data object MainRouteRegexCastRule : MainRoute
 
 @Serializable
 data object MainRouteAbout : MainRoute
+
+@Serializable
+data object MainRouteThirdPartyLicenses : MainRoute
 
 /** 朗读设置卡片里的子页跳转：把 [ReadAloudSubPage] 映射到对应整屏路由。 */
 fun ReadAloudSubPage.toMainRoute(): MainRoute = when (this) {

@@ -6,6 +6,7 @@ import io.legado.app.domain.model.BookContentProcessEngine
 import io.legado.app.domain.model.TextProcessAnchor
 import io.legado.app.domain.model.TextProcessStyle
 import io.legado.app.feature.reader.core.cast.CastMarkers
+import io.legado.app.feature.reader.core.semantic.ReaderSemanticLocation
 import io.legado.app.feature.reader.core.model.ReaderTextBackgroundImage
 import io.legado.app.feature.reader.core.model.ReaderUnderline
 import io.legado.app.feature.reader.core.model.withBitmapSize
@@ -39,9 +40,14 @@ object LegacyReaderStyleRangeMapper {
         processes: List<BookContentProcess>,
         /** 角色名 → 该角色自己设的气泡样式；空表 = 本书没人设气泡。 */
         castBubbles: Map<String, ReaderCharacterStyle> = emptyMap(),
+        /**
+         * 用规则里的哪一套颜色：true = 夜间那套。由调用方按**阅读模式**给（墨水屏是白底，
+         * 与白天同一套），不要在这里自己读主题——预览要能单独看夜晚那套。
+         */
+        isNightTheme: Boolean,
     ): List<ReaderStyleRange> {
         val result = mutableListOf<ReaderStyleRange>()
-        val bodyText = semanticBodyText(source)
+        val bodyText = source.semanticContent
         val titleText = source.semanticTitle
         rules.filter(HighlightRule::enabled).forEachIndexed { index, rule ->
             val regex = runCatching { Regex(rule.pattern) }.getOrNull() ?: return@forEachIndexed
@@ -55,7 +61,7 @@ object LegacyReaderStyleRangeMapper {
                     val start = match.range.first
                     val endExclusive = match.range.last + 1
                     if (start < endExclusive) {
-                        result += rule.matchRanges(start, endExclusive, target, index)
+                        result += rule.matchRanges(start, endExclusive, target, index, isNightTheme)
                     }
                 }
             }
@@ -68,6 +74,8 @@ object LegacyReaderStyleRangeMapper {
                 val markingStyle = GSON.fromJsonObject<TextProcessStyle>(process.styleJson).getOrNull()
                     ?: return@forEachIndexed
                 val range = BookContentProcessEngine.resolveRange(bodyText, anchor) ?: return@forEachIndexed
+                if (!ReaderSemanticLocation.isValidOffset(bodyText, range.first) ||
+                    !ReaderSemanticLocation.isValidOffset(bodyText, range.last + 1)) return@forEachIndexed
                 result += ReaderStyleRange(
                     start = range.first,
                     endExclusive = range.last + 1,
@@ -211,10 +219,11 @@ object LegacyReaderStyleRangeMapper {
      * [toReaderStyle] 里（它按字拆段时才落到首字/末字上），这里补带过去，
      * 好让 [overriddenBy] 与正文的 [matchRanges] 用同一份口径。
      */
-    fun styleOf(rule: HighlightRule): ReaderCharacterStyle = rule.toReaderStyle().copy(
-        matchSpacingBeforePx = rule.letterSpacingBefore.dpToPx().takeIf { it > 0f } ?: 0f,
-        matchSpacingAfterPx = rule.letterSpacingAfter.dpToPx().takeIf { it > 0f } ?: 0f,
-    )
+    fun styleOf(rule: HighlightRule, isNightTheme: Boolean): ReaderCharacterStyle =
+        rule.toReaderStyle(isNightTheme).copy(
+            matchSpacingBeforePx = rule.letterSpacingBefore.dpToPx().takeIf { it > 0f } ?: 0f,
+            matchSpacingAfterPx = rule.letterSpacingAfter.dpToPx().takeIf { it > 0f } ?: 0f,
+        )
 
     /**
      * 把一条规则的样式按**字面区间**挂上去，不走正则。
@@ -230,42 +239,13 @@ object LegacyReaderStyleRangeMapper {
         endExclusive: Int,
         target: ReaderStyleTarget,
         priority: Int,
+        isNightTheme: Boolean,
     ): List<ReaderStyleRange> =
-        if (start < endExclusive) rule.matchRanges(start, endExclusive, target, priority)
-        else emptyList()
-
-    private fun semanticBodyText(source: ReaderChapterSource): String {
-        val chars = CharArray(source.characterCount) { '\n' }
-        source.blocks.forEach { block ->
-            when (block) {
-                is ReaderChapterSourceBlock.Text -> if (!block.isTitle) {
-                    chars.writeText(block.chapterPosition, block.value)
-                }
-                is ReaderChapterSourceBlock.Image -> chars.setOrNull(block.chapterPosition, '\uFFFC')
-                is ReaderChapterSourceBlock.Paragraph -> block.items.forEach { item ->
-                    when (item) {
-                        is ReaderChapterInlineSource.Text -> chars.writeText(item.chapterPosition, item.value)
-                        is ReaderChapterInlineSource.Image -> chars.setOrNull(item.chapterPosition, '\uFFFC')
-                        is ReaderChapterInlineSource.BlankLine -> Unit
-                        // 配乐胶囊零字符，不写语义坐标
-                        is ReaderChapterInlineSource.BgmScene -> Unit
-                    }
-                }
-                is ReaderChapterSourceBlock.Html, is ReaderChapterSourceBlock.PageBreak -> Unit
-            }
+        if (start < endExclusive) {
+            rule.matchRanges(start, endExclusive, target, priority, isNightTheme)
+        } else {
+            emptyList()
         }
-        return chars.concatToString()
-    }
-
-    private fun CharArray.setOrNull(index: Int, value: Char) {
-        if (index in indices) this[index] = value
-    }
-
-    private fun CharArray.writeText(start: Int, text: String) {
-        if (start !in indices || text.isEmpty()) return
-        val count = minOf(text.length, size - start)
-        for (offset in 0 until count) this[start + offset] = text[offset]
-    }
 
     /**
      * 一次命中拆成「首字 / 段内 / 末字」三段互不重叠的区间。
@@ -279,8 +259,9 @@ object LegacyReaderStyleRangeMapper {
         endExclusive: Int,
         target: ReaderStyleTarget,
         priority: Int,
+        isNightTheme: Boolean,
     ): List<ReaderStyleRange> {
-        val base = toReaderStyle()
+        val base = toReaderStyle(isNightTheme)
         val before = letterSpacingBefore.dpToPx().takeIf { it > 0f } ?: 0f
         val after = letterSpacingAfter.dpToPx().takeIf { it > 0f } ?: 0f
         if (endExclusive - start == 1) {
@@ -329,60 +310,69 @@ object LegacyReaderStyleRangeMapper {
         }
     }
 
-    private fun HighlightRule.toReaderStyle() = ReaderCharacterStyle(
-        colorArgb = textColor,
-        backgroundArgb = bgColor,
-        // 边框是一个整体：颜色没给，粗细与圆角就不单独存在，样式里不会出现无主的三件套。
-        borderColorArgb = borderColor,
-        borderWidthPx = borderColor?.let { borderWidth.dpToPx() } ?: 0f,
-        borderRadiusPx = borderColor?.let { borderRadius.dpToPx() } ?: 0f,
-        underline = underlineMode.takeIf { it != 0 }?.let {
-            ReaderUnderline(
-                mode = it,
-                // 兜底跟随正文色：旧 `TextLine.drawStyledUnderlines` 的
-                // `underlineColor ?: textColor ?: ChapterProvider.renderStyle.textColor`
-                // （即 ReadBookConfig.textColor），不是写死的主题绿。
-                colorArgb = underlineColor ?: textColor ?: ReadBookConfig.textColor,
-                widthPx = underlineWidth.dpToPx(),
-                offsetPx = underlineOffset.dpToPx(),
-                svgPath = underlineSvgPath.orEmpty(),
-                dashOnPx = 8f.dpToPx(),
-                dashOffPx = 5f.dpToPx(),
-                waveAmplitudePx = 3f.dpToPx(),
-                waveLengthPx = 12f.dpToPx(),
-                doubleLineGapPx = 3f.dpToPx(),
-            )
-        },
-        fontPath = fontPath,
-        // 400 is the persisted/default "regular" value from the View reader, where an empty
-        // font override left the body Paint untouched.  Passing it as an explicit override in
-        // the new renderer reset bold/light body text to regular.  Keep it unset so the body
-        // style remains the source of truth; non-default weights still override it.
-        fontWeight = fontWeight.takeIf { it != 400 },
-        italic = isItalic,
-        fontSizeOffsetPx = fontSizeOffset.toFloat().spToPx(),
-        linePadTopPx = lineSpacingTop.dpToPx().takeIf { it > 0f } ?: 0f,
-        linePadBottomPx = lineSpacingBottom.dpToPx().takeIf { it > 0f } ?: 0f,
-        backgroundImage = bgImage?.takeIf(String::isNotBlank)?.let {
-            val automatic = if (manualNineSlice) null else {
-                ReaderTextBackgroundLoader.nineSliceFractions(it)
-            }
-            ReaderTextBackgroundImage(
-                source = it,
-                fit = bgImageFit,
-                scale = bgImageScale,
-                ninePatchLeft = automatic?.left ?: npLeft,
-                ninePatchRight = automatic?.right ?: npRight,
-                ninePatchTop = automatic?.top ?: npTop,
-                ninePatchBottom = automatic?.bottom ?: npBottom,
-                lengthOffsetLeftPx = bgLengthOffsetLeft.dpToPx(),
-                lengthOffsetRightPx = bgLengthOffsetRight.dpToPx(),
-            ).let { image ->
-                val (width, height) = backgroundImageSize(it)
-                image.withBitmapSize(width, height)
-            }
-        },
-    )
+    /**
+     * 一条规则换算成 core 侧的字符样式。
+     *
+     * 颜色先按**阅读模式**解析（见 [HighlightRule.colorsFor]）：夜间色为空就跟随白天，
+     * 老规则因此与加夜间色之前逐字节一致。
+     */
+    private fun HighlightRule.toReaderStyle(isNightTheme: Boolean): ReaderCharacterStyle {
+        val colors = colorsFor(isNightTheme)
+        return ReaderCharacterStyle(
+            colorArgb = colors.textColor,
+            backgroundArgb = colors.bgColor,
+            // 边框是一个整体：颜色没给，粗细与圆角就不单独存在，样式里不会出现无主的三件套。
+            borderColorArgb = colors.borderColor,
+            borderWidthPx = colors.borderColor?.let { borderWidth.dpToPx() } ?: 0f,
+            borderRadiusPx = colors.borderColor?.let { borderRadius.dpToPx() } ?: 0f,
+            underline = underlineMode.takeIf { it != 0 }?.let {
+                ReaderUnderline(
+                    mode = it,
+                    // 兜底跟随正文色：旧 `TextLine.drawStyledUnderlines` 的
+                    // `underlineColor ?: textColor ?: ChapterProvider.renderStyle.textColor`
+                    // （即 ReadBookConfig.textColor），不是写死的主题绿。
+                    colorArgb = colors.underlineColor ?: colors.textColor ?: ReadBookConfig.textColor,
+                    widthPx = underlineWidth.dpToPx(),
+                    offsetPx = underlineOffset.dpToPx(),
+                    svgPath = underlineSvgPath.orEmpty(),
+                    dashOnPx = 8f.dpToPx(),
+                    dashOffPx = 5f.dpToPx(),
+                    waveAmplitudePx = 3f.dpToPx(),
+                    waveLengthPx = 12f.dpToPx(),
+                    doubleLineGapPx = 3f.dpToPx(),
+                )
+            },
+            fontPath = fontPath,
+            // 400 is the persisted/default "regular" value from the View reader, where an empty
+            // font override left the body Paint untouched.  Passing it as an explicit override in
+            // the new renderer reset bold/light body text to regular.  Keep it unset so the body
+            // style remains the source of truth; non-default weights still override it.
+            fontWeight = fontWeight.takeIf { it != 400 },
+            italic = isItalic,
+            fontSizeOffsetPx = fontSizeOffset.toFloat().spToPx(),
+            linePadTopPx = lineSpacingTop.dpToPx().takeIf { it > 0f } ?: 0f,
+            linePadBottomPx = lineSpacingBottom.dpToPx().takeIf { it > 0f } ?: 0f,
+            backgroundImage = bgImage?.takeIf(String::isNotBlank)?.let {
+                val automatic = if (manualNineSlice) null else {
+                    ReaderTextBackgroundLoader.nineSliceFractions(it)
+                }
+                ReaderTextBackgroundImage(
+                    source = it,
+                    fit = bgImageFit,
+                    scale = bgImageScale,
+                    ninePatchLeft = automatic?.left ?: npLeft,
+                    ninePatchRight = automatic?.right ?: npRight,
+                    ninePatchTop = automatic?.top ?: npTop,
+                    ninePatchBottom = automatic?.bottom ?: npBottom,
+                    lengthOffsetLeftPx = bgLengthOffsetLeft.dpToPx(),
+                    lengthOffsetRightPx = bgLengthOffsetRight.dpToPx(),
+                ).let { image ->
+                    val (width, height) = backgroundImageSize(it)
+                    image.withBitmapSize(width, height)
+                }
+            },
+        )
+    }
 
     private fun TextProcessStyle.toReaderStyle(markingId: String) = ReaderCharacterStyle(
         colorArgb = textColor,

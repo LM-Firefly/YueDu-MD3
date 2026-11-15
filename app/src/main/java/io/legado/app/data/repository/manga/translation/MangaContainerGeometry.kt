@@ -74,8 +74,25 @@ internal object MangaContainerGeometry {
         }
     }
 
-    fun attach(bitmap: Bitmap, plan: MangaTranslationPlan, detections: List<MangaBubbleDetection>): MangaTranslationPlan {
-        val aiContainers = plan.regions.mapNotNull { it.aiGeometry }.filter { it.containerBox != null }.distinctBy { it.containerId }
+    /**
+     * [acceptAiContainers] 为 false 时只采信端侧检测框：`DEVICE` 来源据此与 `AUTO` 区分，
+     * 模型给的 `aiGeometry.containerBox` 既不会变成气泡框，也不会抢占区域归属。
+     */
+    fun attach(bitmap: Bitmap, plan: MangaTranslationPlan, detections: List<MangaBubbleDetection>,
+        acceptAiContainers: Boolean = true): MangaTranslationPlan {
+        // 模型给的气泡框必须先被复核：容器框要包住原文，也不能大到把相邻气泡吞进来。
+        // 幻觉框一旦进了遮罩分析，擦除范围会跟着错，比没有气泡更糟。
+        val aiContainers = if (!acceptAiContainers) emptyList() else plan.regions.mapNotNull { region ->
+            val geometry = region.aiGeometry ?: return@mapNotNull null
+            if (geometry.containerId.isNullOrBlank()) return@mapNotNull null
+            val container = geometry.containerBox ?: return@mapNotNull null
+            val text = region.recognitionBox ?: region.textBox
+            val covers = container.left <= text.left && container.top <= text.top &&
+                container.right >= text.right && container.bottom >= text.bottom
+            val textArea = (text.right - text.left) * (text.bottom - text.top)
+            val containerArea = (container.right - container.left) * (container.bottom - container.top)
+            if (!covers || containerArea / textArea.coerceAtLeast(1f) > 20f) null else geometry
+        }.distinctBy { it.containerId }
         val aiBubbles = aiContainers.map { geometry ->
             val r = checkNotNull(geometry.containerBox).pixels(bitmap.width, bitmap.height)
             MangaBubbleDetection(MangaShapeRect(r.left, r.top, r.right, r.bottom), 1f, 0)

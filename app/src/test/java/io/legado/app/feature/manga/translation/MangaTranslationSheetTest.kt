@@ -7,6 +7,7 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.semantics.SemanticsActions
+import io.legado.app.BuildConfig
 import io.legado.app.R
 import io.legado.app.domain.model.settings.AppUiConfiguration
 import io.legado.app.domain.model.AiReasoningLevel
@@ -16,6 +17,7 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.collections.immutable.toImmutableMap
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -47,6 +49,31 @@ class MangaTranslationSheetTest {
         assertTrue(opened)
         compose.onNodeWithText(app.getString(R.string.manga_translation_use_global)).performScrollTo().performClick()
         compose.onNodeWithText(app.getString(R.string.manga_translation_source)).performScrollTo().assertIsDisplayed()
+        // 本漫单独设置时全局设置入口没有意义：改不动眼前这些选项。
+        compose.onNodeWithText(app.getString(R.string.manga_translation_global_settings)).assertDoesNotExist()
+    }
+
+    /** 轻量产品不内置运行时，权重下载入口必须缺席，否则用户会下载后用不了。 */
+    @Test fun `core build offers no local model download`() {
+        assumeTrue("Only the core product omits the local engine", !BuildConfig.MANGA_LOCAL_ENGINE)
+        val app = RuntimeEnvironment.getApplication().also { it.injectAsAppCtx() }
+        val state = mutableStateOf(MangaTranslationUiState(open = true, loaded = true,
+            settings = MangaTranslationSettings(locator = MangaLocator.LOCAL, localOcrEngine = MangaLocalOcrEngine.PADDLE_V5),
+            ocrModels = persistentMapOf(MangaLocalOcrEngine.PADDLE_V5 to MangaOcrModelState(MangaOcrModelPhase.MISSING, totalBytes = 21_509_645))))
+        compose.setContent { CompositionLocalProvider(LocalInspectionMode provides true) { AppTheme(AppUiConfiguration()) {
+            MangaTranslationSheet(state.value) {}
+        } } }
+        compose.onAllNodesWithText("Download OCR model").assertCountEquals(0)
+        // 识别方式里不再提供端侧选项，引擎下拉也缺席，且控件下方不再有"需要漫画增强版"说明。
+        compose.onAllNodesWithText(app.getString(R.string.manga_translation_locator_local)).assertCountEquals(0)
+        compose.onAllNodesWithText(app.getString(R.string.manga_ocr_local_engine)).assertCountEquals(0)
+        compose.onAllNodesWithText(app.getString(R.string.manga_local_engine_requires_comic)).assertCountEquals(0)
+        // 模型擦字同样不提供：擦字下拉保留在原位并置灰，档位只剩内置。
+        compose.onAllNodesWithText(app.getString(R.string.manga_inpaint_engine)).assertCountEquals(1)
+        compose.onAllNodesWithText(app.getString(R.string.manga_inpaint_local)).assertCountEquals(1)
+        // 气泡几何只剩三项：端侧检测不进 core 的列表（读取时归一化为「关闭」）。
+        compose.onAllNodesWithText(app.getString(R.string.manga_bubble_source)).assertCountEquals(1)
+        compose.onAllNodesWithText(app.getString(R.string.manga_bubble_source_device)).assertCountEquals(0)
     }
 
     // Robolectric never idles a Material dialog that hosts a text field at w400dp-h800dp (bare MaterialTheme
@@ -59,14 +86,14 @@ class MangaTranslationSheetTest {
         compose.setContent { CompositionLocalProvider(LocalInspectionMode provides true) { AppTheme(AppUiConfiguration()) {
             MangaGlossarySheet(true, draft.value, true, {}, { draft.value = it }, { saved = draft.value })
         } } }
-        compose.onNodeWithText(app.getString(R.string.manga_glossary_add)).performClick()
+        compose.onNodeWithContentDescription(app.getString(R.string.manga_glossary_add)).performClick()
         compose.onNodeWithText(app.getString(R.string.manga_glossary_source)).performTextInput("Alice")
         compose.onNodeWithText(app.getString(R.string.manga_glossary_target)).performTextInput("Alias")
         compose.onNodeWithText(app.getString(R.string.manga_glossary_apply)).performClick()
         compose.onNodeWithText("Alice").assertExists().performClick()
         compose.onNodeWithText(app.getString(R.string.manga_glossary_target)).performTextReplacement("Updated")
         compose.onNodeWithText(app.getString(R.string.manga_glossary_apply)).performClick()
-        compose.onNodeWithText(app.getString(R.string.manga_translation_save_glossary)).performClick()
+        // 没有保存按钮：每次增删改即时落库。
         assertTrue(saved == "Alice=Updated")
         compose.onNodeWithText("Alice").performClick()
         compose.onNodeWithText(app.getString(R.string.delete)).performClick()
@@ -129,7 +156,7 @@ class MangaTranslationSheetTest {
         compose.onNodeWithText(app.getString(R.string.manga_translation_title)).assertIsDisplayed()
         compose.onNodeWithText(app.getString(R.string.manga_translation_reasoning_parameters, "{\"thinking\":{\"type\":\"disabled\"}}"))
             .assertDoesNotExist()
-        compose.onNodeWithContentDescription(app.getString(R.string.feature_manga_translation_diagnostics)).performClick()
+        compose.onNodeWithText(app.getString(R.string.feature_manga_translation_diagnostics)).performScrollTo().performClick()
         compose.onNodeWithText(app.getString(R.string.manga_translation_reasoning_parameters, "{\"thinking\":{\"type\":\"disabled\"}}"))
             .performScrollTo().assertIsDisplayed()
         compose.onNodeWithText(app.getString(R.string.manga_translation_reasoning_disable_ignored)).performScrollTo().assertIsDisplayed()
@@ -141,13 +168,13 @@ class MangaTranslationSheetTest {
         compose.onNodeWithText(app.getString(R.string.manga_translation_current)).assertDoesNotExist()
         compose.onNodeWithText(app.getString(R.string.manga_translation_retry_current)).assertDoesNotExist()
         compose.onNodeWithText(app.getString(R.string.manga_translation_recompose)).assertDoesNotExist()
-        compose.onNodeWithText(app.getString(R.string.manga_translation_recompose_chapter)).performScrollTo().performClick()
+        compose.onNodeWithContentDescription(app.getString(R.string.manga_translation_recompose_chapter)).performClick()
         assertTrue(intents.any { it is MangaTranslationIntent.Recompose })
         compose.onNodeWithText(app.getString(R.string.manga_translation_composition)).performScrollTo().performClick()
         compose.onNodeWithText(app.getString(R.string.manga_translation_ai_page)).performClick()
         compose.onNodeWithContentDescription(app.getString(R.string.ai_thinking_mode)).assertDoesNotExist()
         compose.onNodeWithText(app.getString(R.string.manga_translation_image_model)).performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText(app.getString(R.string.manga_translation_chapter, 8)).performScrollTo().performClick()
+        compose.onNodeWithContentDescription(app.getString(R.string.manga_translation_chapter, 8)).performClick()
         assertTrue(intents.any { it is MangaTranslationIntent.Translate })
     }
 
@@ -169,7 +196,7 @@ class MangaTranslationSheetTest {
         assertTrue(state.value.settings.targetLanguage == "zh-TW")
         compose.onNodeWithText(app.getString(R.string.manga_translation_glossary_hint)).assertDoesNotExist()
         compose.onNodeWithText(app.getString(R.string.manga_translation_glossary)).performScrollTo().performClick()
-        compose.onNodeWithText(app.getString(R.string.manga_translation_save_glossary)).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription(app.getString(R.string.manga_glossary_add)).assertIsDisplayed()
         compose.onNodeWithText(app.getString(R.string.manga_translation_clear)).performScrollTo().performClick()
         assertTrue(MangaTranslationIntent.Clear !in intents)
         compose.onNodeWithText(app.getString(R.string.manga_translation_clear_confirm)).assertIsDisplayed()
@@ -181,6 +208,8 @@ class MangaTranslationSheetTest {
     fun `expanded languages use dropdowns and cleanup requires confirmation`() = languageAndCleanupControls()
 
     private fun ocrControls() {
+        // Weight download only exists in the comic product; the core build hides it.
+        assumeTrue("Local recognizers are only bundled in the comic product", BuildConfig.MANGA_LOCAL_ENGINE)
         val app = RuntimeEnvironment.getApplication().also { it.injectAsAppCtx() }
         val state = mutableStateOf(MangaTranslationUiState(open = true, loaded = true,
             settings = MangaTranslationSettings(locator = MangaLocator.LOCAL, localOcrEngine = MangaLocalOcrEngine.PADDLE_V5),
@@ -227,25 +256,22 @@ class MangaTranslationSheetTest {
 
     private fun reasoningControl() {
         val app = RuntimeEnvironment.getApplication().also { it.injectAsAppCtx() }
-        val state = mutableStateOf(MangaTranslationUiState(open = true, loaded = true, useGlobalSettings = true))
+        val state = mutableStateOf(MangaTranslationUiState(open = true, loaded = true))
         compose.setContent { CompositionLocalProvider(LocalInspectionMode provides true) { AppTheme(AppUiConfiguration()) {
             MangaTranslationSheet(state.value) { intent ->
                 if (intent is MangaTranslationIntent.ChangeSettings) state.value = state.value.copy(settings = intent.transform(state.value.settings))
             }
         } } }
-        compose.onNodeWithContentDescription(app.getString(R.string.ai_thinking_mode)).performClick()
-        compose.onNodeWithText(app.getString(R.string.ai_thinking_off)).assertIsDisplayed()
-        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.SetProgress)).performSemanticsAction(SemanticsActions.SetProgress) {
-            it(AiReasoningLevel.LOW.ordinal.toFloat())
-        }
-        compose.onNodeWithText(app.getString(R.string.ai_reasoning_level_low)).assertIsDisplayed()
+        // 顶栏不再有思考模式按钮，强度选项回到基础设置组内。
+        compose.onNodeWithText(app.getString(R.string.ai_thinking_mode)).performScrollTo().performClick()
+        compose.onNodeWithText(app.getString(R.string.ai_reasoning_level_low)).performClick()
         compose.runOnIdle { assertTrue(state.value.settings.reasoningLevel == AiReasoningLevel.LOW.storageValue) }
     }
 
-    @Test fun `compact manga sheet uses the shared reasoning strength selector`() = reasoningControl()
+    @Test fun `compact manga sheet edits reasoning strength in basic settings`() = reasoningControl()
 
     @Test @Config(qualifiers = "w1000dp-h700dp")
-    fun `expanded manga sheet uses the shared reasoning strength selector`() = reasoningControl()
+    fun `expanded manga sheet edits reasoning strength in basic settings`() = reasoningControl()
 
     private fun cloudControls() {
         val app = RuntimeEnvironment.getApplication().also { it.injectAsAppCtx() }
@@ -319,9 +345,9 @@ class MangaTranslationSheetTest {
         compose.onNodeWithText(app.getString(R.string.manga_translation_advanced)).performScrollTo().performClick()
         compose.onNodeWithText(app.getString(R.string.manga_ai_geometry_diagnostics)).performScrollTo().performClick()
         assertTrue(state.value.settings.geometryDiagnostics)
-        // The preview moved into the diagnostics sheet, which the sheet's top bar opens.
-        compose.onNodeWithContentDescription(app.getString(R.string.feature_manga_translation_diagnostics)).performClick()
-        compose.onNodeWithText(app.getString(R.string.manga_ai_geometry_preview)).performScrollTo().performClick()
+        // The preview lives in the diagnostics sheet, opened from the settings entry.
+        compose.onNodeWithText(app.getString(R.string.feature_manga_translation_diagnostics)).performScrollTo().performClick()
+        compose.onNodeWithText(app.getString(R.string.manga_ai_geometry_preview)).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText(app.getString(R.string.manga_ai_geometry_legend)).performScrollTo().assertIsDisplayed()
     }
     @Test fun `compact AI detail and diagnostic controls preserve published page`() = aiGeometryControls()
@@ -349,6 +375,7 @@ class MangaTranslationSheetTest {
     fun `expanded AI typesetting mode hides crop refinement and keeps the published image`() = aiTypesettingControls()
 
     private fun inpaintControls() {
+        assumeTrue("Text removal is only bundled in the comic product", BuildConfig.MANGA_LOCAL_ENGINE)
         val app = RuntimeEnvironment.getApplication().also { it.injectAsAppCtx() }
         val state = mutableStateOf(MangaTranslationUiState(open = true, loaded = true,
             settings = MangaTranslationSettings(inpaintEngine = MangaInpaintEngine.MI_GAN),
@@ -365,7 +392,7 @@ class MangaTranslationSheetTest {
         compose.onNodeWithText(app.getString(R.string.manga_inpaint_download)).performScrollTo().performClick()
         assertTrue(intents.contains(MangaTranslationIntent.DownloadInpaint(MangaInpaintEngine.MI_GAN)))
         state.value = state.value.copy(inpaintModels = persistentMapOf(MangaInpaintEngine.MI_GAN to MangaInpaintModelState(MangaInpaintModelPhase.DOWNLOADING, 100, 1000)),
-            inpaintOperation = MangaInpaintEngine.MI_GAN, settings = state.value.settings.copy(inpaintEngine = MangaInpaintEngine.LOCAL))
+            inpaintOperation = MangaInpaintEngine.MI_GAN, settings = state.value.settings.copy(inpaintEngine = MangaInpaintEngine.BUILTIN))
         compose.onNodeWithText(app.getString(R.string.manga_inpaint_downloading)).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText(app.getString(R.string.cancel)).performScrollTo().performClick()
         assertTrue(intents.contains(MangaTranslationIntent.CancelInpaintDownload(MangaInpaintEngine.MI_GAN)))

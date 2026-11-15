@@ -33,6 +33,8 @@ import io.legado.app.help.book.getLocalUri
 import io.legado.app.help.book.getRemoteUrl
 import io.legado.app.help.book.isArchive
 import io.legado.app.help.book.isEpub
+import io.legado.app.help.book.isLocalManga
+import io.legado.app.help.book.isMarkdown
 import io.legado.app.help.book.isMobi
 import io.legado.app.help.book.isPdf
 import io.legado.app.help.book.isUmd
@@ -59,7 +61,6 @@ import io.legado.app.utils.parseToUri
 import io.legado.app.utils.printOnDebug
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.runBlocking
-import org.apache.commons.text.StringEscapeUtils
 import org.koin.core.context.GlobalContext
 import splitties.init.appCtx
 import java.io.ByteArrayInputStream
@@ -74,6 +75,9 @@ import java.io.InputStream
  * 支持在线文件(txt epub umd 压缩文件 本地文件
  */
 object LocalBook {
+
+    /** 批量导入的单块提交规模；同时约束块事务持锁时长与书表失效次数 */
+    private const val IMPORT_COMMIT_CHUNK = 200
 
     private val otherSettingsGateway get() = GlobalContext.get().get<OtherSettingsGateway>()
     private val readSettingsGateway get() = GlobalContext.get().get<ReadSettingsGateway>()
@@ -117,7 +121,12 @@ object LocalBook {
         return kotlin.runCatching {
             val uri = book.bookUrl.toUri()
             if (uri.isContentScheme()) {
-                return@runCatching DocumentFile.fromSingleUri(appCtx, uri)!!.lastModified()
+                val modified = DocumentFile.fromSingleUri(appCtx, uri)?.lastModified() ?: 0L
+                if (modified != 0L || !book.isLocalManga || book.isLocalMangaArchive) {
+                    return@runCatching modified
+                }
+                val readable = readableMangaDirectoryUri(uri)
+                return@runCatching DocumentFile.fromSingleUri(appCtx, readable)?.lastModified() ?: 0L
             }
             val file = File(uri.path!!)
             if (file.exists()) {
@@ -130,6 +139,8 @@ object LocalBook {
     @Throws(TocEmptyException::class)
     fun getChapterList(book: Book): ArrayList<BookChapter> {
         val chapters = when {
+            book.isLocalManga -> LocalMangaFiles.chapters(book)
+
             book.isEpub -> {
                 EpubFile.getChapterList(book)
             }
@@ -144,6 +155,10 @@ object LocalBook {
 
             book.isMobi -> {
                 MobiFile.getChapterList(book)
+            }
+
+            book.isMarkdown -> {
+                MarkdownFile.getChapterList(book)
             }
 
             else -> {
@@ -180,7 +195,8 @@ object LocalBook {
     }
 
     fun getContent(book: Book, chapter: BookChapter): String? {
-        var content = try {
+        if (book.isLocalManga) return null
+        val content = try {
             when {
                 book.isEpub -> {
                     EpubFile.getContent(book, chapter)
@@ -198,6 +214,10 @@ object LocalBook {
                     MobiFile.getContent(book, chapter)
                 }
 
+                book.isMarkdown -> {
+                    MarkdownFile.getContent(book, chapter)
+                }
+
                 else -> {
                     TextFile.getContent(book, chapter)
                 }
@@ -207,17 +227,26 @@ object LocalBook {
             AppLog.put("获取本地书籍内容失败\n${e.localizedMessage}", e)
             "获取本地书籍内容失败\n${e.localizedMessage}"
         }
-        if (book.isEpub) {
-            content ?: return null
-            if (content.indexOf('&') > -1) {
-                content = content.replace("&lt;img", "&lt; img", true)
-                return StringEscapeUtils.unescapeHtml4(content)
-            }
-        }
-        if (content.isNullOrEmpty() && !chapter.isVolume) {
-            return null
-        }
+        // EPUB's mixed-channel emitter already decodes plain text once. Rich text is
+        // decoded by the reader parser; decoding here would corrupt literal entities.
+        // An empty chapter body ("") is a valid blank page and renders through the
+        // title pipeline; only null means the content is genuinely unavailable.
         return content
+    }
+
+    /** Optional original markup. Failure must never replace the authoritative chapter text. */
+    fun getPresentation(book: Book, chapter: BookChapter): io.legado.app.feature.reader.core.source.ReaderLocalPresentation? = try {
+        when {
+            book.isEpub -> EpubFile.getPresentation(book, chapter)
+            book.isMobi -> MobiFile.getPresentation(book, chapter)
+            book.isMarkdown -> MarkdownFile.getPresentation(book, chapter)
+            else -> null
+        }
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        AppLog.put("本地呈现读取失败: chapter=${chapter.index}, ${error.javaClass.simpleName}")
+        null
     }
 
     fun getCoverPath(book: Book): String {
@@ -246,15 +275,16 @@ object LocalBook {
     /**
      * 导入本地文件
      */
-    fun importFile(uri: Uri): Book {
-        val input = FileDoc.fromUri(uri, false)
-        if (input.isDir) return importMangaDirectory(input)
-        val bookUrl: String
-        //updateTime变量不要修改,否则会导致读取不到缓存
-        val (fileName, _, _, updateTime, _) = FileDoc.fromUri(uri, false).apply {
-            if (size == 0L) throw EmptyFileException("Unexpected empty File")
+    fun importFile(uri: Uri): Book = importFiles(uri).first()
 
-            bookUrl = toString()
+    private fun importSingleFile(input: FileDoc, comicArchive: Boolean = false): Book {
+        if (input.size == 0L) throw EmptyFileException("Unexpected empty File")
+        val (fileName, _, _, updateTime) = input
+        val bookUrl = input.toString()
+        val type = if (comicArchive) {
+            BookType.local or BookType.image or BookType.archive
+        } else {
+            BookType.local or BookType.text
         }
         var book = appDb.bookDao.getBook(bookUrl)
         if (book == null) {
@@ -262,11 +292,11 @@ object LocalBook {
             // 直接 insert 会再裂出一条同名书，应先把它接回这次导入的文件。
             val reusableBook = findReusableStaleLocalBook(bookUrl, fileName)
             if (reusableBook != null) {
-                return rebindLocalBook(reusableBook, bookUrl, fileName)
+                return rebindLocalBook(reusableBook, bookUrl, fileName, type.takeIf { comicArchive })
             }
             val nameAuthor = analyzeNameAuthor(fileName)
             book = Book(
-                type = BookType.text or BookType.local,
+                type = type,
                 bookUrl = bookUrl,
                 name = nameAuthor.first,
                 author = nameAuthor.second,
@@ -279,6 +309,7 @@ object LocalBook {
             appDb.bookDao.insert(book)
         } else {
             deleteBook(book, false)
+            if (comicArchive) book.type = type
             upBookInfo(book)
             book.upKind()
             // 触发 isLocalModified
@@ -320,10 +351,19 @@ object LocalBook {
     /**
      * 把失效记录迁到新文件上：保留分组、阅读进度等用户数据，清掉旧目录、缓存与封面。
      */
-    private fun rebindLocalBook(staleBook: Book, newBookUrl: String, fileName: String): Book {
+    private fun rebindLocalBook(
+        staleBook: Book,
+        newBookUrl: String,
+        fileName: String,
+        type: Int?,
+    ): Book {
         val oldBook = staleBook.copy()
         deleteBook(oldBook, false)
-        val reboundBook = oldBook.copy(bookUrl = newBookUrl, originName = fileName)
+        val reboundBook = oldBook.copy(
+            bookUrl = newBookUrl,
+            originName = fileName,
+            type = type ?: oldBook.type,
+        )
         // 触发 isLocalModified：旧目录的正文偏移对新文件没有意义，必须重新解析
         reboundBook.latestChapterTime = 0
         upBookInfo(reboundBook)
@@ -387,7 +427,7 @@ object LocalBook {
         }
         return files.map {
             saveBookFile(FileInputStream(it), saveFileName ?: it.name).let { uri ->
-                importFile(uri).apply {
+                importSingleFile(FileDoc.fromUri(uri, false)).apply {
                     //附加压缩包名称 以便解压文件被删后再解压
                     origin = "${BookType.localTag}::${archiveFileDoc.name}"
                     addType(BookType.archive)
@@ -400,42 +440,39 @@ object LocalBook {
 
     /* 批量导入 支持自动导入压缩包的支持书籍 */
     fun importFiles(uri: Uri): List<Book> {
-        val books = mutableListOf<Book>()
         val fileDoc = FileDoc.fromUri(uri, false)
-        if (ArchiveUtils.isArchive(fileDoc.name)) {
-            val entries = ArchiveUtils.getArchiveFilesName(fileDoc)
-            val isComicArchive = entries.any { entry ->
-                entry.substringAfterLast('.', "").lowercase() in
-                        setOf("jpg", "jpeg", "png", "webp", "gif", "avif", "bmp")
-            }
-            if (isComicArchive) {
-                books += importFile(uri).apply {
-                    type = BookType.local or BookType.image or BookType.archive
-                    origin = BookType.localTag
-                    upKind()
-                    save()
-                }
-            } else {
-                books.addAll(importArchiveFile(uri) { it.matches(AppPattern.bookFileRegex) })
-            }
+        if (!ArchiveUtils.isArchive(fileDoc.name)) return listOf(importSingleFile(fileDoc))
+        return if (LocalMangaFiles.isMangaArchive(fileDoc)) {
+            listOf(importSingleFile(fileDoc, comicArchive = true))
         } else {
-            books.add(importFile(uri))
+            importArchiveFile(uri) { it.matches(AppPattern.bookFileRegex) }
         }
-        return books
     }
 
+    /**
+     * 批量导入按块提交：逐本 insert 每本都会广播一次书表失效，书架各 Flow 收到后
+     * 对整架全量重查重排，数千本规模形成 O(n²) 分配风暴。分块事务把失效次数压到
+     * 块数，块内有界持锁。
+     *
+     * 失败语义（骨架见 [importInChunks]）：块事务内不吞异常——Android SQLite 的
+     * 嵌套事务失败会静默毒化外层事务，块内 runCatching 吞掉异常后外层可能已整体
+     * 回滚，而错误计数只记了个别本，计数与落库不一致。任一本抛错即让异常越过块
+     * 事务边界（整块回滚有保证），该块退回逐本无事务重放，单本失败按本隔离计数。
+     */
     fun importFiles(uris: List<Uri>) {
         var errorCount = 0
-        uris.forEach { uri ->
-            val fileDoc = FileDoc.fromUri(uri, false)
-            kotlin.runCatching {
-                importFiles(uri)
-            }.onFailure {
-                AppLog.put("ImportFile Error:\nFile $fileDoc\n${it.localizedMessage}", it)
+        importInChunks(
+            items = uris,
+            chunkSize = IMPORT_COMMIT_CHUNK,
+            importOne = { uri -> importFiles(uri) },
+            runChunkInTransaction = { block -> appDb.runInTransaction { block() } },
+            onImportError = { uri, error ->
+                val fileDoc = FileDoc.fromUri(uri, false)
+                AppLog.put("ImportFile Error:\nFile $fileDoc\n${error.localizedMessage}", error)
                 errorCount += 1
-            }
-        }
-        if (errorCount == uris.size) {
+            },
+        )
+        if (uris.isNotEmpty() && errorCount >= uris.size) {
             throw NoStackTraceException("ImportFiles Error:\nAll input files occur error")
         }
     }

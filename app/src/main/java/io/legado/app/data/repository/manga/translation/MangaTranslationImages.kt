@@ -8,7 +8,6 @@ import android.graphics.Rect
 import io.legado.app.domain.model.manga.*
 import io.legado.app.domain.reader.MangaImageRegion
 import io.legado.app.domain.reader.MangaRegionDecoder
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -42,7 +41,16 @@ internal fun mangaMutableBitmap(decoded: Bitmap): Bitmap {
     finally { decoded.recycle() }
 }
 
-internal suspend fun mangaAnalysisBands(decoder: MangaRegionDecoder<Bitmap>, language: String): List<MangaTranslationBand> {
+/**
+ * [locate] supplies auxiliary text hints for choosing a boundary; `null` means the caller has no
+ * local recognizer and the page must be partitioned from gutters alone. It is injected explicitly
+ * so a product without the local engine cannot silently load ML Kit from this helper.
+ */
+internal suspend fun mangaAnalysisBands(
+    decoder: MangaRegionDecoder<Bitmap>,
+    language: String,
+    locate: suspend (Bitmap, String) -> List<MangaTranslatedRegion>?,
+): List<MangaTranslationBand> {
     val (width, height) = decoder.imageSize
     if (mangaTranslationWholePage(width, height)) return listOf(MangaTranslationBand(0, height, 0, height))
     val target = max(1536, width * 5 / 2)
@@ -59,13 +67,10 @@ internal suspend fun mangaAnalysisBands(decoder: MangaRegionDecoder<Bitmap>, lan
             val probeBottom = min(height, maximum + width / 2)
             val preview = mangaAnalysisPreview(decoder, probeTop, probeBottom, 1024 * 1024, 2048)
             try {
-                // Auxiliary local detection protects text blocks before any paid request. Unsupported
-                // languages still use gutters; actual LOCAL recognition failures propagate later.
-                val detected = if (language in setOf("ja", "zh", "ko", "en")) {
-                    try { MangaLocalTextDetector.detect(preview, language) }
-                    catch (cancelled: CancellationException) { throw cancelled }
-                    catch (_: Exception) { emptyList() }
-                } else emptyList()
+                // Auxiliary local detection protects text blocks before any paid request. A missing
+                // capability keeps the gutter fallback; actual LOCAL recognition failures propagate
+                // later from the recognition stage.
+                val detected = locate(preview, language).orEmpty()
                 val protected = detected.map {
                     val h = probeBottom - probeTop
                     (probeTop + (it.textBox.top * h / 1000).toInt() - 8).coerceAtLeast(0)..

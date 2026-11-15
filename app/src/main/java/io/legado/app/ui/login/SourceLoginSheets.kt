@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.net.Uri
 import android.net.http.SslError
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,20 +43,25 @@ import androidx.compose.ui.unit.dp
 import io.legado.app.R
 import io.legado.app.constant.AppConst
 import io.legado.app.data.entities.rule.ExploreKind
-import io.legado.app.ui.about.MarkdownSheet
+import io.legado.app.help.http.handleRenderProcessGone
+import io.legado.app.ui.widget.components.modalBottomSheet.MarkdownSheet
 import io.legado.app.ui.rss.read.VisibleWebViewCompose
+import io.legado.app.ui.theme.ComposeEngine
 import io.legado.app.ui.theme.LegadoTheme
-import io.legado.app.ui.theme.ThemeResolver
 import io.legado.app.ui.widget.components.AppTextField
 import io.legado.app.ui.widget.components.button.series.MediumTonalButton
 import io.legado.app.ui.widget.components.explore.ExploreKindMultiTypeItem
 import io.legado.app.ui.widget.components.explore.FlexItemLayout
 import io.legado.app.ui.widget.components.explore.calculateFlexRows
+import io.legado.app.ui.widget.components.icon.AppIcon
 import io.legado.app.ui.widget.components.icon.AppIcons
 import io.legado.app.ui.widget.components.log.AppLogSheet
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenu
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenuItem
+import io.legado.app.ui.widget.components.menu.AppAction
+import io.legado.app.ui.widget.components.menu.AppActionGroup
+import io.legado.app.ui.widget.components.menu.AppActionMenu
 import io.legado.app.ui.widget.components.modalBottomSheet.AppModalBottomSheet
+import kotlinx.collections.immutable.persistentListOf
+import top.yukonga.miuix.kmp.squircle.LocalSquircleEnabled
 
 @Composable
 fun SourceLoginSheetHost(
@@ -110,29 +117,35 @@ private fun SourceLoginFormSheet(
     state: SourceLoginUiState,
     onIntent: (SourceLoginIntent) -> Unit,
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
     AppModalBottomSheet(
         show = state.activeSheet == SourceLoginSheet.Form,
         onDismissRequest = { onIntent(SourceLoginIntent.Back) },
         title = state.title,
         startAction = {
-            Box {
-                MediumTonalButton(
-                    icon = AppIcons.MoreVert,
+            AppActionMenu(
+                groups = persistentListOf(
+                    AppActionGroup(
+                        id = "source_login_commands",
+                        actions = persistentListOf(
+                            AppAction("show_login_header", stringResource(R.string.show_login_header)),
+                            AppAction("delete_login_header", stringResource(R.string.del_login_header)),
+                            AppAction("show_log", stringResource(R.string.log)),
+                        ),
+                    ),
+                ),
+                onAction = { id ->
+                    when (id) {
+                        "show_login_header" -> onIntent(SourceLoginIntent.ShowLoginHeader)
+                        "delete_login_header" -> onIntent(SourceLoginIntent.DeleteLoginHeader)
+                        "show_log" -> onIntent(SourceLoginIntent.ShowLog)
+                    }
+                },
+            ) {
+                AppIcon(
+                    imageVector = AppIcons.MoreVert,
                     contentDescription = stringResource(R.string.menu),
-                    onClick = { menuExpanded = true },
+                    modifier = this.modifier,
                 )
-                RoundDropdownMenu(menuExpanded, { menuExpanded = false }) { dismiss ->
-                    RoundDropdownMenuItem(stringResource(R.string.show_login_header), onClick = {
-                        dismiss(); onIntent(SourceLoginIntent.ShowLoginHeader)
-                    })
-                    RoundDropdownMenuItem(stringResource(R.string.del_login_header), onClick = {
-                        dismiss(); onIntent(SourceLoginIntent.DeleteLoginHeader)
-                    })
-                    RoundDropdownMenuItem(stringResource(R.string.log), onClick = {
-                        dismiss(); onIntent(SourceLoginIntent.ShowLog)
-                    })
-                }
             }
         },
         endAction = {
@@ -231,7 +244,7 @@ private fun SourceLoginRow(
                 modifier = modifier,
                 backgroundColor = LegadoTheme.colorScheme.surface,
                 minHeight = 44.dp,
-                isMiuix = ThemeResolver.isMiuixEngine(LegadoTheme.composeEngine),
+                isMiuix = LegadoTheme.composeEngine == ComposeEngine.Miuix,
                 displayNameOverride = row.title,
                 valueOverride = value,
                 onValueChange = onValueChange,
@@ -273,35 +286,41 @@ private fun SourceLoginWebSheet(
     onIntent: (SourceLoginIntent) -> Unit,
     onOpenExternalUrl: (String) -> Unit,
 ) {
-    AppModalBottomSheet(
-        show = state.mode == SourceLoginMode.Web && !state.loading,
-        onDismissRequest = { onIntent(SourceLoginIntent.Back) },
-        title = state.title,
-        endAction = {
-            MediumTonalButton(
-                icon = AppIcons.Check,
-                contentDescription = stringResource(R.string.ok),
-                onClick = { onIntent(SourceLoginIntent.Confirm) },
-            )
-        },
-        contentPaddingEnabled = false,
-        sheetGesturesEnabled = false,
-    ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 520.dp)
+    // Miuix 的超椭圆遮罩会把 WebView 包进离屏图层，部分 Android 13 设备可能在
+    // HWUI GLFunctorDrawable 绘制时原生崩溃（#2546）。在整个弹层外回退普通圆角，
+    // 避免仅包住 WebView 内容而遗漏 WindowBottomSheet 自身的遮罩。
+    CompositionLocalProvider(LocalSquircleEnabled provides false) {
+        AppModalBottomSheet(
+            show = state.mode == SourceLoginMode.Web && !state.loading,
+            onDismissRequest = { onIntent(SourceLoginIntent.Back) },
+            title = state.title,
+            endAction = {
+                MediumTonalButton(
+                    icon = AppIcons.Check,
+                    contentDescription = stringResource(R.string.ok),
+                    onClick = { onIntent(SourceLoginIntent.Confirm) },
+                )
+            },
+            contentPaddingEnabled = false,
+            sheetGesturesEnabled = false,
         ) {
-            SourceLoginWebView(
-                state = state,
-                onIntent = onIntent,
-                onOpenExternalUrl = onOpenExternalUrl,
-            )
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 520.dp)
+            ) {
+                SourceLoginWebView(
+                    state = state,
+                    onIntent = onIntent,
+                    onOpenExternalUrl = onOpenExternalUrl,
+                )
+            }
         }
     }
 }
 
-@SuppressLint("SetJavaScriptEnabled", "WebViewClientOnReceivedSslError")
+// MissingOnRenderProcessGone：该规则按 Java PSI 查构造调用，看不到 Kotlin 匿名对象里的 override。
+@SuppressLint("SetJavaScriptEnabled", "WebViewClientOnReceivedSslError", "MissingOnRenderProcessGone")
 @Composable
 private fun SourceLoginWebView(
     state: SourceLoginUiState,
@@ -344,6 +363,12 @@ private fun SourceLoginWebView(
                         @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
                         override fun shouldOverrideUrlLoading(view: WebView, url: String) =
                             handleUrl(Uri.parse(url))
+
+                        // 渲染进程被系统回收时默认会连带杀掉宿主进程
+                        override fun onRenderProcessGone(
+                            view: WebView,
+                            detail: RenderProcessGoneDetail,
+                        ): Boolean = view.handleRenderProcessGone()
 
                         private fun handleUrl(uri: Uri): Boolean {
                             if (uri.scheme == "http" || uri.scheme == "https") return false

@@ -154,7 +154,14 @@ class MangaAiTypesetterTest {
         try {
             val plan = MangaTranslationPlan(listOf(region))
             val prepared = MangaPageComposer.prepare(image, plan, listOf(MangaBubbleDetection(MangaShapeRect(0, 0, 100, 100), 1f, 0)))
-            assertEquals(region, prepared.regions.single())
+            val actual = prepared.regions.single()
+            // AI 的排版坐标与字号原样保留：本地只补气泡遮罩，不改 layoutBox。
+            assertEquals(region, actual.copy(bubbleShape = null))
+            val shape = actual.bubbleShape
+            assertNotNull("AI 排版也必须拿到擦除遮罩", shape)
+            // 遮罩来自检测到的气泡（100px → 归一化 200），而不是模型容器框。
+            assertTrue("Mask must come from the detected bubble: ${shape!!.bounds}", shape.bounds.right <= 200f)
+            assertEquals(region.layoutBox, actual.layoutBox)
             MangaPageComposer.draw(image, prepared, false, 1f)
             val bounds = ink(image)
             val area = region.layoutBox.pixels(500, 500)

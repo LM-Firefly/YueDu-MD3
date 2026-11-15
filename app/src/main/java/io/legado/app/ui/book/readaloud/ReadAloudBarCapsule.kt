@@ -64,6 +64,9 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.drawBackdrop
@@ -81,7 +84,19 @@ import io.legado.app.ui.book.readaloud.morph.CapsuleAnchorKind
 import io.legado.app.ui.book.readaloud.morph.LocalReadAloudMorph
 import io.legado.app.ui.book.readaloud.morph.ReadAloudMorphState
 import io.legado.app.ui.theme.LegadoTheme
+import io.legado.app.ui.theme.ComposeEngine
 import io.legado.app.ui.theme.LocalAppUiConfiguration
+import io.legado.app.ui.theme.LocalMiuixBarBackdrop
+import io.legado.app.ui.theme.miuixCapsuleGlass
+import com.itos.coui.shape.CouiCapsuleShape
+import com.itos.coui.theme.CouiTheme
+import io.legado.app.ui.theme.ThemeResolver
+import io.legado.app.ui.widget.components.coui.LocalCouiFloatingNavigation
+import io.legado.app.ui.widget.components.coui.couiFloatingCapsule
+import io.legado.app.ui.widget.components.coui.rememberCouiCapsuleRenderer
+import ui.feice.mochi.effect.glass.LocalMochiBackdrop
+import ui.feice.mochi.effect.glass.MochiGlassSurface
+import ui.feice.mochi.theme.MochiTheme
 import io.legado.app.ui.widget.components.button.series.MediumPlainButton
 import io.legado.app.ui.widget.components.image.cover.BookCoverImage
 import org.koin.compose.koinInject
@@ -128,6 +143,11 @@ fun ReadAloudBarCapsule(
 ) {
     val morph = LocalReadAloudMorph.current
     val currentMorph by rememberUpdatedState(morph)
+    val playerDescription = if (bookName.isNullOrBlank()) {
+        stringResource(R.string.a11y_open_playback)
+    } else {
+        stringResource(R.string.a11y_open_playback_named, bookName)
+    }
     val showCapsuleShadow by remember(morph) {
         derivedStateOf { (morph?.progress?.value ?: 0f) <= 0f }
     }
@@ -152,19 +172,33 @@ fun ReadAloudBarCapsule(
                 with(ringDensity) { CapsuleRingWidth.toPx() })
         )
     }
-    val containerColor = if (isBlurEnabled) {
+    val engine = LegadoTheme.composeEngine
+    val capsuleShape = if (engine == ComposeEngine.Coui) CouiCapsuleShape else ContinuousCapsule
+    val couiBackdrop = LocalCouiFloatingNavigation.current?.backdrop
+    val couiSurface = if (engine == ComposeEngine.Coui && isBlurEnabled && couiBackdrop != null &&
+        ThemeResolver.isCouiSupported()
+    ) {
+        val renderer = rememberCouiCapsuleRenderer()
+        if (renderer != null) {
+            couiFloatingCapsule(couiBackdrop, renderer, shadowAlpha = if (showCapsuleShadow) shadowStrength else 0f)
+        } else null
+    } else null
+    val materialGlass = engine == ComposeEngine.Material && isBlurEnabled && backdrop != null &&
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+    val miuixGlass = engine == ComposeEngine.Miuix && isBlurEnabled && LocalMiuixBarBackdrop.current != null
+    val mochiBackdrop = if (engine == ComposeEngine.Mochi && isBlurEnabled) LocalMochiBackdrop.current else null
+    val containerColor = if (engine == ComposeEngine.Coui) {
+        CouiTheme.colorScheme.surface
+    } else if (materialGlass || miuixGlass || mochiBackdrop != null) {
         LegadoTheme.colorScheme.surfaceContainer.copy(
             alpha = themeSettings.bottomBarBlurAlpha / 100f
         )
     } else {
         LegadoTheme.colorScheme.surfaceContainer
     }
-    val glass = isBlurEnabled &&
-            backdrop != null &&
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-
-    val surfaceModifier = if (glass) {
-        Modifier.drawBackdrop(
+    val surfaceModifier = when {
+        couiSurface != null -> couiSurface
+        materialGlass -> Modifier.drawBackdrop(
             backdrop = backdrop,
             shape = { ContinuousCapsule },
             effects = {
@@ -181,16 +215,21 @@ fun ReadAloudBarCapsule(
             } else null,
             onDrawSurface = { drawRect(containerColor) },
         )
-    } else {
-        Modifier
+        miuixGlass -> Modifier.miuixCapsuleGlass(
+            tint = containerColor,
+            blurRadius = themeSettings.bottomBarBlurRadius.dp,
+            lensRadius = themeSettings.bottomBarLensRadius.dp,
+        )
+        mochiBackdrop != null -> Modifier
+        else -> Modifier
             .shadow(
                 elevation = 12.dp * shadowStrength,
-                shape = ContinuousCapsule,
+                shape = capsuleShape,
                 clip = false,
                 ambientColor = Color.Black.copy(alpha = 0.18f),
                 spotColor = Color.Black.copy(alpha = 0.18f),
             )
-            .clip(ContinuousCapsule)
+            .clip(capsuleShape)
             .background(containerColor)
     }
 
@@ -200,7 +239,7 @@ fun ReadAloudBarCapsule(
             .height(ReadAloudBarCapsuleSize)
             .graphicsLayer { alpha = 1f - (morph?.progress?.value ?: 0f) }
             .then(surfaceModifier)
-            .clip(ContinuousCapsule)
+            .clip(capsuleShape)
             .onGloballyPositioned { coordinates ->
                 val state = currentMorph ?: return@onGloballyPositioned
                 state.reportPanelStart(
@@ -212,6 +251,7 @@ fun ReadAloudBarCapsule(
                 )
             }
             .combinedClickable(
+                role = Role.Button,
                 enabled = idle,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
@@ -221,9 +261,13 @@ fun ReadAloudBarCapsule(
                     if (controlsExpanded) R.string.home_capsule_restore_navigation
                     else R.string.home_capsule_expand_controls
                 ),
-            ),
+            )
+            .semantics { contentDescription = playerDescription },
         contentAlignment = Alignment.CenterStart,
     ) {
+        if (mochiBackdrop != null) {
+            MochiGlassSurface(Modifier.matchParentSize(), material = MochiTheme.materials.bar, backdrop = mochiBackdrop) {}
+        }
         Box(
             modifier = Modifier
                 .padding(start = 4.dp)

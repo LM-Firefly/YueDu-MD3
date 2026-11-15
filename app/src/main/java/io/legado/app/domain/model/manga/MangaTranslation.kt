@@ -12,6 +12,23 @@ enum class MangaLocator { AI, LOCAL, CLOUD }
 @Serializable
 enum class MangaComposition { SMART, PATCH, AI_REPAIR, AI_REGION, AI_PAGE }
 
+/**
+ * 气泡几何的来源。每个值都按实际实现描述，不写"理想顺序"：
+ * - [DEVICE]（默认）：只采信端侧检测；core 没有这个模型，因此不提供该选项，读取时回落到 [OFF]；
+ * - [AI]：不跑端侧检测，要求识别模型返回气泡框并使用它；
+ * - [OUTLINE]：不看任何模型，只从原图像素推断气泡轮廓，两种产物行为一致；
+ * - [OFF]：不需要气泡几何，端侧检测一次也不调用；
+ * - [AUTO]：已停用，仅为读旧存档保留；读取时迁移为 [DEVICE]，缺端侧能力时再落到 [AI]。
+ *   它当年的行为就是"跑端侧检测 + 有机会就用识别框"，与 [DEVICE] 等价，因此不再作为可选值。
+ */
+@Serializable
+enum class MangaBubbleSource {
+    DEVICE, AI, OUTLINE, OFF,
+
+    /** 旧存档兼容值，不再出现在可选列表，也不参与任何运行时分支。 */
+    AUTO,
+}
+
 /** Text-only translation engine. Only meaningful when recognition and translation are separate. */
 @Serializable
 enum class MangaTranslateEngine {
@@ -86,9 +103,14 @@ data class MangaTranslationSettings(
     val cloudOcrProvider: MangaCloudOcrProvider = MangaCloudOcrProvider.BAIDU,
     val ocrOptions: MangaOcrOptions = MangaOcrOptions(),
     val geometryDiagnostics: Boolean = false,
-    val inpaintEngine: MangaInpaintEngine = MangaInpaintEngine.LOCAL,
+    val inpaintEngine: MangaInpaintEngine = MangaInpaintEngine.BUILTIN,
+    /** 气泡几何来源：影响擦除遮罩与排版约束，不影响识别与翻译本身。 */
+    val bubbleSource: MangaBubbleSource = MangaBubbleSource.DEVICE,
 ) {
     val usesAiTypesetting: Boolean get() = locator == MangaLocator.AI && composition != MangaComposition.AI_PAGE
+
+    /** 空 [ocrModelId] 表示识别由翻译模型兼任；非 AI 引擎下它需要单独跑一次识别。 */
+    val fusedRecognition: Boolean get() = usesAiTypesetting && ocrModelId.isBlank()
 }
 
 /** Original transport identity is retained when the host displays a derived image. */
@@ -180,6 +202,8 @@ data class MangaTranslationPlan(
     val noText: Boolean = false,
     /** Version of client preparation/validation; authored AI geometry is retained, never claimed as locally measured. */
     val localGeometryVersion: Int = 0,
+    /** 生成这份本地几何时采信的气泡来源；来源变了就必须重算几何，不能跨来源复用遮罩。 */
+    val geometrySource: String = "",
     val flows: List<MangaDialogueFlow> = emptyList(),
 ) {
     fun validate(expectedIds: Set<String>? = null): MangaTranslationPlan {

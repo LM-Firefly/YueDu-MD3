@@ -5,7 +5,13 @@ import android.graphics.drawable.Drawable
 import androidx.core.graphics.drawable.toBitmap
 import com.bumptech.glide.Glide
 import com.google.gson.JsonParser
+import io.legado.app.R
 import io.legado.app.api.ReturnData
+import io.legado.app.api.ReaderWebChapter
+import io.legado.app.domain.gateway.ReadAloudSettingsGateway
+import io.legado.app.feature.reader.core.source.ReaderChapterSourceParser
+import io.legado.app.feature.reader.platform.AndroidReaderHtmlSemanticTextResolver
+import io.legado.app.help.readaloud.cast.CastAssignmentStore
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookProgress
@@ -15,6 +21,7 @@ import io.legado.app.help.CacheManager
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isLocal
+import io.legado.app.help.book.isLocalManga
 import io.legado.app.domain.gateway.BookshelfSettingsGateway
 import io.legado.app.help.glide.ImageLoader
 import io.legado.app.model.BookCover
@@ -193,6 +200,9 @@ object BookController {
             return returnData.setErrorMsg("参数index不能为空, 请指定目录序号")
         }
         val book = appDb.bookDao.getBook(bookUrl)
+        if (book?.isLocalManga == true) {
+            return returnData.setErrorMsg(appCtx.getString(R.string.local_manga_requires_reader))
+        }
         val chapter = runBlocking {
             var chapter = appDb.bookChapterDao.getChapter(bookUrl, index)
             var wait = 0
@@ -206,26 +216,33 @@ object BookController {
         if (book == null || chapter == null) {
             return returnData.setErrorMsg("未找到")
         }
+        fun response(raw: String): ReturnData = runBlocking {
+            val processor = ContentProcessor.get(book)
+            val settings = processor.captureSettings()
+            val processed = processor.getContent(book, chapter, raw, includeTitle = false,
+                paragraphIndent = null, settings = settings)
+            if (parameters["format"]?.firstOrNull() != "semantic") {
+                return@runBlocking returnData.setData(processed.toString())
+            }
+            val labels = if (GlobalContext.get().get<ReadAloudSettingsGateway>().currentSettings.multiRoleCast) {
+                CastAssignmentStore.labelsForChapter(book.bookUrl, chapter.index)
+            } else emptyMap()
+            val title = chapter.getDisplayTitle(processor.getTitleReplaceRules(),
+                book.getUseReplaceRule(settings.replaceEnableDefault),
+                chineseConverterType = settings.chineseConverterType)
+            val source = ReaderChapterSourceParser.parse(chapter.index, title, processed.textList,
+                false, settings.adaptSpecialStyle, AndroidReaderHtmlSemanticTextResolver, labels)
+            returnData.setData(ReaderWebChapter.fromSource(source))
+        }
         var content: String? = BookHelp.getContent(book, chapter)
         if (content != null) {
-            val contentProcessor = ContentProcessor.get(book.name, book.origin)
-            content = runBlocking {
-                contentProcessor.getContent(book, chapter, content, includeTitle = false)
-                    .toString()
-            }
-            return returnData.setData(content)
+            return response(content)
         }
         val bookSource = appDb.bookSourceDao.getBookSource(book.origin)
             ?: return returnData.setErrorMsg("未找到书源")
         try {
-            content = runBlocking {
-                WebBook.getContentAwait(bookSource, book, chapter).let {
-                    val contentProcessor = ContentProcessor.get(book.name, book.origin)
-                    contentProcessor.getContent(book, chapter, it, includeTitle = false)
-                        .toString()
-                }
-            }
-            returnData.setData(content)
+            content = runBlocking { WebBook.getContentAwait(bookSource, book, chapter) }
+            response(content)
         } catch (e: Exception) {
             returnData.setErrorMsg(e.stackTraceStr)
         }

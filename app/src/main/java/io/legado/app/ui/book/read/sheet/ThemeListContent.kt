@@ -54,6 +54,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -91,7 +92,7 @@ import io.legado.app.ui.widget.components.alert.AppAlertDialog
 import io.legado.app.ui.widget.components.button.series.SmallTonalButton
 import io.legado.app.ui.widget.components.card.NormalCard
 import io.legado.app.ui.widget.components.icon.AppIcons
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenu
+import io.legado.app.ui.widget.components.menu.AppAnchoredPanel
 import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenuItem
 import io.legado.app.ui.widget.components.reader.ScrollFabButtons
 import io.legado.app.ui.widget.components.reader.rememberScrollFabState
@@ -162,7 +163,7 @@ fun ThemeListContent(
     /** 删除二次确认：非 null = 待确认的选中项（点确认才真删、才清空选中）。 */
     var pendingDeleteIndices by remember { mutableStateOf<List<Int>?>(null) }
     /** 管理底栏实测高度（px）：给右下角悬浮箭头做抬升用，0 = 还没量到（用兜底值）。 */
-    var manageBarHeightPx by remember { mutableStateOf(0) }
+    var manageBarHeightPx by remember { mutableIntStateOf(0) }
 
     val themes = styleConfig.styleItems
     val selectedIndices = themes.indices.filter { themes[it].id in selectedIds }
@@ -198,7 +199,7 @@ fun ThemeListContent(
 
     // 导入/新建都会让列表长一份（单份 +1、批量 +N）：先清掉搜索词保证新条目可见，再滚到最后。
     // 网格按下标定位（现成）；流式只有像素目标，而 maxValue 要等新 chip 完成布局才是新值 ⇒ 等一帧。
-    var previousThemeCount by remember { mutableStateOf(themes.size) }
+    var previousThemeCount by remember { mutableIntStateOf(themes.size) }
     LaunchedEffect(themes.size) {
         if (themes.size > previousThemeCount) {
             searchQuery = ""
@@ -300,84 +301,90 @@ fun ThemeListContent(
                             else R.string.theme_list_layout_list
                         ),
                     )
-                    Box {
-                        SmallTonalButton(
-                            onClick = {
-                                themeMenuShowsColumns = false
-                                menuExpanded = true
-                            },
-                            icon = AppIcons.MoreVert,
-                            contentDescription = stringResource(R.string.more),
-                        )
-                        // 单菜单"原地翻页"：点「网格列数」后同一个菜单就地换成 2..6；
-                        // 宽度锁死 ⇒ 翻页时菜单不会跳宽；点数字即生效并关闭。
-                        RoundDropdownMenu(
-                            expanded = menuExpanded,
-                            onDismissRequest = {
-                                menuExpanded = false
+                    // 单菜单"原地翻页"：点「网格列数」后同一个弹层就地换成 2..6；
+                    // 宽度锁死 ⇒ 翻页时菜单不会跳宽；点数字即生效并关闭。
+                    // 弹层分派收编到 AppAnchoredPanel 的兼容路径：⋮ 按钮仍由本页渲染
+                    // （SmallTonalButton 外观不变），content 自己决定是否 dismiss，
+                    // 因此「不关菜单」的翻页语义不需要入口补 keepOpen。
+                    AppAnchoredPanel(
+                        expanded = menuExpanded,
+                        onExpandedChange = { isOpen ->
+                            menuExpanded = isOpen
+                            if (!isOpen) {
                                 themeMenuShowsColumns = false
                                 themeMenuWidth = 0.dp      // 关掉就作废 ⇒ 下次重开按当前语言/字号重新量
+                            }
+                        },
+                        externalTrigger = true,
+                        modifier = Modifier
+                            // 测到之前不约束 ⇒ 弹窗按内容自适应（收窄）；测到之后锁成同一个
+                            // 宽度 ⇒ 翻到列数列表时不跳宽、勾也自然离数字更近
+                            .then(
+                                if (themeMenuWidth > 0.dp) {
+                                    Modifier.width(themeMenuWidth)
+                                } else {
+                                    Modifier
+                                }
+                            )
+                            .onSizeChanged {
+                                if (themeMenuWidth == 0.dp) {
+                                    themeMenuWidth =
+                                        with(menuDensity) { it.width.toDp() }
+                                }
                             },
-                            modifier = Modifier
-                                // 测到之前不约束 ⇒ 弹窗按内容自适应（收窄）；测到之后锁成同一个
-                                // 宽度 ⇒ 翻到列数列表时不跳宽、勾也自然离数字更近
-                                .then(
-                                    if (themeMenuWidth > 0.dp) {
-                                        Modifier.width(themeMenuWidth)
-                                    } else {
-                                        Modifier
-                                    }
-                                )
-                                .onSizeChanged {
-                                    if (themeMenuWidth == 0.dp) {
-                                        themeMenuWidth =
-                                            with(menuDensity) { it.width.toDp() }
-                                    }
+                        trigger = {
+                            SmallTonalButton(
+                                onClick = {
+                                    themeMenuShowsColumns = false
+                                    open()
                                 },
-                        ) { dismiss ->
-                            if (!themeMenuShowsColumns) {
+                                icon = AppIcons.MoreVert,
+                                contentDescription = stringResource(R.string.more),
+                            )
+                        },
+                    ) { dismiss ->
+                        if (!themeMenuShowsColumns) {
+                            RoundDropdownMenuItem(
+                                text = stringResource(R.string.theme_list_import_as_new),
+                                onClick = {
+                                    dismiss()
+                                    onIntent(ReadBookIntent.OpenReadStyleImportAsNew)
+                                },
+                            )
+                            RoundDropdownMenuItem(
+                                text = stringResource(R.string.theme_list_add_theme),
+                                onClick = {
+                                    dismiss()
+                                    // 和底部 [+] 完全同一个入口
+                                    onIntent(ReadBookIntent.AddReadStyleConfig)
+                                },
+                            )
+                            RoundDropdownMenuItem(
+                                text = stringResource(R.string.theme_list_manage),
+                                onClick = {
+                                    dismiss()
+                                    manageMode = true
+                                },
+                            )
+                            // 网格专属的收尾项：只在网格模式出现（流式布局没有列数概念）
+                            if (!useFlowLayout) {
                                 RoundDropdownMenuItem(
-                                    text = stringResource(R.string.theme_list_import_as_new),
+                                    text = stringResource(R.string.a11y_grid_columns),
+                                    // 不关菜单，原地翻页到列数列表
+                                    onClick = { themeMenuShowsColumns = true },
+                                )
+                            }
+                        } else {
+                            val currentColumns = styleConfig.gridColumns.coerceIn(2, 6)
+                            GridColumnOptions.forEach { columns ->
+                                RoundDropdownMenuItem(
+                                    text = columns.toString(),
+                                    isSelected = columns == currentColumns,
                                     onClick = {
+                                        onIntent(ReadBookIntent.SetThemeGridColumns(columns))
                                         dismiss()
-                                        onIntent(ReadBookIntent.OpenReadStyleImportAsNew)
                                     },
                                 )
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.theme_list_add_theme),
-                                    onClick = {
-                                        dismiss()
-                                        // 和底部 [+] 完全同一个入口
-                                        onIntent(ReadBookIntent.AddReadStyleConfig)
-                                    },
-                                )
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.theme_list_manage),
-                                    onClick = {
-                                        dismiss()
-                                        manageMode = true
-                                    },
-                                )
-                                // 网格专属的收尾项：只在网格模式出现（流式布局没有列数概念）
-                                if (!useFlowLayout) {
-                                    RoundDropdownMenuItem(
-                                        text = stringResource(R.string.a11y_grid_columns),
-                                        // 不关菜单，原地翻页到列数列表
-                                        onClick = { themeMenuShowsColumns = true },
-                                    )
-                                }
-                            } else {
-                                val currentColumns = styleConfig.gridColumns.coerceIn(2, 6)
-                                GridColumnOptions.forEach { columns ->
-                                    RoundDropdownMenuItem(
-                                        text = columns.toString(),
-                                        isSelected = columns == currentColumns,
-                                        onClick = {
-                                            onIntent(ReadBookIntent.SetThemeGridColumns(columns))
-                                            dismiss()
-                                        },
-                                    )
-                                }
                             }
                         }
                     }

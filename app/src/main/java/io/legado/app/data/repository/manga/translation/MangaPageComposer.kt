@@ -3,6 +3,7 @@ package io.legado.app.data.repository.manga.translation
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Rect
+import io.legado.app.domain.model.manga.MangaBubbleSource
 import io.legado.app.domain.model.manga.MangaTextBox
 import io.legado.app.domain.model.manga.MangaTranslationPlan
 import io.legado.app.domain.model.manga.MangaTranslatedRegion
@@ -29,22 +30,54 @@ internal fun MangaTextBox.layoutPixels(width: Int, height: Int): Rect = Rect(
 
 /** Local pixel operations. Ink cleanup stays near source lettering, independent of layout space. */
 internal object MangaPageComposer {
-    const val GEOMETRY_VERSION = 10
+    /**
+     * 本地几何算法版本：输出语义变化必须加一，旧 plan 会因此重算。
+     * - 11：AI 排版不再扩框（core 无气泡几何时扩框会把居中基准挪走）；
+     * - 12：`DEVICE` 不再采信识别结果的容器框，旧几何可能是模型框算出来的；
+     * - 13：AI 排版也生成气泡遮罩，擦除范围从此受气泡约束（此前有 typesetting 反而没有遮罩）。
+     */
+    const val GEOMETRY_VERSION = 13
 
+    /**
+     * [bubbleSource] 决定气泡证据的采信范围，各来源的差异就在这一步：
+     * - [MangaBubbleSource.OUTLINE] 只读原图像素，模型容器框与端侧检测框都不参与；
+     * - [MangaBubbleSource.DEVICE] 只采信端侧检测框，模型给的 `aiGeometry.containerBox` 被忽略；
+     * - [MangaBubbleSource.AI] 只用模型容器框（端侧检测框为空，`attach` 自然只看到 AI 框）。
+     */
     fun prepare(bitmap: Bitmap, input: MangaTranslationPlan, containers: List<MangaBubbleDetection> = emptyList(),
-        fontScale: Float = 1f): MangaTranslationPlan {
+        fontScale: Float = 1f, bubbleSource: MangaBubbleSource = MangaBubbleSource.DEVICE): MangaTranslationPlan {
+        val outline = bubbleSource == MangaBubbleSource.OUTLINE
         val plan = input.copy(regions = input.regions.map { region ->
             if (!region.vertical || region.sourceColumnCount != null) region else
                 region.copy(sourceColumnCount = mangaSourceColumnCount(region) ?: measureMangaSourceColumns(bitmap, region))
         })
-        if (plan.regions.isNotEmpty() && plan.regions.all { it.typesetting != null })
-            return separateLayouts(bitmap, plan).copy(localGeometryVersion = GEOMETRY_VERSION).validate()
+        if (plan.regions.isNotEmpty() && plan.regions.all { it.typesetting != null }) {
+            // AI 已给出排版坐标：本地不再推 layoutBox，但仍要把气泡框变成擦除遮罩，
+            // 否则"有 typesetting"反而比"没有"擦得更宽。
+            val shaped = MangaContainerGeometry.attach(bitmap,
+                if (outline) outlineBubbleShapes(bitmap, plan) else plan,
+                if (outline) emptyList() else containers,
+                acceptAiContainers = bubbleSource != MangaBubbleSource.DEVICE)
+            // attach 会顺手把 layoutBox 改写成气泡 bounds；AI 排版的坐标优先。
+            val authored = shaped.copy(regions = shaped.regions.mapIndexed { index, region ->
+                region.copy(layoutBox = plan.regions[index].layoutBox)
+            })
+            return separateLayouts(bitmap, authored)
+                .copy(localGeometryVersion = GEOMETRY_VERSION, geometrySource = bubbleSource.name).validate()
+        }
         if (plan.localGeometryVersion >= GEOMETRY_VERSION) return plan
         // Re-estimate old baselines from the original pixels, including caches inflated in previews.
         val unmeasured = plan.copy(regions = plan.regions.map { it.copy(sourceFontSize = it.fontMeasurement?.glyphHeight, bubbleShape = null) })
-        val refined = MangaContainerGeometry.attach(bitmap, refineMangaLettering(bitmap, recoverMangaBubbles(bitmap, unmeasured)), containers)
+        // 「本地轮廓推断」只认像素证据：模型容器框与端侧气泡框都不参与，其余来源的输入保持原样。
+        val pixelOnly = if (!outline) unmeasured else unmeasured.copy(regions = unmeasured.regions.map { region ->
+            region.aiGeometry?.let { geometry -> region.copy(aiGeometry = geometry.copy(containerId = null, containerBox = null)) } ?: region
+        })
+        val refined = MangaContainerGeometry.attach(bitmap,
+            refineMangaLettering(bitmap, recoverMangaBubbles(bitmap, pixelOnly, withShapes = outline)),
+            if (outline) emptyList() else containers,
+            acceptAiContainers = bubbleSource != MangaBubbleSource.DEVICE)
         return constrainMangaAiSafety(bitmap, planLayout(bitmap, anchor(bitmap, refined), fontScale))
-            .copy(localGeometryVersion = GEOMETRY_VERSION).validate()
+            .copy(localGeometryVersion = GEOMETRY_VERSION, geometrySource = bubbleSource.name).validate()
     }
 
     /** Persist a source-size estimate before erasing; never infer it from a repaired background. */
@@ -70,7 +103,10 @@ internal object MangaPageComposer {
             val font = (region.sourceFontSize?.let { it * bitmap.height / 1000 } ?: sourceSize(bitmap, region)) * fontScale
             fun fits() = MangaOverlayTypesetter.fitsAtSize(region.translation, vertical, area.width(), area.height(), font)
             // A short translation does not need extra blank space. Keep relocated legacy anchors.
-            if (region.bubbleShape != null || fits() || region.layoutBox != region.textBox && !area.contains(source)) return@mapIndexed region
+            // AI 排版自带字号收敛（MangaAiTypesetter 会缩到装得下），扩框只会把居中基准挪走；
+            // 没有气泡几何的产物（core）一旦扩框就会整体偏移，所以这里必须原样返回。
+            if (region.bubbleShape != null || region.typesetting != null || fits() ||
+                region.layoutBox != region.textBox && !area.contains(source)) return@mapIndexed region
             val bg = background(bitmap, source)
             val baseMargin = min(font * 0.8f, min(bitmap.width, bitmap.height) * 0.08f).roundToInt().coerceIn(2, 48)
             val margin = min(font * 3f, min(bitmap.width, bitmap.height) * 0.2f).roundToInt().coerceIn(baseMargin, 96)

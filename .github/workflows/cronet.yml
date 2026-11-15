@@ -16,6 +16,8 @@ jobs:
     if: ${{ github.repository == 'LM-Firefly/YueDu-MD3' }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          submodules: true
 
       - name: Check Cronet Updates
         run: source .github/scripts/cronet.sh
@@ -30,6 +32,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
         if: ${{ env.cronet == 'ok' }}
 
+      - name: Prepare pinned UI forks
+        if: ${{ env.cronet == 'ok' }}
+        uses: ./.github/actions/prepare-ui-forks
+
       # 与 verify.yml / auto-release.yml 同一处理：settings.gradle 的 aliyun 镜像在 GitHub runner 上 502
       - name: Remove Aliyun mirrors (unreliable in CI)
         if: ${{ env.cronet == 'ok' }}
@@ -42,9 +48,10 @@ jobs:
           ./gradlew app:downloadCronet
 
       # 版本升级可能拆分 jar 或变更 proguard cfg，构建门禁确保不产出无法打包的 PR
+      # 双产品（appCore/appComic）都要能打包，任一失败即拦截
       - name: Verify release build with the new Cronet
         if: ${{ env.cronet == 'ok' }}
-        run: ./gradlew assembleAppRelease --no-configuration-cache --no-daemon
+        run: ./gradlew assembleAppCoreRelease assembleAppComicRelease --no-configuration-cache --no-daemon
 
       - name: Create Pull Request
         if: ${{ env.cronet == 'ok' }}

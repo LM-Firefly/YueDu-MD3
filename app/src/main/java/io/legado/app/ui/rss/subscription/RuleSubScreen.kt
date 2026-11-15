@@ -27,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,8 +40,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.legado.app.R
 import io.legado.app.data.entities.RuleSub
 import io.legado.app.data.entities.RuleSubType
+import io.legado.app.feature.rss.source.RssSourceImportDialog
 import io.legado.app.ui.association.ImportReplaceRuleDialog
-import io.legado.app.ui.association.ImportRssSourceDialog
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.theme.adaptiveContentPadding
 import io.legado.app.ui.widget.components.AppFloatingActionButton
@@ -50,7 +51,10 @@ import io.legado.app.ui.widget.components.alert.AppAlertDialog
 import io.legado.app.ui.widget.components.button.series.SmallPlainButton
 import io.legado.app.ui.widget.components.card.SelectionItemCard
 import io.legado.app.ui.widget.components.checkBox.CheckboxItem
+import io.legado.app.ui.widget.components.menu.AppAction
+import io.legado.app.ui.widget.components.menu.AppActionGroup
 import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenuItem
+import kotlinx.collections.immutable.persistentListOf
 import io.legado.app.ui.widget.components.rules.RuleListScaffold
 import io.legado.app.ui.widget.components.text.AppText
 import io.legado.app.utils.showDialogFragment
@@ -66,6 +70,7 @@ fun RuleSubRouteScreen(
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var rssImportSource by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(viewModel) {
         viewModel.effects.collect { effect ->
             when (effect) {
@@ -74,10 +79,7 @@ fun RuleSubRouteScreen(
                     val ruleSub = effect.rule
                     when (ruleSub.type) {
                         RuleSubType.BOOK_SOURCE -> onImportBookSource(ruleSub.url)
-                        RuleSubType.RSS_SOURCE ->
-                            (context as? AppCompatActivity)?.showDialogFragment(
-                                ImportRssSourceDialog(ruleSub.url)
-                            )
+                        RuleSubType.RSS_SOURCE -> rssImportSource = ruleSub.url
                         RuleSubType.REPLACE_RULE ->
                             (context as? AppCompatActivity)?.showDialogFragment(
                                 ImportReplaceRuleDialog(ruleSub.url)
@@ -101,6 +103,9 @@ fun RuleSubRouteScreen(
         onIntent = viewModel::onIntent,
         onBackClick = onBackClick,
     )
+    rssImportSource?.let { source ->
+        RssSourceImportDialog(source, onClose = { rssImportSource = null })
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -125,17 +130,20 @@ fun RuleSubScreen(
         snackbarHostState = snackbarHostState,
         selectionSecondaryActions = emptyList(),
         topBarActions = {},
-        dropDownMenuContent = { dismiss ->
-            RoundDropdownMenuItem(
-                text = stringResource(R.string.sort),
-                leadingIcon = {
-                    Icon(Icons.AutoMirrored.Filled.Sort, null, modifier = Modifier.size(18.dp))
-                },
-                onClick = {
-                    onIntent(RuleSubIntent.ResetOrder)
-                    dismiss()
-                }
-            )
+        menuGroups = persistentListOf(
+            AppActionGroup(
+                id = "rule_sub_sort",
+                actions = persistentListOf(
+                    AppAction(
+                        "reset_order",
+                        stringResource(R.string.sort),
+                        icon = Icons.AutoMirrored.Filled.Sort,
+                    ),
+                ),
+            ),
+        ),
+        onMenuAction = { id ->
+            if (id == "reset_order") onIntent(RuleSubIntent.ResetOrder)
         },
         floatingActionButton = {
             AppFloatingActionButton(

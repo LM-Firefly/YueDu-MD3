@@ -13,6 +13,11 @@ interface MangaTranslationGateway {
     fun useGlobalSettings(bookUrl: String): Flow<Boolean>
     suspend fun setUseGlobalSettings(bookUrl: String, enabled: Boolean)
     fun settings(bookUrl: String): Flow<MangaTranslationSettings>
+    /**
+     * 未经产物降级的存储值。界面用它说明"保存过的端侧选择在当前产物里不可用"，
+     * 不要拿它驱动运行或缓存。
+     */
+    suspend fun storedSettings(bookUrl: String): MangaTranslationSettings
     suspend fun update(bookUrl: String, transform: (MangaTranslationSettings) -> MangaTranslationSettings)
     suspend fun glossary(bookUrl: String): Map<String, String>
     suspend fun setGlossary(bookUrl: String, terms: Map<String, String>)

@@ -3,6 +3,7 @@ package io.legado.app.ui.widget.dialog
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.Uri
 import android.net.http.SslError
@@ -14,9 +15,11 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.view.WindowManager
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.SslErrorHandler
 import android.webkit.URLUtil
 import android.webkit.WebChromeClient
@@ -29,7 +32,10 @@ import android.widget.FrameLayout
 import androidx.annotation.Keep
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.net.toUri
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.size
+import androidx.core.view.updateLayoutParams
 import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -49,6 +55,7 @@ import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.WebCacheManager
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.help.http.handleRenderProcessGone
 import io.legado.app.help.http.newCallResponse
 import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
@@ -90,12 +97,14 @@ import org.koin.android.ext.android.inject
 import java.io.ByteArrayInputStream
 import java.lang.ref.WeakReference
 import java.util.Date
+import kotlin.math.roundToInt
 
 class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view),
     WebJsExtensions.Callback {
 
     companion object {
         const val DEFAULT_JS_INJECT_URL = "https://legado-inject-js.internal"
+        private const val ARG_HEIGHT_PERCENT = "heightPercent"
     }
 
     constructor(
@@ -104,7 +113,8 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         url: String,
         html: String? = null,
         preloadJs: String? = null,
-        config: String? = null
+        config: String? = null,
+        heightPercent: Int = 0,
     ) : this() {
         arguments = Bundle().apply {
             putString("sourceKey", sourceKey)
@@ -113,6 +123,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             putString("html", html)
             putString("preloadJs", preloadJs)
             putString("config", config)
+            putInt(ARG_HEIGHT_PERCENT, heightPercent)
         }
     }
 
@@ -126,6 +137,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         }
     }
     private val displayMetrics by lazy { resources.displayMetrics }
+    private val heightPercent get() = arguments?.getInt(ARG_HEIGHT_PERCENT) ?: 0
     private val appUiConfigurationGateway by inject<AppUiConfigurationGateway>()
     private val otherSettingsGateway by inject<OtherSettingsGateway>()
     private val appShellSettingsGateway by inject<AppShellSettingsGateway>()
@@ -163,8 +175,44 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
 
 
     override fun onStart() {
+        applyPreferredHeight()
         super.onStart()
         setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applyPreferredHeight()
+    }
+
+    private fun applyPreferredHeight() {
+        val percent = heightPercent
+        if (percent == 0) return
+        val host = activity ?: return
+        val availableHeight = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val metrics = host.windowManager.currentWindowMetrics
+            val insets = metrics.windowInsets.getInsetsIgnoringVisibility(
+                WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
+            )
+            metrics.bounds.height() - insets.top - insets.bottom
+        } else {
+            val decor = host.window.decorView
+            val insets = ViewCompat.getRootWindowInsets(decor)?.getInsetsIgnoringVisibility(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout(),
+            )
+            decor.height.takeIf { it > 0 }?.let { it - (insets?.top ?: 0) - (insets?.bottom ?: 0) }
+                ?: displayMetrics.heightPixels
+        }
+        val height = (availableHeight * (percent / 100f)).roundToInt().coerceAtLeast(1)
+        behavior?.apply {
+            isFitToContents = true
+            peekHeight = height
+            maxHeight = height
+            if (state == BottomSheetBehavior.STATE_HALF_EXPANDED) {
+                state = BottomSheetBehavior.STATE_EXPANDED
+            }
+        }
+        bottomSheet?.updateLayoutParams { this.height = ViewGroup.LayoutParams.MATCH_PARENT }
     }
 
     override fun show(manager: FragmentManager, tag: String?) {
@@ -177,20 +225,29 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     }
 
     private fun setConfig(config: Config, first: Boolean = false) {
+        val followSourceHeight = heightPercent == 0
         behavior?.let { behavior ->
-            config.state?.let { behavior.state = it }
-            config.peekHeight?.let { behavior.peekHeight = it }
+            config.state?.let { state ->
+                behavior.state = if (!followSourceHeight && state == BottomSheetBehavior.STATE_HALF_EXPANDED) {
+                    BottomSheetBehavior.STATE_EXPANDED
+                } else {
+                    state
+                }
+            }
+            if (followSourceHeight) {
+                config.peekHeight?.let { behavior.peekHeight = it }
+                config.setHalfExpandedRatio?.let { behavior.setHalfExpandedRatio(it) }
+                config.setExpandedOffset?.let { behavior.setExpandedOffset(it) }
+                config.setFitToContents?.let { behavior.setFitToContents(it) }
+                config.maxHeight?.let { behavior.maxHeight = it }
+            }
             config.isHideable?.let { behavior.isHideable = it }
             config.skipCollapsed?.let { behavior.skipCollapsed = it }
-            config.setHalfExpandedRatio?.let { behavior.setHalfExpandedRatio(it) }
-            config.setExpandedOffset?.let { behavior.setExpandedOffset(it) }
-            config.setFitToContents?.let { behavior.setFitToContents(it) }
             config.isDraggable?.let { behavior.isDraggable = it }
             config.isDraggableOnNestedScroll?.let { behavior.isDraggableOnNestedScroll = it }
             config.significantVelocityThreshold?.let { behavior.significantVelocityThreshold = it }
             config.hideFriction?.let { behavior.hideFriction = it }
             config.maxWidth?.let { behavior.maxWidth = it }
-            config.maxHeight?.let { behavior.maxHeight = it }
             config.isGestureInsetBottomIgnored?.let { behavior.isGestureInsetBottomIgnored = it }
             config.setUpdateImportantForAccessibilityOnSiblings?.let {
                 behavior.setUpdateImportantForAccessibilityOnSiblings(it)
@@ -300,22 +357,24 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                 }
             }
 
-            val dialogHeight = config.dialogHeight ?: if (first) -1 else null
-            dialogHeight?.let { height ->
-                params.height = height
-                hasChanged = true
-            }
-            config.heightPercentage?.let { percentage ->
-                if (percentage in 0.0..1.0) {
-                    val height = (displayMetrics.heightPixels * percentage).toInt()
+            if (followSourceHeight) {
+                val dialogHeight = config.dialogHeight ?: if (first) -1 else null
+                dialogHeight?.let { height ->
                     params.height = height
-                    if (config.peekHeight == null) {
-                        behavior?.peekHeight = height
-                    }
-                    if (config.maxHeight == null) {
-                        behavior?.maxHeight = height
-                    }
                     hasChanged = true
+                }
+                config.heightPercentage?.let { percentage ->
+                    if (percentage in 0.0..1.0) {
+                        val height = (displayMetrics.heightPixels * percentage).toInt()
+                        params.height = height
+                        if (config.peekHeight == null) {
+                            behavior?.peekHeight = height
+                        }
+                        if (config.maxHeight == null) {
+                            behavior?.maxHeight = height
+                        }
+                        hasChanged = true
+                    }
                 }
             }
             if (hasChanged) {
@@ -326,7 +385,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         config.responsiveBreakpoint?.let { breakpoint ->
             val screenWidth = displayMetrics.widthPixels
             if (screenWidth < breakpoint) {
-                behavior?.peekHeight = config.peekHeight ?: 300
+                if (followSourceHeight) behavior?.peekHeight = config.peekHeight ?: 300
                 config.widthPercentage?.let { percentage ->
                     if (percentage > 0.8f) {
                         val maxWidth = (screenWidth * 0.9).toInt()
@@ -334,7 +393,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                     }
                 }
             } else {
-                behavior?.peekHeight = config.peekHeight ?: 400
+                if (followSourceHeight) behavior?.peekHeight = config.peekHeight ?: 400
                 config.widthPercentage?.let { percentage ->
                     if (percentage < 0.6f) {
                         bottomSheet?.layoutParams?.width =
@@ -433,6 +492,13 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                         setLongClickSaveImg()
                     }
                 }
+                // Resolve the source before parsing the URL or making the first request: both
+                // fetched and inline pages need its headers, login state and user agent.
+                source = appDb.bookSourceDao.getBookSource(sourceKey) ?: run {
+                    activity?.toastOnUi("no find bookSource")
+                    dismiss()
+                    return@launch
+                }
                 val analyzeUrl =
                     AnalyzeUrl(url, source = source, coroutineContext = coroutineContext)
                 val html = args.getString("html") ?: analyzeUrl.getStrResponseAwait().body
@@ -441,11 +507,6 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                 }
                 preloadJs = args.getString("preloadJs")
                 val spliceHtml = buildSpliceHtml(html)
-                source = appDb.bookSourceDao.getBookSource(sourceKey) ?: run {
-                    activity?.toastOnUi("no find bookSource")
-                    dismiss()
-                    return@launch
-                }
                 val bookType = args.getInt("bookType", 0)
                 activity?.runOnUiThread {
                     initWebView(analyzeUrl.url, spliceHtml, analyzeUrl.headerMap, bookType)
@@ -757,6 +818,9 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         }
     }
 
+    // 该规则按 Java PSI 检查 WebViewClient 的构造调用，看不到 Kotlin 里的实现；
+    // 本类已实现 onRenderProcessGone（见下方 override）。
+    @SuppressLint("MissingOnRenderProcessGone")
     inner class CustomWebViewClient : WebViewClient() {
 
         override fun shouldOverrideUrlLoading(
@@ -785,6 +849,10 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             super.onPageFinished(view, url)
             applyWebViewTheme(appliedDarkTheme ?: isNightTheme, force = true)
         }
+
+        // 渲染进程被系统回收时默认会连带杀掉宿主进程
+        override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean =
+            view.handleRenderProcessGone()
 
         private fun shouldOverrideUrlLoading(url: Uri): Boolean {
             return when (url.scheme) {

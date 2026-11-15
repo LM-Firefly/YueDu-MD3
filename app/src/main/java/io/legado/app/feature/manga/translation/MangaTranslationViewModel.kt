@@ -268,7 +268,8 @@ class MangaTranslationViewModel(
                             resetAutomaticFailures()
                             if (automaticTask && !settings.automatic) stop()
                         }
-                        _state.update { it.copy(settings = settings, globalSettings = global, useGlobalSettings = inherit, loaded = true) }
+                        val stored = gateway.storedSettings(bookUrl)
+                        _state.update { it.copy(settings = settings, storedSettings = stored, globalSettings = global, useGlobalSettings = inherit, loaded = true) }
                         if (settings.locator == MangaLocator.CLOUD && _state.value.cloudProvider != settings.cloudOcrProvider) loadCloudConfig(settings.cloudOcrProvider)
                         refresh()
                     }

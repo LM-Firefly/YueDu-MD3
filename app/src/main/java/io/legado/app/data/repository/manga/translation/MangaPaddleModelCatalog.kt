@@ -2,6 +2,12 @@ package io.legado.app.data.repository.manga.translation
 
 import io.legado.app.domain.model.manga.MangaLocalOcrEngine
 
+/**
+ * One pinned weight file. It stays in the shared layer because the analysis cache identity and the
+ * language pre-check read this catalog without loading any runtime.
+ */
+internal data class MangaOcrModelFile(val name: String, val url: String, val bytes: Long, val sha256: String)
+
 /** Revisions and checksums are pinned; changing weights requires a new storage/cache revision. */
 internal object MangaPaddleModelCatalog {
     private const val V5_DET = "https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det_onnx/resolve/e6f4fa85f00e168c862bc462aebca69eef9b3d3d"

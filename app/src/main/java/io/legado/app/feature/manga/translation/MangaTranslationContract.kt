@@ -28,6 +28,8 @@ data class MangaTranslationUiState(
     val open: Boolean = false,
     val loaded: Boolean = false,
     val settings: MangaTranslationSettings = MangaTranslationSettings(),
+    /** 存储值（未按产物降级），仅用于解释"保存过的端侧选择当前不可用"。 */
+    val storedSettings: MangaTranslationSettings = MangaTranslationSettings(),
     val globalSettings: MangaTranslationGlobalSettings = MangaTranslationGlobalSettings(),
     val globalMode: Boolean = false,
     val useGlobalSettings: Boolean = false,

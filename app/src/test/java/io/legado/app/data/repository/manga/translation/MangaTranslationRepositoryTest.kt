@@ -10,6 +10,9 @@ import android.graphics.RectF
 import android.graphics.BitmapFactory.Options
 import androidx.room.Room
 import io.legado.app.data.AppDatabase
+import io.legado.app.data.repository.manga.engine.MangaLocalEngine
+import io.legado.app.data.repository.manga.engine.MangaLocalEngineFailureException
+import io.legado.app.data.repository.manga.engine.MangaLocalEngineUnavailableException
 import io.legado.app.domain.gateway.*
 import io.legado.app.domain.model.*
 import io.legado.app.domain.model.manga.*
@@ -71,6 +74,8 @@ class MangaTranslationRepositoryTest {
     private var respond: ((AiGenerateRequest) -> String)? = null
     private var bubbleCalls = 0
     private var bubbleFailure = false
+    /** 模拟 core 产品：本地运行时整体缺席（能力缺失，不是运行故障）。 */
+    private var engineMissing = false
     private var inpaintAvailable = true
     private var inpaintFailure = false
     private var inpaintCalls = 0
@@ -116,30 +121,59 @@ class MangaTranslationRepositoryTest {
             arrayOf(TranslationSettingsGateway::class.java)) { _, method, _ ->
             when (method.name) { "getCurrentSettings" -> TranslationSettings(provider = globalProvider); else -> null }
         } as TranslationSettingsGateway
-        reopen = { MangaTranslationRepository(app, db, profiles, ai, translationSettings, googleTranslate = { text, target ->
+        // Fixture engine: mirrors the shipped contract, including explicit unavailability.
+        val localEngine = object : MangaLocalEngine {
+            override val available get() = !engineMissing
+
+            override suspend fun detectBubbles(bitmap: Bitmap): List<MangaBubbleDetection> {
+                bubbleCalls++
+                if (engineMissing) throw MangaLocalEngineUnavailableException("Manga local engine is not installed")
+                if (bubbleFailure) throw MangaLocalEngineFailureException(
+                    "Manga detector runtime unavailable", UnsatisfiedLinkError("fixture native load failure"))
+                return bubbleDetections
+            }
+
+            override suspend fun recognize(
+                bitmap: Bitmap, language: String, engine: MangaLocalOcrEngine, options: MangaOcrOptions,
+            ): List<MangaTranslatedRegion> = when (engine) {
+                // Mirrors the shipped engine: ML Kit receives the preprocessed working copy.
+                MangaLocalOcrEngine.ML_KIT -> withMangaOcrInput(bitmap, options) { input ->
+                    textInputSize = input.width to input.height
+                    detectedRegions
+                }
+                else -> {
+                    paddleCalls++; paddleEngines += engine; paddleOptions = options
+                    if (paddleNativeFailure) throw MangaLocalEngineFailureException(
+                        "Manga OCR runtime unavailable", UnsatisfiedLinkError("fixture native load failure"))
+                    check(!paddleMissing) { "Model not downloaded" }
+                    detectedRegions
+                }
+            }
+
+            override suspend fun requireInpaint(engine: MangaInpaintEngine) {
+                check(inpaintAvailable) { "Inpainting model missing" }
+            }
+
+            override suspend fun erase(bitmap: Bitmap, mask: BooleanArray, engine: MangaInpaintEngine) {
+                inpaintCalls++
+                check(!inpaintFailure) { "Inpainting failed" }
+                bitmap.eraseColor(Color.LTGRAY) // Deliberately alters outside the mask; repository must contain it.
+            }
+
+            override suspend fun locate(bitmap: Bitmap, language: String): List<MangaTranslatedRegion>? = null
+        }
+        reopen = { MangaTranslationRepository(app, db, profiles, ai, translationSettings, localEngine = localEngine,
+            googleTranslate = { text, target ->
             googleRequests += "$target:$text"
             if (googleFailure) Result.failure(IllegalStateException("HTTP 503")) else Result.success("译:$text")
         }, imageEditor = { input, _, _, _ ->
             edits++
             input.copy(Bitmap.Config.ARGB_8888, true)
-        }, textDetector = { input, _ -> textInputSize = input.width to input.height; detectedRegions }, bubbleDetector = {
-            bubbleCalls++
-            if (bubbleFailure) throw UnsatisfiedLinkError("fixture native load failure")
-            bubbleDetections
-        }, paddleDetector = { _, _, engine, options ->
-            paddleCalls++; paddleEngines += engine; paddleOptions = options
-            if (paddleNativeFailure) throw UnsatisfiedLinkError("fixture native load failure")
-            check(!paddleMissing) { "Model not downloaded" }
-            detectedRegions
         }, cloudIdentity = { cloudVersion }, cloudDetector = { input, _, provider ->
             cloudInputSize = input.width to input.height
             cloudCalls++; cloudProvider = provider
             check(!cloudFailure) { "Cloud OCR fixture failure" }
             detectedRegions
-        }, inpaintReady = { check(inpaintAvailable) { "Inpainting model missing" } }, inpaint = { bitmap, _, _ ->
-            inpaintCalls++
-            check(!inpaintFailure) { "Inpainting failed" }
-            bitmap.eraseColor(Color.LTGRAY) // Deliberately alters outside the mask; repository must contain it.
         }) { file ->
             val bitmap = BitmapFactory.decodeFile(file.absolutePath)
             object : MangaRegionDecoder<Bitmap> {
@@ -207,6 +241,106 @@ class MangaTranslationRepositoryTest {
         assertEquals(1, cloudCalls)
         assertTrue(requests.last().messages.last().content.startsWith("TRANSLATION CORRECTION ONLY"))
         assertTrue(requests.all { it.messages.all { message -> message.images.isEmpty() } })
+    }
+
+    /** core 产品没有本地运行时：端侧来源直接返回空几何，不再调用必然失败的检测器。 */
+    @Test fun `cloud OCR still composes when the local engine is absent`() = runBlocking {
+        detectedRegions = listOf(MangaTranslatedRegion("r0", "hello", "hello", MangaTextBox(100f, 100f, 900f, 700f)))
+        engineMissing = true
+        repository.update(page.bookUrl) { it.copy(locator = MangaLocator.CLOUD) }
+        respond = { """{"translations":[{"id":"r0","translation":"Hi"}]}""" }
+        bubbleCalls = 0
+        assertTrue(File(repository.translate(page, progress = {}).imagePath).exists())
+        assertEquals(1, cloudCalls)
+        assertEquals("A missing detector must not be called at all", 0, bubbleCalls)
+        assertEquals(MangaBubbleSource.OFF, repository.settings(page.bookUrl).first().bubbleSource)
+    }
+
+    /** 关闭气泡检测后不再调用本地模型：两个产物上同一份设置的行为一致。 */
+    @Test fun `bubble detection off skips the local detector`() = runBlocking {
+        detectedRegions = listOf(MangaTranslatedRegion("r0", "hello", "hello", MangaTextBox(100f, 100f, 900f, 700f)))
+        repository.update(page.bookUrl) {
+            it.copy(locator = MangaLocator.CLOUD, bubbleSource = MangaBubbleSource.OFF)
+        }
+        respond = { """{"translations":[{"id":"r0","translation":"Hi"}]}""" }
+        bubbleCalls = 0
+        assertTrue(File(repository.translate(page, progress = {}).imagePath).exists())
+        assertEquals(0, bubbleCalls)
+        assertEquals(1, cloudCalls)
+    }
+
+    /** 「本地轮廓推断」不看模型：两个产物上都不调用端侧检测器，也不会被 core 规范化掉。 */
+    @Test fun `outline bubble source never calls the local detector`() = runBlocking {
+        detectedRegions = listOf(MangaTranslatedRegion("r0", "hello", "hello", MangaTextBox(100f, 100f, 900f, 700f)))
+        repository.update(page.bookUrl) {
+            it.copy(locator = MangaLocator.CLOUD, bubbleSource = MangaBubbleSource.OUTLINE)
+        }
+        respond = { """{"translations":[{"id":"r0","translation":"Hi"}]}""" }
+        bubbleCalls = 0
+        assertTrue(File(repository.translate(page, progress = {}).imagePath).exists())
+        assertEquals(0, bubbleCalls)
+        assertEquals(1, cloudCalls)
+        engineMissing = true
+        assertEquals(MangaBubbleSource.OUTLINE, repository.settings(page.bookUrl).first().bubbleSource)
+    }
+
+    private fun settingsFile() =
+        File(RuntimeEnvironment.getApplication().filesDir, "manga-translation/settings.json")
+            .apply { parentFile?.mkdirs() }
+
+    /** 重命名前的存档写着 `LOCAL`：读时必须还能还原成 `BUILTIN`，否则整个设置面板都解析失败。 */
+    @Test fun `legacy inpaint engine name still decodes`() = runBlocking {
+        val file = settingsFile()
+        // retryCount 用来区分"读成功"和"回落默认值"：BUILTIN 恰好是默认值，单看它无法说明是否读到了存档。
+        file.writeText("""{"defaults":{"inpaintEngine":"LOCAL","retryCount":7}}""")
+        try {
+            val settings = reopen().settings(page.bookUrl).first()
+            assertEquals(7, settings.retryCount)
+            assertEquals(MangaInpaintEngine.BUILTIN, settings.inpaintEngine)
+        } finally { file.delete() }
+    }
+
+    /** 无法解析的存档回落默认值并保留现场，而不是让设置界面整体报错。 */
+    @Test fun `unreadable settings fall back to defaults`() = runBlocking {
+        val file = settingsFile()
+        file.writeText("""{"defaults":{"composition":"GONE"}}""")
+        try {
+            assertEquals(MangaComposition.SMART, reopen().settings(page.bookUrl).first().composition)
+            assertTrue(File(file.path + ".corrupt").exists())
+        } finally {
+            file.delete()
+            File(file.path + ".corrupt").delete()
+        }
+    }
+
+    /** core 产品读不回"本地识别"与"模型擦字"：full 留下的选择在读取时回落，写入时也不再保留。 */
+    @Test fun `product without the local engine drops saved on-device recognition`() = runBlocking {
+        repository.update(page.bookUrl) {
+            it.copy(locator = MangaLocator.LOCAL, inpaintEngine = MangaInpaintEngine.MI_GAN,
+                bubbleSource = MangaBubbleSource.DEVICE, automatic = true)
+        }
+        val full = repository.settings(page.bookUrl).first()
+        assertEquals(MangaLocator.LOCAL, full.locator)
+        assertEquals(MangaInpaintEngine.MI_GAN, full.inpaintEngine)
+        assertEquals(MangaBubbleSource.DEVICE, full.bubbleSource)
+        assertTrue(full.automatic)
+        engineMissing = true
+        val core = repository.settings(page.bookUrl).first()
+        assertEquals(MangaLocator.AI, core.locator)
+        // 识别从免费端侧变成云端 AI：自动翻译必须暂停，否则新页面会静默上传图片并计费。
+        assertFalse(core.automatic)
+        // 存储值仍是用户当初的选择，界面据此说明"被暂停"而不是"用户关掉了"。
+        assertTrue(repository.storedSettings(page.bookUrl).automatic)
+        // 模型擦字走 ONNX；core 回落到内置（纯绘制）擦字，SMART 排版本身仍然可用。
+        assertEquals(MangaInpaintEngine.BUILTIN, core.inpaintEngine)
+        // 端侧气泡检测不进 core 的可选列表，读取时归一化为「关闭」（两者在 core 上输出完全相同）。
+        assertEquals(MangaBubbleSource.OFF, core.bubbleSource)
+        // 改任意设置会把这些不可达的选择规范化掉，不会写回存储。
+        repository.update(page.bookUrl) { it.copy(targetLanguage = "en") }
+        val saved = repository.settings(page.bookUrl).first()
+        assertEquals(MangaLocator.AI, saved.locator)
+        assertEquals(MangaInpaintEngine.BUILTIN, saved.inpaintEngine)
+        assertEquals(MangaBubbleSource.OFF, saved.bubbleSource)
     }
 
     @Test fun `independent AI OCR uses vision model then text only translation model`() = runBlocking {
@@ -625,6 +759,19 @@ class MangaTranslationRepositoryTest {
         assertEquals(1800, dimensions.outWidth); assertEquals(2700, dimensions.outHeight)
     }
 
+    @Test fun `whole page edit cache ignores the bubble source it never reads`() = runBlocking {
+        saveOriginal(Color.WHITE, 1800, 2700)
+        repository.update(page.bookUrl) {
+            it.copy(composition = MangaComposition.AI_PAGE, imageModelId = "image", bubbleSource = MangaBubbleSource.OFF)
+        }
+        repository.translate(page, progress = {})
+        assertEquals(1, edits)
+        // 整页重绘不读气泡几何：换来源不该让这一页再付一次图片编辑。
+        repository.update(page.bookUrl) { it.copy(bubbleSource = MangaBubbleSource.AI) }
+        repository.translate(page, progress = {})
+        assertEquals(1, edits)
+    }
+
     @Test fun `complete lettering layout is identical on both sides of a render boundary`() = runBlocking {
         saveOriginal(Color.WHITE, 800, 2048)
         val box = MangaTextBox(125f, 625f, 875f, 875f)
@@ -917,6 +1064,22 @@ class MangaTranslationRepositoryTest {
         assertEquals(1, calls)
     }
 
+    @Test fun `recompose rebuilds local geometry when the bubble source changes`() = runBlocking {
+        detectedRegions = listOf(MangaTranslatedRegion("r0", "hello", "hello", MangaTextBox(100f, 100f, 900f, 700f)))
+        responseText = """{"translations":[{"id":"r0","translation":"Hi"}]}"""
+        repository.update(page.bookUrl) {
+            it.copy(locator = MangaLocator.CLOUD, bubbleSource = MangaBubbleSource.OFF)
+        }
+        repository.translate(page, progress = {})
+        assertEquals(0, bubbleCalls)
+        // 只换气泡来源：重新排版要按新来源重建本地几何，且不能回到付费识别。
+        repository.update(page.bookUrl) { it.copy(bubbleSource = MangaBubbleSource.DEVICE) }
+        val recognitionCalls = cloudCalls
+        repository.recompose(page, progress = {})
+        assertEquals(1, bubbleCalls)
+        assertEquals(recognitionCalls, cloudCalls)
+    }
+
     @Test fun `google engine needs no ai model and sends identical lettering once`() = runBlocking {
         detectedRegions = listOf(
             MangaTranslatedRegion("r0", "こんにちは", "こんにちは", MangaTextBox(100f, 100f, 900f, 700f)),
@@ -962,6 +1125,31 @@ class MangaTranslationRepositoryTest {
         assertEquals(listOf("ocr", "ocr"), requests.map { it.model.id })
         assertEquals(2, calls)
         assertEquals(listOf("zh-CN:原文"), googleRequests)
+    }
+
+    @Test fun `google engine keeps fused recognition on the translation model`() = runBlocking {
+        repository.update(page.bookUrl) {
+            it.copy(locator = MangaLocator.AI, ocrModelId = "", textEngine = MangaTranslateEngine.GOOGLE)
+        }
+        respond = { request ->
+            if (request.messages.first().content.contains("COMPLETE translation and typesetting plan"))
+                authoredResponse("\"译:原文\"", "原文")
+            else """{"regions":[{"id":"r0","original":"原文","textBox":{"left":100,"top":100,"right":900,"bottom":700}}]}"""
+        }
+        assertNotNull(repository.translate(page, progress = {}))
+        // "与 AI 识别合并"沿用翻译模型做识别，不要求用户另选视觉模型；文字翻译才交给 Google。
+        assertEquals(listOf("model", "model"), requests.map { it.model.id })
+        assertEquals(2, calls)
+        assertEquals(listOf("zh-CN:原文"), googleRequests)
+    }
+
+    @Test fun `fused recognition with a non-ai engine fails when the translation model cannot see`() = runBlocking {
+        repository.update(page.bookUrl) {
+            it.copy(locator = MangaLocator.AI, ocrModelId = "", modelId = "text-only",
+                textEngine = MangaTranslateEngine.GOOGLE)
+        }
+        assertTrue(runCatching { repository.translate(page, progress = {}) }.isFailure)
+        assertEquals(0, calls)
     }
 
     @Test fun `follow settings uses the globally selected translation engine`() = runBlocking {

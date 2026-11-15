@@ -55,7 +55,8 @@ class MangaTranslationImagesTest {
             override suspend fun decodeRegion(region: MangaImageRegion, sampleSize: Int): Bitmap = error("No preview needed to partition an ordinary page")
             override fun close() = Unit
         }
-        assertEquals(listOf(MangaTranslationBand(0, 9000, 0, 9000)), mangaAnalysisBands(decoder, "ja"))
+        assertEquals(listOf(MangaTranslationBand(0, 9000, 0, 9000)),
+            mangaAnalysisBands(decoder, "ja") { _, _ -> error("An ordinary page must not run auxiliary OCR") })
     }
 
     @Test fun `large page preview requests sampled pixels and keeps the complete page frame`() = runBlocking {
@@ -90,7 +91,7 @@ class MangaTranslationImagesTest {
             }
             override fun close() = Unit
         }
-        val bands = mangaAnalysisBands(decoder, "und")
+        val bands = mangaAnalysisBands(decoder, "und") { _, _ -> null }
         assertEquals(1700, bands.first().coreBottom)
         assertEquals(6000, bands.sumOf { it.coreBottom - it.coreTop })
         bands.zipWithNext().forEach { (left, right) ->

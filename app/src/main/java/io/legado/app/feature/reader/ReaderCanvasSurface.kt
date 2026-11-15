@@ -4,7 +4,9 @@ import android.graphics.Bitmap
 import android.graphics.BitmapShader
 import android.graphics.Paint
 import android.graphics.Shader
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -57,6 +59,7 @@ import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -65,6 +68,7 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.toArgb
@@ -113,6 +117,7 @@ import io.legado.app.feature.reader.core.model.ReaderPageId
 import io.legado.app.feature.reader.core.model.ReaderPageTip
 import io.legado.app.feature.reader.core.model.ReaderPageWindow
 import io.legado.app.feature.reader.core.model.ReaderRect
+import io.legado.app.feature.reader.core.model.ReaderTextStyle
 import io.legado.app.feature.reader.core.model.ReaderTextBackgroundImage
 import io.legado.app.feature.reader.core.model.ReaderTipAlignment
 import io.legado.app.feature.reader.core.model.ReaderTipRow
@@ -235,6 +240,7 @@ fun ReaderCanvasSurface(
     onAutoPageStop: () -> Unit,
     onShowSelectionMenu: (ReaderSelection, String, ReaderSelectionMenuAnchor) -> Unit,
     onDismissSelectionMenu: () -> Unit,
+    onTurnToSelectionPage: (ReaderPageId) -> ReaderPageWindow?,
     onElementClick: (ReaderElement) -> Boolean,
     onElementLongPress: (ReaderElement, Float, Float) -> Boolean,
     selectionEnabled: Boolean,
@@ -246,6 +252,7 @@ fun ReaderCanvasSurface(
     noAnimationScrollPage: Boolean,
     externalPageTurns: Flow<ReaderTurnDirection>,
     externalSelectionCancels: Flow<Unit>,
+    externalSelectionExtensions: Flow<ReaderSelection>,
     /** 宿主要求建立选区（全文搜索命中）：旧 View 的命中就是一次真选区，带手柄与菜单。 */
     externalSelections: Flow<ReaderSelection>,
     onVisibleBodyTextPositionProvider: ((() -> ReaderVisibleTextPosition?)?) -> Unit,
@@ -330,6 +337,7 @@ fun ReaderCanvasSurface(
     val latestAutoPagePaused by rememberUpdatedState(autoPagePaused)
     val latestAutoPageActive by rememberUpdatedState(autoPageActive)
     val latestShowSelectionMenu by rememberUpdatedState(onShowSelectionMenu)
+    val latestTurnToSelectionPage by rememberUpdatedState(onTurnToSelectionPage)
     val latestDismissSelectionMenu by rememberUpdatedState(onDismissSelectionMenu)
     val latestSelectionHapticsEnabled by rememberUpdatedState(selectionHapticsEnabled)
     val latestSelectionEnabled by rememberUpdatedState(selectionEnabled)
@@ -461,14 +469,16 @@ fun ReaderCanvasSurface(
         } else {
             ReaderPageViewportLayout.paged(window)
         }
-    fun selectionEndpointBound(
+    fun selectionHandleBounds(
         selection: ReaderSelection,
-        endpoint: ReaderSelectionEndpoint,
         window: ReaderPageWindow = currentPageWindow(),
-    ) = run {
+    ): Pair<ReaderRect?, ReaderRect?> {
         val bounds = pageViewportLayout(window).selectionBounds(selection).map { it.bounds }
-        val visualStart = endpoint == selection.visualStartEndpoint()
-        if (visualStart) bounds.firstOrNull() else bounds.lastOrNull()
+        fun isVisible(endpoint: ReaderSelectionEndpoint): Boolean =
+            transitionMode == ReaderTransitionMode.SCROLL ||
+                window.current?.let { selection.hasEndpointOn(it, endpoint) } == true
+        return bounds.firstOrNull()?.takeIf { isVisible(selection.visualStartEndpoint()) } to
+            bounds.lastOrNull()?.takeIf { isVisible(selection.visualEndEndpoint()) }
     }
 
     fun selectionCursorCenter(
@@ -477,8 +487,9 @@ fun ReaderCanvasSurface(
         window: ReaderPageWindow = currentPageWindow(),
         draggedHandleCenter: Offset? = null,
     ): Offset? {
-        val bound = selectionEndpointBound(selection, endpoint, window) ?: return null
         val visualStart = endpoint == selection.visualStartEndpoint()
+        val (start, end) = selectionHandleBounds(selection, window)
+        val bound = (if (visualStart) start else end) ?: return null
         val logicalLineCenter = Offset(
             x = if (visualStart) bound.left else bound.right,
             y = (bound.top + bound.bottom) / 2f,
@@ -837,6 +848,23 @@ fun ReaderCanvasSurface(
             selectionMenuVisible = false
         }
     }
+    LaunchedEffect(externalSelectionExtensions, transitionMode) {
+        externalSelectionExtensions.collect { selection ->
+            if (transitionMode == ReaderTransitionMode.SCROLL ||
+                !selectionMenuVisible || textSelection != selection ||
+                !latestSelectionEnabled || latestAutoPageActive || pageMotionJob?.isActive == true
+            ) return@collect
+            val window = currentPageWindow()
+            val extended = selection.extendToNextPage(window) ?: return@collect
+            val nextId = window.next?.id ?: return@collect
+            val nextWindow = latestTurnToSelectionPage(nextId) ?: return@collect
+            pendingPageBase = latestHostPages
+            pendingPageWindow = nextWindow
+            dismissSelectionMenu()
+            textSelection = extended
+            showSelectionMenu(extended, nextWindow)
+        }
+    }
     LaunchedEffect(externalSelections) {
         externalSelections.collect { selection ->
             // 旧 View 的搜索结果即真选区：建选区、带手柄，并按当前窗口弹一次选区菜单。
@@ -1085,12 +1113,10 @@ fun ReaderCanvasSurface(
                 val downPage = downPlacement?.page ?: downWindow.current
                 val downPageY = downPlacement?.localY(down.position.y) ?: down.position.y
                 textSelection?.let { selection ->
-                    val bounds = downSelectionLayout.selectionBounds(selection).map { it.bounds }
+                    val (start, end) = selectionHandleBounds(selection, downWindow)
                     // 命中点必须是实际绘制出来的圆心，不能仍以文字行底为中心。保留较大的
                     // 28dp 热区，让圆下方的正文也能作为把手的触控区域，但坐标仍以圆心换算。
                     val handleHitRadius = 28f * density
-                    val start = bounds.firstOrNull()
-                    val end = bounds.lastOrNull()
                     val startCenter = start?.let {
                         Offset(
                             it.left,
@@ -1630,13 +1656,14 @@ fun ReaderCanvasSurface(
                     offsetYState = scrollOffsetState,
                     selection = selectionColor,
                     readAloud = textAccentColor,
+                    solidBackground = solidPageBackground(backgroundColor, pageBackgroundImage, backgroundImageAlpha),
                     selectionProvider = { textSelection },
                     selectionPreviewStyle = selectionPreviewStyle,
                     cachedImage = cachedImage,
                     loadImage = loadImage,
                 )
             }
-        } else if (transitionMode == ReaderTransitionMode.IOS_CURL && composedTurnDirection != null) {
+        } else if (transitionMode == ReaderTransitionMode.IOS_CURL) {
             IosCurlPageStack(
                 pages = pages,
                 direction = composedTurnDirection,
@@ -1890,7 +1917,7 @@ fun ReaderCanvasSurface(
             label = "readerSelectionFocusHandleAlpha",
         )
         textSelection?.let { selection ->
-            val bounds = pageViewportLayout(pages).selectionBounds(selection).map { it.bounds }
+            val (start, end) = selectionHandleBounds(selection, pages)
             val handleColor = selectionColor.copy(alpha = 1f)
             val screenDensity = LocalDensity.current.density
             val handleShadowPaint = remember(screenDensity) {
@@ -1954,7 +1981,7 @@ fun ReaderCanvasSurface(
                             style = Stroke(SelectionHandleStrokeWidth.toPx()),
                         )
                     }
-                    bounds.firstOrNull()?.let { rect ->
+                    start?.let { rect ->
                         drawPinHandle(
                             rect.left,
                             rect.top,
@@ -1962,7 +1989,7 @@ fun ReaderCanvasSurface(
                             selection.visualStartEndpoint(),
                         )
                     }
-                    bounds.lastOrNull()?.let { rect ->
+                    end?.let { rect ->
                         drawPinHandle(
                             rect.right,
                             rect.top,
@@ -2029,7 +2056,7 @@ private val batteryClassicTypeface: android.graphics.Typeface? by lazy {
 
 /** View 版 `BatteryView` 使用的轮廓；绘制时复用原有 `ic_battery` 矢量资源。 */
 private val batteryOutlineState: Drawable.ConstantState? by lazy {
-    appCtx.getDrawable(R.drawable.ic_battery)?.constantState
+    AppCompatResources.getDrawable(appCtx, R.drawable.ic_battery)?.constantState
 }
 
 private fun ReaderPage.scrollViewportExtentPx(): Float =
@@ -2042,6 +2069,7 @@ private fun ScrollPageStack(
     offsetYState: androidx.compose.runtime.MutableFloatState,
     selection: Color,
     readAloud: Color,
+    solidBackground: Color?,
     selectionProvider: () -> ReaderSelection?,
     selectionPreviewStyle: TextProcessStyle?,
     cachedImage: (ReaderElement.Image) -> Bitmap?,
@@ -2051,20 +2079,36 @@ private fun ScrollPageStack(
     // 角色胶囊只跟主题（深浅模式切换），绝不跟正文/高亮样式取色
     val castColorArgb = LegadoTheme.colorScheme.onSurface.toArgb()
     val castVariantArgb = LegadoTheme.colorScheme.onSurfaceVariant.toArgb()
+    /**
+     * 窗口内正文图片。
+     *
+     * 滚动模式一次绘制记录就会画完窗口内四页，而滚动本身只平移图层、不重新记录：图片若在
+     * 记录期没命中，绘制结果里留下的 18% 灰占位会一直挂在屏幕上（#2547 的「滚动时闪烁 /
+     * 偶发变灰」）。所以位图必须像分页模式那样进组合状态——加载完成即换掉占位；
+     * 换窗时丢弃窗口外条目，Bitmap 随组合态释放，不额外留一份长期强引用。
+     */
+    var pageImages by remember { mutableStateOf<Map<ReaderElement.Image, Bitmap>>(emptyMap()) }
     // 窗口变化（含跨页同步换窗）：effect 期为三页构建绘制数据并加载位图，正常情况下
     // 跨页时新进入窗口的页在此处预热；draw 期 miss 时同步兜底，保正确性不缺字
     // （对照 shutiao 的组合期 ensureTextLayoutCache + 绘制期兜底）。
     LaunchedEffect(windowProvider()) {
         val pageWindow = windowProvider()
-        // 预热含下下页：跨页后新进入窗口的 next 页就是上一窗口的 nextPlus，绘制数据
-        // 早已就绪。数据构建放 Default 线程——跨页帧主线程对页数据零构建，只有重绘
-        // （对照 shutiao 的四页流预热；miss 时的 draw 期同步构建仍是兜底）。
-        listOfNotNull(
+        val windowPages = listOfNotNull(
             pageWindow.previous,
             pageWindow.current,
             pageWindow.next,
             pageWindow.nextPlus,
-        ).forEach { page ->
+        )
+        val windowImages = windowPages.asSequence()
+            .flatMap { page -> page.elements.asSequence().filterIsInstance<ReaderElement.Image>() }
+            .toSet()
+        if (pageImages.keys.any { it !in windowImages }) {
+            pageImages = pageImages.filterKeys { it in windowImages }
+        }
+        // 预热含下下页：跨页后新进入窗口的 next 页就是上一窗口的 nextPlus，绘制数据
+        // 早已就绪。数据构建放 Default 线程——跨页帧主线程对页数据零构建，只有重绘
+        // （对照 shutiao 的四页流预热；miss 时的 draw 期同步构建仍是兜底）。
+        windowPages.forEach { page ->
             val data = cache.peek(page)
                 ?: withContext(Dispatchers.Default) { ScrollPageDrawData(page) }
                     .also { cache.put(page, it) }
@@ -2072,17 +2116,28 @@ private fun ScrollPageStack(
             val cachedSources = sources.mapNotNull { source ->
                 ReaderTextBackgroundLoader.cached(source)?.let { source to it }
             }.toMap()
-            if (cachedSources.isNotEmpty()) data.textBackgroundRevision.value++
+            if (cachedSources.isNotEmpty()) data.textBackgroundRevision.intValue++
             val loadedSources = withContext(Dispatchers.IO) {
                 sources.mapNotNull { source ->
                     ReaderTextBackgroundLoader.load(source)?.let { source to it }
                 }.toMap()
             }
-            if (loadedSources.isNotEmpty()) data.textBackgroundRevision.value++
+            if (loadedSources.isNotEmpty()) data.textBackgroundRevision.intValue++
+        }
+        windowPages.forEach { page ->
             page.elements.filterIsInstance<ReaderElement.Image>().forEach { element ->
-                // The controller owns inline bitmaps in a byte-bounded LRU. Do not retain
-                // another strong reference for every cached draw page.
-                if (cachedImage(element) == null) loadImage(element)
+                val cached = cachedImage(element)?.takeUnless(Bitmap::isRecycled)
+                val known = pageImages[element]?.takeUnless(Bitmap::isRecycled)
+                val bitmap = when {
+                    // 缓存里换成了新 generation（图片刷新）就以它为准
+                    cached != null && cached !== known -> cached
+                    // 已被字节 LRU 淘汰但组合态还握着：直接复用，不重新解码
+                    known != null -> known
+                    else -> loadImage(element)?.takeUnless(Bitmap::isRecycled)
+                }
+                if (bitmap != null && pageImages[element] !== bitmap) {
+                    pageImages = pageImages + (element to bitmap)
+                }
             }
         }
     }
@@ -2096,6 +2151,8 @@ private fun ScrollPageStack(
         // graphicsLayer 变换，draw 块不执行。相邻页的 y 是栈坐标，整画布随层平移偏移。
         val window = windowProvider()
         val current = window.current ?: return@Canvas
+        // 位图加载完成只让这一块重新记录（不重组），灰占位随下一次记录换成真图。
+        val imagesForDraw = pageImages
         val activeSelection = selectionProvider()
         fun drawOne(page: ReaderPage, stackOffsetY: Float) {
             val data = cache.ensure(page)
@@ -2117,7 +2174,8 @@ private fun ScrollPageStack(
                     activeSelection,
                     selectedBounds,
                     selectionPreviewStyle,
-                    cachedImage,
+                    solidBackground,
+                    imageProvider = { element -> imagesForDraw[element] ?: cachedImage(element) },
                     castColorArgb,
                     castVariantArgb,
                 )
@@ -2142,7 +2200,8 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScrollPageConte
     activeSelection: ReaderSelection?,
     selectedBounds: List<ReaderRect>,
     selectionPreviewStyle: TextProcessStyle?,
-    cachedImage: (ReaderElement.Image) -> Bitmap?,
+    solidBackground: Color?,
+    imageProvider: (ReaderElement.Image) -> Bitmap?,
     castColorArgb: Int,
     castVariantArgb: Int,
 ) {
@@ -2150,7 +2209,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScrollPageConte
     val visibleDecorationCache = if (selectionPreviewStyle != null && activeSelection != null) {
         ReaderPageDecorationDrawCache.create(page.withoutSelectionDecorations(activeSelection))
     } else data.decorationDrawCache
-    data.textBackgroundRevision.value
+    data.textBackgroundRevision.intValue
     val previewing = selectionPreviewStyle != null && activeSelection != null
     val previewBounds = if (previewing) {
         data.textElements.filter { activeSelection.contains(it, page.id.chapterIndex) }
@@ -2163,7 +2222,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScrollPageConte
     } else data.textBackgroundBands
     // 对照旧 `TextLine.drawStyledBackgrounds`：先背景色、再背景图，与翻页模式同一顺序。
     visibleTextBackgroundBands.forEach { band ->
-        drawBackgroundBand(band)
+        drawBackgroundBand(band, selection.toArgb())
     }
     data.textBackgrounds.forEach { run ->
         ReaderTextBackgroundLoader.cached(run.image.source)?.let { bitmap ->
@@ -2172,20 +2231,43 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScrollPageConte
     }
     drawSelectionStylePreview(selectionPreviewStyle, previewBounds, beforeText = true)
     visibleDecorationCache.halfHighlights.forEach { it.draw(native) }
+    val foregroundOverrides = bookForegroundOverrides(data.paints.keys, solidBackground)
+    // 搜索命中和样式预览要按元素改颜色，这两段时间退回逐字绘制。
+    val mergedTextRuns =
+        if (previewing || page.searchStart != null) {
+            emptyMap<ReaderElement.Text, ReaderTextDrawRun>()
+        } else {
+            data.textDrawRuns
+        }
     page.elements.forEach { e -> when (e) {
         is ReaderElement.Text -> {
-            val paint = data.paints.getValue(e.style)
-            paint.color = if (previewing && activeSelection.contains(e, page.id.chapterIndex)) {
-                selectionPreviewStyle.textColor ?: page.previewBaseTextColor(e)
-            } else page.resolvedColorArgb(e, readAloud.toArgb())
-            // 与分页绘制和旧 TextHtmlColumn 一致：规则自定义线替代 HTML 原生线，
-            // 链接下划线仍由原生 Paint 绘制。
-            paint.isUnderlineText = (e.style.nativeUnderline && e.style.underline == null) ||
-                    e.drawsLinkUnderline
-            native.drawText(e.value, e.bounds.left, e.baselinePx, paint)
+            val run = mergedTextRuns[e]
+            if (run == null) {
+                val paint = data.paints.getValue(e.style)
+                paint.color = if (previewing && activeSelection.contains(e, page.id.chapterIndex)) {
+                    selectionPreviewStyle.textColor ?: page.previewBaseTextColor(e)
+                } else page.resolvedColorArgb(e, readAloud.toArgb(), foregroundOverrides[e.style])
+                // 与分页绘制和旧 TextHtmlColumn 一致：规则自定义线替代 HTML 原生线，
+                // 链接下划线仍由原生 Paint 绘制。
+                paint.isUnderlineText = (e.style.nativeUnderline && e.style.underline == null) ||
+                        e.drawsLinkUnderline
+                native.drawText(e.value, e.bounds.left, e.baselinePx, paint)
+            } else if (run.first === e) {
+                drawMergedTextRun(
+                    canvas = native,
+                    run = run,
+                    stylePaint = data.paints.getValue(run.style),
+                    colorArgb = page.resolvedColorArgb(
+                        run.first,
+                        readAloud.toArgb(),
+                        foregroundOverrides[run.style],
+                    ),
+                    scratchPaint = data.mergedRunPaint,
+                )
+            }
         }
 
-        is ReaderElement.Image -> cachedImage(e)?.let { bitmap ->
+        is ReaderElement.Image -> imageProvider(e)?.let { bitmap ->
             ReaderImageDrawLayout.forElement(e, bitmap.width, bitmap.height)?.let { layout ->
                 drawImage(
                     image = bitmap.asImageBitmap(),
@@ -2208,7 +2290,9 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawScrollPageConte
         is ReaderElement.Action -> Unit
         is ReaderElement.Spacer -> Unit
         is ReaderElement.ParagraphMarker -> {
-            if (e.circular) {
+            if (e.label != null) {
+                drawNumberedParagraphMarker(native, e)
+            } else if (e.circular) {
                 drawCircle(Color(e.colorArgb), e.strokeWidthPx / 2f, Offset(e.bounds.left, e.bounds.top))
             } else {
                 drawLine(
@@ -2428,13 +2512,14 @@ private fun SimulationPageStack(
 
 /**
  * 一页位图快照的身份。任何会改变该页像素的输入都必须进来，否则会命中过期位图：
- * 页 id/revision/layoutRevision（图片刷新会改 revision）、背景色/背景图及其透明度、
+ * 页 id/revision/layoutRevision（图片刷新会改 revision）、排版元素、背景色/背景图及其透明度、
  * 选区与朗读高亮色、活动选区、选区预览样式、视口尺寸。
  */
 internal data class PageSnapshotKey(
     val pageId: ReaderPageId,
     val revision: Long,
     val layoutRevision: Long,
+    val elementsKey: ReaderPageElementsKey,
     val backgroundArgb: Int,
     val backgroundImageIdentity: Int,
     val backgroundImageAlpha: Float,
@@ -2461,6 +2546,7 @@ private fun pageSnapshotKey(
     pageId = page.id,
     revision = page.revision,
     layoutRevision = page.layoutRevision,
+    elementsKey = ReaderPageElementsKey(page.elements),
     backgroundArgb = background.toArgb(),
     backgroundImageIdentity = System.identityHashCode(backgroundImage),
     backgroundImageAlpha = backgroundImageAlpha,
@@ -2805,6 +2891,15 @@ private fun ReaderPageCanvas(
         textElements.map { it.style }.distinct()
             .associateWith(ReaderAndroidPaintFactory::create)
     }
+    // 可以整段画的正文段落划分。与命中、朗读状态无关，只跟排版元素有关。
+    val textDrawRuns = remember(page.elements) { buildMergedTextRuns(page.elements) }
+    // 整段绘制时临时承载字距的画笔，避免改动 [paints] 里共用的画笔。
+    val mergedRunPaint = remember { Paint() }
+    val solidBackground = solidPageBackground(background, backgroundImage, backgroundImageAlpha)
+        .takeIf { drawBackground }
+    val foregroundOverrides = remember(paints, solidBackground) {
+        bookForegroundOverrides(paints.keys, solidBackground)
+    }
     val badge = page.decoration.bookmarkBadge.takeIf { drawDecoration }
     val cachedBadgeImage = badge?.let(ReaderBookmarkBadgeRenderer::cachedResult)
     val badgeImage by produceState(cachedBadgeImage, badge) {
@@ -2918,7 +3013,7 @@ private fun ReaderPageCanvas(
         // 对照旧 `TextLine.drawStyledBackgrounds`：先背景色、再背景图。色块是按行盒画的直边
         // 矩形，画在九宫格上面就会把气泡切出一截直边（旧版还直接不给带图的列铺色）。
         textBackgroundBands.forEach { band ->
-            drawBackgroundBand(band)
+            drawBackgroundBand(band, selection.toArgb())
         }
         // 快照读放在绘制期：异步补解完成后只重绘，不重组整页正文。
         textBackgroundRevision
@@ -2929,18 +3024,40 @@ private fun ReaderPageCanvas(
         }
         drawSelectionStylePreview(selectionPreviewStyle, previewBounds, beforeText = true)
         decorationDrawCache.halfHighlights.forEach { it.draw(native) }
+        // 搜索命中和样式预览要按元素改颜色，这两段时间退回逐字绘制。
+        val mergedTextRuns =
+            if (previewing || page.searchStart != null) {
+                emptyMap<ReaderElement.Text, ReaderTextDrawRun>()
+            } else {
+                textDrawRuns
+            }
         page.elements.forEach { e -> when (e) {
             is ReaderElement.Text -> {
-                val paint = paints.getValue(e.style)
-                paint.color = if (previewing && activeSelection.contains(e, page.id.chapterIndex)) {
-                    selectionPreviewStyle.textColor ?: page.previewBaseTextColor(e)
-                } else page.resolvedColorArgb(e, readAloud.toArgb())
-                // HTML 原生下划线（<u>）在与规则自定义下划线同时存在时只画自定义那条：
-                // 旧版从不画 HTML 原生下划线，两条线叠在一起会多出旧版没有的观感。
-                // 链接下划线仍按旧版优先（`TextHtmlColumn.draw` 的 isUnderlineText）。
-                paint.isUnderlineText = (e.style.nativeUnderline && e.style.underline == null) ||
-                        e.drawsLinkUnderline
-                native.drawText(e.value, e.bounds.left, e.baselinePx, paint)
+                val run = mergedTextRuns[e]
+                if (run == null) {
+                    val paint = paints.getValue(e.style)
+                    paint.color = if (previewing && activeSelection.contains(e, page.id.chapterIndex)) {
+                        selectionPreviewStyle.textColor ?: page.previewBaseTextColor(e)
+                    } else page.resolvedColorArgb(e, readAloud.toArgb(), foregroundOverrides[e.style])
+                    // HTML 原生下划线（<u>）在与规则自定义下划线同时存在时只画自定义那条：
+                    // 旧版从不画 HTML 原生下划线，两条线叠在一起会多出旧版没有的观感。
+                    // 链接下划线仍按旧版优先（`TextHtmlColumn.draw` 的 isUnderlineText）。
+                    paint.isUnderlineText = (e.style.nativeUnderline && e.style.underline == null) ||
+                            e.drawsLinkUnderline
+                    native.drawText(e.value, e.bounds.left, e.baselinePx, paint)
+                } else if (run.first === e) {
+                    drawMergedTextRun(
+                        canvas = native,
+                        run = run,
+                        stylePaint = paints.getValue(run.style),
+                        colorArgb = page.resolvedColorArgb(
+                            run.first,
+                            readAloud.toArgb(),
+                            foregroundOverrides[run.style],
+                        ),
+                        scratchPaint = mergedRunPaint,
+                    )
+                }
             }
             is ReaderElement.Image -> images[e]?.let { bitmap ->
                 ReaderImageDrawLayout.forElement(e, bitmap.width, bitmap.height)?.let { layout ->
@@ -2965,7 +3082,9 @@ private fun ReaderPageCanvas(
             is ReaderElement.Action -> Unit
             is ReaderElement.Spacer -> Unit
             is ReaderElement.ParagraphMarker -> {
-                if (e.circular) {
+                if (e.label != null) {
+                    drawNumberedParagraphMarker(native, e)
+                } else if (e.circular) {
                     drawCircle(Color(e.colorArgb), e.strokeWidthPx / 2f, Offset(e.bounds.left, e.bounds.top))
                 } else {
                     drawLine(
@@ -3129,8 +3248,58 @@ private fun ReaderPage.isSearchResult(text: ReaderElement.Text): Boolean {
 private fun ReaderPage.isReadAloud(text: ReaderElement.Text): Boolean =
     readAloudParagraphIndex != null && text.paragraphIndex == readAloudParagraphIndex
 
-private fun ReaderPage.resolvedColorArgb(text: ReaderElement.Text, accentColorArgb: Int): Int =
-    if (text.link != null || isSearchResult(text) || isReadAloud(text)) accentColorArgb else text.style.colorArgb
+private fun ReaderPage.resolvedColorArgb(text: ReaderElement.Text, accentColorArgb: Int, bookOverrideArgb: Int?): Int =
+    if (text.link != null || isSearchResult(text) || isReadAloud(text)) accentColorArgb
+    else bookOverrideArgb ?: text.style.colorArgb
+
+private fun solidPageBackground(base: Color, overlay: Drawable?, overlayAlpha: Float): Color? {
+    if (overlay == null || overlayAlpha <= 0f) return base
+    val color = Color((overlay as? ColorDrawable)?.color ?: return null)
+    return color.copy(alpha = color.alpha * overlayAlpha.coerceIn(0f, 1f)).compositeOver(base)
+}
+
+internal fun bookForegroundOverrides(styles: Set<ReaderTextStyle>, solidBackground: Color?): Map<ReaderTextStyle, Int> {
+    val background = solidBackground?.takeIf { it.alpha == 1f } ?: return emptyMap()
+    val backgroundLuminance = background.luminance()
+    val minimumContrast = 3f
+    fun contrast(argb: Int): Float {
+        val foreground = Color(argb).compositeOver(background).luminance()
+        return (maxOf(foreground, backgroundLuminance) + 0.05f) /
+            (minOf(foreground, backgroundLuminance) + 0.05f)
+    }
+    val canLighten = contrast(Color.White.toArgb()) >= minimumContrast
+    val canDarken = contrast(Color.Black.toArgb()) >= minimumContrast
+    return buildMap {
+        for (style in styles) {
+            val fallback = style.bookColorFallbackArgb ?: continue
+            if (style.marked || style.backgroundArgb != null || style.backgroundImage != null) continue
+            val bookContrast = contrast(style.colorArgb)
+            if (bookContrast >= minimumContrast) continue
+            val bookColor = Color(style.colorArgb)
+            if (bookColor.red == bookColor.green && bookColor.green == bookColor.blue) {
+                if (contrast(fallback) > bookContrast) put(style, fallback)
+                continue
+            }
+
+            // Move the sRGB channels together to preserve hue. Prefer the original side of
+            // the background luminance when that side can reach the contrast floor.
+            val lighten = canLighten && (!canDarken || bookColor.luminance() >= backgroundLuminance)
+            val neutral = if (lighten) 1f else 0f
+            fun adjustedColor(amount: Float): Int = Color(
+                red = bookColor.red + (neutral - bookColor.red) * amount,
+                green = bookColor.green + (neutral - bookColor.green) * amount,
+                blue = bookColor.blue + (neutral - bookColor.blue) * amount,
+            ).toArgb()
+            var low = 0f
+            var high = 1f
+            repeat(8) {
+                val middle = (low + high) / 2f
+                if (contrast(adjustedColor(middle)) >= minimumContrast) high = middle else low = middle
+            }
+            put(style, adjustedColor(high))
+        }
+    }
+}
 
 private fun ReaderPage.dynamicEmphasisUnderlineRuns(): List<ReaderEmphasisUnderlineRun> {
     val style = emphasisUnderlineStyle ?: return emptyList()
@@ -3880,4 +4049,18 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawBatteryGlyph(
             numberPaint,
         )
     }
+}
+
+// Marker numbers are decorations, so they never enter text selection or semantic offsets.
+private val paragraphMarkerPaint = ThreadLocal.withInitial {
+    android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = android.graphics.Paint.Align.RIGHT
+    }
+}
+
+private fun drawNumberedParagraphMarker(canvas: android.graphics.Canvas, marker: ReaderElement.ParagraphMarker) {
+    val paint = paragraphMarkerPaint.get()!!
+    paint.color = marker.colorArgb
+    paint.textSize = marker.textSizePx
+    canvas.drawText(marker.label.orEmpty(), marker.bounds.right, marker.bounds.bottom, paint)
 }

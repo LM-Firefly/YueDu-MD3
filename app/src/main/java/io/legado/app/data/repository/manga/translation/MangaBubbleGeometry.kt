@@ -2,6 +2,7 @@ package io.legado.app.data.repository.manga.translation
 
 import android.graphics.Bitmap
 import android.graphics.Rect
+import io.legado.app.domain.model.manga.MangaBubbleShape
 import io.legado.app.domain.model.manga.MangaTextBox
 import io.legado.app.domain.model.manga.MangaTranslatedRegion
 import io.legado.app.domain.model.manga.MangaTranslationPlan
@@ -10,9 +11,9 @@ import kotlin.math.max
 import kotlin.math.min
 
 /** An enclosed flat balloon is a stronger spatial anchor than a partial AI lettering box. */
-internal fun recoverMangaBubbles(bitmap: Bitmap, plan: MangaTranslationPlan): MangaTranslationPlan {
+internal fun recoverMangaBubbles(bitmap: Bitmap, plan: MangaTranslationPlan, withShapes: Boolean = false): MangaTranslationPlan {
     var budget = min(4L * 1024 * 1024, bitmap.width.toLong() * bitmap.height * 2)
-    return plan.copy(regions = plan.regions.map { region ->
+    return plan.copy(regions = plan.regions.mapIndexed { index, region ->
         val original = region.recognitionBox ?: region.textBox
         val source = original.pixels(bitmap.width, bitmap.height)
         val short = min(bitmap.width, bitmap.height)
@@ -21,23 +22,59 @@ internal fun recoverMangaBubbles(bitmap: Bitmap, plan: MangaTranslationPlan): Ma
         val crop = Rect(max(0, source.left - padX), max(0, source.top - padY),
             min(bitmap.width, source.right + padX), min(bitmap.height, source.bottom + padY))
         val count = crop.width().toLong() * crop.height()
-        if (count > 1024 * 1024 || count > budget) return@map region
+        if (count > 1024 * 1024 || count > budget) return@mapIndexed region
         budget -= count
         val pixels = IntArray(count.toInt())
         bitmap.getPixels(pixels, 0, crop.width(), crop.left, crop.top, crop.width(), crop.height())
         val background = MangaPageComposer.background(bitmap, source)
         val others = plan.regions.filter { it.id != region.id }.map { (it.recognitionBox ?: it.textBox).pixels(bitmap.width, bitmap.height) }
-        val bubble = findBubble(crop, pixels, source, background, region.original, others) ?: return@map region
-        val masks = bubble.lettering(background, region.vertical) ?: return@map region
+        val bubble = findBubble(crop, pixels, source, background, region.original, others) ?: return@mapIndexed region
+        val masks = bubble.lettering(background, region.vertical) ?: return@mapIndexed region
         val enclosing = Rect(masks.first()).apply { masks.drop(1).forEach(::union) }
         fun normalized(rect: Rect) = MangaTextBox((rect.left + 0.01f) * 1000 / bitmap.width,
             (rect.top + 0.01f) * 1000 / bitmap.height, rect.right * 1000f / bitmap.width, rect.bottom * 1000f / bitmap.height)
         val recovered = region.copy(textBox = normalized(enclosing), eraseBoxes = masks.map(::normalized),
             recognitionBox = original, sourceFontSize = null)
         val anchored = MangaPageComposer.anchor(bitmap, MangaTranslationPlan(listOf(recovered))).regions.single()
-        val layout = bubble.layout(anchored, bitmap.height) ?: return@map region
-        anchored.copy(layoutBox = normalized(layout))
+        val layout = bubble.layout(anchored, bitmap.height) ?: return@mapIndexed region
+        // 只有显式选择「本地轮廓推断」时才持久化 mask：其余来源的气泡几何仍由既有 owner 决定。
+        anchored.copy(layoutBox = normalized(layout),
+            bubbleShape = if (withShapes) bubble.shape("outline-$index", bitmap.width, bitmap.height) else null)
     })
+}
+
+/**
+ * Shape-only variant for AI-authored layout: the remote plan owns textBox/layoutBox and its explicit
+ * rows, so this pass adds nothing but a locally verified mask.
+ */
+internal fun outlineBubbleShapes(bitmap: Bitmap, plan: MangaTranslationPlan): MangaTranslationPlan {
+    val recovered = recoverMangaBubbles(bitmap, plan, withShapes = true)
+    return plan.copy(regions = plan.regions.mapIndexed { index, region ->
+        recovered.regions.getOrNull(index)?.bubbleShape?.let { region.copy(bubbleShape = it) } ?: region
+    })
+}
+
+/**
+ * Flooded row spans already are the writable interior; they become the persistent mask for both
+ * erasing and fitting. Rows stay in ascending order, so the run encoding needs no sorting.
+ */
+private fun BubbleInterior.shape(id: String, width: Int, height: Int): MangaBubbleShape? {
+    val shapeWidth = bounds.width(); val shapeHeight = bounds.height()
+    if (shapeWidth <= 0 || shapeHeight <= 0 || shapeWidth.toLong() * shapeHeight > 1024 * 1024) return null
+    val runs = ArrayList<Int>(shapeHeight * 2)
+    for (y in 0 until shapeHeight) {
+        val row = bounds.top + y
+        if (row !in left.indices) return null
+        val from = left[row]; val to = right[row]
+        if (to <= from) continue
+        runs += y * shapeWidth + (from - bounds.left)
+        runs += to - from
+    }
+    if (runs.isEmpty() || runs.size > 65536) return null
+    return MangaBubbleShape(id, MangaTextBox(
+        (bounds.left + crop.left + .01f) * 1000 / width, (bounds.top + crop.top + .01f) * 1000 / height,
+        (bounds.right + crop.left) * 1000f / width, (bounds.bottom + crop.top) * 1000f / height),
+        shapeWidth, shapeHeight, runs)
 }
 
 private class BubbleInterior(

@@ -146,6 +146,3 @@
 -dontwarn java.lang.management.**
 -dontwarn io.ktor.util.debug.IntellijIdeaDebugDetector
 -keep,allowobfuscation class io.ktor.util.debug.** { *; }
-
-# ONNX Runtime JNI constructs Java tensor/metadata classes by their original names.
--keep class ai.onnxruntime.** { *; }

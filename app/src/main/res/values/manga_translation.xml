@@ -40,6 +40,7 @@
     <string name="manga_translation_default_model">Follow AI settings (chapter translation preset)</string>
     <string name="manga_model_size">%1$.1f MiB</string>
     <string name="manga_translation_model_relation">How recognition, translation and composition relate</string>
+    <string name="manga_translation_model_relation_hint">Recognition, translation and composition can collapse into one request; cost and what stays adjustable change with it.</string>
     <string name="manga_translation_model_relation_roles">The OCR model reads the source lettering and bubble positions, the translation model translates it, and the composition stage produces the translated page locally or with an image model.</string>
     <string name="manga_translation_model_relation_merge">Setting the OCR model to \"Recognize with the translation model\", or selecting the same model for both, merges the three steps into one cheaper request. Different models run recognition, text-only translation and visual layout in sequence.</string>
     <string name="manga_translation_image_model">Image editing model</string>
@@ -54,7 +55,6 @@
     <string name="manga_translation_retry_current">Translate current page again</string>
     <string name="manga_translation_glossary">Names and terminology</string>
     <string name="manga_translation_glossary_hint">One entry per line: original=translation</string>
-    <string name="manga_translation_save_glossary">Save terminology</string>
     <string name="manga_translation_clear">Clear translated images</string>
     <string name="manga_translation_progress">Images completed: %1$d/%2$d</string>
     <string name="manga_translation_preparing">Reading the original and planning analysis</string>
@@ -102,21 +102,17 @@
     <string name="feature_manga_recompose_short">Recompose</string>
     <string name="feature_manga_save_translation">Save translation</string>
 
-    <string name="manga_translation_pipeline_summary">Pipeline: %1$s</string>
-    <string name="manga_translation_pipeline_ai_vision">AI vision recognition</string>
-    <string name="manga_translation_pipeline_fused">recognition and translation combined</string>
-    <string name="manga_translation_pipeline_ai">AI translation</string>
-    <string name="manga_translation_pipeline_ai_preset">AI translation · chapter translation preset</string>
-    <string name="manga_translation_pipeline_local_fast">local typesetting</string>
-    <string name="manga_translation_pipeline_local_erase">local erase and typesetting</string>
-    <string name="manga_translation_pipeline_unknown_model">unknown model</string>
-
     <string name="manga_translation_engine">Translation engine</string>
     <string name="manga_translation_engine_ai">AI text model</string>
     <string name="manga_translation_engine_google">Google Translate</string>
-    <string name="manga_translation_engine_google_hint">Sends each text region separately: no glossary, no cross-balloon context, and a failure never falls back to AI.</string>
     <string name="manga_translation_engine_follow">Follow translation settings</string>
-    <string name="manga_translation_engine_follow_hint">Runs whichever engine Translation settings selects (Google or AI) and still requires a separate recognition stage.</string>
     <string name="manga_translation_engine_unavailable">A non-AI engine needs a separate recognition stage: use on-device or cloud OCR, or pick a vision model for AI recognition. Whole-page edits cannot use it.</string>
     <string name="manga_translation_google_failed">Google Translate failed, translated image not updated: %1$s</string>
+
+    <string name="manga_translation_recognition_hint">Recognition emits text blocks and coordinates; the locator decides whether a vision model or OCR handles it.</string>
+    <string name="manga_translation_recognition_detail">Recognition only produces text and geometry; the rest of this group chooses the path:\n\n- **AI vision**: the whole page goes to a vision model, one request returns text and boxes without OCR, billed per image request.\n- **On-device OCR**: models ship on the device, run offline and are not billed, comic build only.\n- **Cloud OCR**: the image is uploaded and recognized remotely, billed per call.\n\nSpecify the source language explicitly where possible: “Auto” makes the model infer it, which misreads mixed pages more often.\n\nPreprocessing (upscale, invert, binarize) applies to on-device OCR only and needs a retranslate to take effect.\n\nWithout an on-device runtime, saved on-device options fall back to what this build supports, and automatic translation is paused so it cannot start billed cloud recognition on its own.</string>
+    <string name="manga_translation_basic_hint">The text stage translates line by line; the engine decides glossary, context and fallback behavior.</string>
+    <string name="manga_translation_basic_detail">Each recognized line is translated one to one:\n\n- **AI text model**: glossary, neighbouring dialogue and a retry budget, requires an AI key.\n- **Google Translate**: one request per line to the free endpoint, no glossary or cross-balloon context, and no fallback to AI on failure.\n- **Follow translation settings**: uses the global engine from Translation settings, applied from the next page.\n\n“Combine with AI recognition” means one model does recognition and translation in a single request, so there is no separate text stage; the engine can still be switched, and choosing Google only hands the text to an external engine.\n\nThinking level applies to AI requests only; the retry count covers automatic retries of a failed page.</string>
+    <string name="manga_translation_processing_hint">The composition stage decides how the translation is laid out and whether erasing and typesetting run locally.</string>
+    <string name="manga_translation_processing_detail">Composition produces the final image:\n\n- **Local erase and typesetting**: erase the source text, then typeset with the on-device font, no network request.\n- **Cover source text and typeset**: keep the original lettering, paint over it and typeset on top.\n- **AI erase, local typesetting**: an image model removes the text, typesetting stays on device, billed per image request.\n- **AI redraw a region / the whole page**: a model repaints the region or the page; a whole-page redraw has no text stage.\n\nA whole-page redraw sends only image edit requests, billed per page segment, with no recognition or translation requests.\n\nModel-based erase engines and on-device bubble detection are comic build only; text scale applies to local typesetting only.</string>
 </resources>

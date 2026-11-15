@@ -161,3 +161,26 @@ SMART／PATCH 输出分别与此前验证图逐字节相同；零线上 AI 请�
 记录在忽略目录 vertical-layout/remove-options-final.log、remove-options-unit-results.zip、
 options-removed-native.log 和 options-removed-recomposed/。未跑全量 Lint、Release／R8，
 本次未重新调用真实云端识图或图片编辑服务。
+
+## 2026-11-01 遮罩、来源与缓存维度归位
+
+- 几何版本 12 → 13：AI 排版（每个 region 都带 `typesetting`）此前直接走 `separateLayouts` 提前
+  返回，跳过 `MangaContainerGeometry.attach`，于是「有 AI 排版反而没有气泡遮罩」，擦除范围不受
+  气泡约束。现在提前返回分支仍补遮罩，但 `attach` 回写的 `layoutBox` 会被还原，AI 给出的排版坐标
+  与字号保持不变。渲染版本 24 → 25，旧合成图失效重算，付费分析结果继续复用。
+- `MangaTranslationPlan` 新增 `geometrySource`：记录生成该本地几何时采信的气泡来源。重新排版在
+  几何版本过期**或来源变化**时重建几何；此前只比较版本和字号，换来源后仍沿用旧遮罩。
+- 气泡来源不再是付费分析键的无条件维度：只有 AI 识别会把来源写进请求（是否附锚点、是否要求容器框），
+  因此只在 `locator == AI && composition != AI_PAGE` 时参与分析键；本地/云端识别只把它记进
+  `geometryFile` 名字，整页重绘完全不参与。此前切换来源会让整页图片编辑重跑一次。
+- core（无本地运行时）降级把本地识别换成云端 AI 时，一并把 `automatic` 置为暂停：识别从免费端侧
+  变成付费云端上传，不能沿用用户当初的选择静默开跑。
+- 产物差异只允许出现在"选项可见性"上，不允许出现在"同一个选项的行为"上。本地识别、模型擦字、
+  端侧气泡检测这三个档位在 core 里**仍然列出但置灰**，显示名带"仅漫画增强版"，且不可选中
+  （`DropdownListSettingItem.unavailableValues`）；点到置灰项会弹一句"需要漫画增强版"的提示
+  （miuix 引擎的 spinner 无法压灰，只靠这条提示补偿）。`SMART` 等组合方式在两包语义一致，
+  擦字方式由独立的「擦字引擎」表达（full 同时保留「内置」）。
+- 被静默改写的选择要能解释：`MangaTranslationGateway.storedSettings()` 返回未降级的存储值，
+  `MangaSettingsRelevance.of(settings, capabilities, stored)` 比较后把 `LOCATOR`／`INPAINT_ENGINE`／
+  `BUBBLE_SOURCE` 标成 degraded，界面在对应控件下方说明"保存过的端侧选择不可用"。比较只用于
+  解释，不参与运行与缓存键。

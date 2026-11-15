@@ -12,7 +12,7 @@ import io.legado.app.ui.widget.components.button.series.SmallTonalButton
 
 @Composable
 internal fun mangaInpaintEngineName(engine: MangaInpaintEngine): String = when (engine) {
-    MangaInpaintEngine.LOCAL -> stringResource(R.string.manga_inpaint_local)
+    MangaInpaintEngine.BUILTIN -> stringResource(R.string.manga_inpaint_local)
     MangaInpaintEngine.MI_GAN -> "MI-GAN"
     MangaInpaintEngine.LAMA -> "LaMa"
 }

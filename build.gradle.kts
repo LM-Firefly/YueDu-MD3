@@ -196,6 +196,8 @@ buildscript {
 }
 
 plugins {
+    // printToolchainJavaHome 用它取 toolchain（foojay-resolver 动态供给 JDK 21）
+    `java-base`
     alias(libs.plugins.compose.compiler) apply false
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
@@ -228,8 +230,23 @@ versionCatalogUpdate {
     }
 }
 
-tasks.register<Delete>("clean") {
+// java-base（lifecycle-base）已注册 clean，这里只补充删除根构建目录
+tasks.named<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
+}
+
+// 供 scripts/prepare-ui-forks.py 动态取 JDK 21：toolchain 由 foojay-resolver（settings.gradle）
+// 供给，fork 构建的启动 JVM 与开发机 JAVA_HOME 解耦（mochi 的 Gradle 8.x 要求启动 JVM ≤24，
+// toolchain 机制管不到 Gradle 自己的启动 JVM，只能由脚本显式传入）。
+tasks.register("printToolchainJavaHome") {
+    group = "help"
+    description = "输出 toolchain JDK 21 的安装路径，供脚本作为 fork 构建的启动 JVM"
+    val launcher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+    doLast {
+        println(launcher.get().metadata.installationPath.asFile.absolutePath)
+    }
 }
 
 val verifyConfigArchitecture = tasks.register<VerifyConfigArchitectureTask>(
@@ -280,7 +297,6 @@ val verifyConfigArchitecture = tasks.register<VerifyConfigArchitectureTask>(
         mapOf(
             "io/legado/app/ui/association/AddToBookshelfDialog.kt" to 5,
             "io/legado/app/ui/association/ImportReplaceRuleDialog.kt" to 1,
-            "io/legado/app/ui/association/ImportRssSourceDialog.kt" to 1,
             "io/legado/app/ui/book/read/ReadBookController.kt" to 2,
             // 护栏缺席期间 main 新增（整书页码估算），随合并冻结
             "io/legado/app/ui/book/read/pageestimate/ExactChapterPageCountStore.kt" to 3,

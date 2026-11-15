@@ -13,7 +13,7 @@ class MangaTranslationPipelineTest {
             locator = MangaLocator.AI, composition = MangaComposition.SMART, modelId = "text", ocrModelId = ""))
         assertEquals(MangaTranslationPipeline.Recognition.AiVision(""), pipeline.recognition)
         assertEquals(MangaTranslationPipeline.Translation.FusedWithRecognition, pipeline.translation)
-        assertEquals(MangaTranslationPipeline.Composition.LocalLayout(MangaInpaintEngine.LOCAL), pipeline.composition)
+        assertEquals(MangaTranslationPipeline.Composition.LocalLayout(MangaInpaintEngine.BUILTIN), pipeline.composition)
     }
 
     @Test fun `separate vision model exposes a pure text translation stage`() {
@@ -65,7 +65,7 @@ class MangaTranslationPipelineTest {
             locator = MangaLocator.LOCAL, textEngine = MangaTranslateEngine.GOOGLE, modelId = "text"))
         assertEquals(MangaTranslationPipeline.Recognition.LocalOcr(MangaLocalOcrEngine.ML_KIT), pipeline.recognition)
         assertEquals(MangaTranslationPipeline.Translation.GoogleText, pipeline.translation)
-        assertEquals(MangaTranslationPipeline.Composition.LocalLayout(MangaInpaintEngine.LOCAL), pipeline.composition)
+        assertEquals(MangaTranslationPipeline.Composition.LocalLayout(MangaInpaintEngine.BUILTIN), pipeline.composition)
     }
 
     @Test fun `settings written before the engine choice decode as ai`() {

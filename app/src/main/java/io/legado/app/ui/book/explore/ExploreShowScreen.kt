@@ -41,13 +41,11 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.chrisbanes.haze.HazeState
 import io.legado.app.R
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.domain.model.BookShelfState
 import io.legado.app.ui.main.bookCoverSharedElementKey
-import io.legado.app.ui.theme.responsiveHazeEffect
-import io.legado.app.ui.theme.responsiveHazeSource
+import io.legado.app.ui.theme.LocalBottomOverlayPadding
 import io.legado.app.ui.widget.components.AppPullToRefresh
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.LoadMoreFooter
@@ -172,7 +170,6 @@ fun ExploreShowScreen(
     val defaultScrollBehavior = GlassTopAppBarDefaults.defaultScrollBehavior()
     val scrollBehavior = embeddedScrollBehavior ?: defaultScrollBehavior
     val isGridMode = state.layoutState == 1
-    val hazeState = remember { HazeState() }
     val showLoadMoreFooter = !state.isRefreshing &&
         (state.isLoading || state.errorMsg != null || state.isEnd)
     val canLoadMore = state.books.isNotEmpty() &&
@@ -295,17 +292,12 @@ fun ExploreShowScreen(
                 if (isGrid) {
                     LazyVerticalStaggeredGrid(
                         state = gridState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .then(
-                                if (embeddedInMain) Modifier else Modifier.responsiveHazeSource(
-                                    hazeState
-                                )
-                            ),
+                        modifier = Modifier.fillMaxSize(),
                         columns = StaggeredGridCells.Fixed(state.gridCount),
                         contentPadding = PaddingValues(
                             top = paddingValues.calculateTopPadding() + 12.dp,
-                            bottom = paddingValues.calculateBottomPadding() + if (embeddedInMain) 108.dp else 12.dp,
+                            bottom = paddingValues.calculateBottomPadding() +
+                                if (embeddedInMain) 108.dp.coerceAtLeast(LocalBottomOverlayPadding.current) else 12.dp,
                             start = 12.dp,
                             end = 12.dp
                         ),
@@ -354,17 +346,12 @@ fun ExploreShowScreen(
                     }
                 } else {
                     LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .then(
-                                if (embeddedInMain) Modifier else Modifier.responsiveHazeSource(
-                                    hazeState
-                                )
-                            ),
+                        modifier = Modifier.fillMaxSize(),
                         state = listState,
                         contentPadding = PaddingValues(
                             top = paddingValues.calculateTopPadding(),
-                            bottom = paddingValues.calculateBottomPadding() + if (embeddedInMain) 108.dp else 16.dp
+                            bottom = paddingValues.calculateBottomPadding() +
+                                if (embeddedInMain) 108.dp.coerceAtLeast(LocalBottomOverlayPadding.current) else 16.dp
                         )
                     ) {
                         itemsIndexed(
@@ -419,7 +406,6 @@ fun ExploreShowScreen(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
             topBar = {
                 GlassMediumFlexibleTopAppBar(
-                    modifier = Modifier.responsiveHazeEffect(state = hazeState),
                     title = state.selectedKindTitle ?: title,
                     navigationIcon = { TopBarNavigationButton(onClick = onBack) },
                     actions = {
@@ -466,6 +452,7 @@ fun ExploreShowScreen(
                         jumpPageInput = input.filter(Char::isDigit).take(4)
                     },
                     placeholder = { AppText(stringResource(R.string.explore_jump_page_hint)) },
+                    placeholderText = stringResource(R.string.explore_jump_page_hint),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 )
             },

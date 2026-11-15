@@ -93,6 +93,7 @@ object PreferKey {
     const val exportToWebDav = "webDavCacheBackup"
     const val exportNoChapterName = "exportNoChapterName"
     const val exportType = "exportType"
+    const val mangaExportFormat = "mangaExportFormat"
     const val exportPictureFile = "exportPictureFile"
     const val chineseConverterType = "chineseConverterType"
     const val launcherIcon = "launcherIcon"
@@ -218,6 +219,7 @@ object PreferKey {
     const val recordHeapDump = "recordHeapDump"
     const val optimizeRender = "optimizeRender"
     const val updateToVariant = "updateToVariant"
+    const val updateEndpoint = "updateEndpoint"
     const val autoCheckUpdateOnStart = "autoCheckUpdateOnStart"
     const val streamReadAloudAudio = "streamReadAloudAudio"
     const val pauseReadAloudWhilePhoneCalls = "pauseReadAloudWhilePhoneCalls"
@@ -253,6 +255,10 @@ object PreferKey {
     const val useFlexibleTopAppBar = "useFlexibleTopAppBar"
     const val topBarButtonStyle = "topBarButtonStyle"
     const val mergeTopBarActions = "mergeTopBarActions"
+    const val mochiTopBarLiquidGlass = "mochiTopBarLiquidGlass"
+    const val mochiScrollEdgeBlurEnabled = "mochiScrollEdgeBlurEnabled"
+    const val miuixTopBarLiquidGlass = "miuixTopBarLiquidGlass"
+    const val useHyperOs4Components = "useHyperOs4Components"
     const val bookInfoFollowCoverColor = "bookInfoFollowCoverColor"
     const val bookInfoBackgroundBlur = "bookInfoBackgroundBlur"
     const val bookInfoNetworkCoverBackground = "bookInfoNetworkCoverBackground"
@@ -366,6 +372,8 @@ object PreferKey {
     const val bookshelfGroupCoverCount = "bookshelfGroupCoverCount"
     const val bookshelfListCoverWidth = "bookshelfListCoverWidth"
     const val bookshelfGridCoverWidth = "bookshelfGridCoverWidth"
+    const val bookshelfGridFixedColumns = "bookshelfGridFixedColumns"
+    const val bookshelfGridFixedCoverWidth = "bookshelfGridFixedCoverWidth"
 
 
     const val tabletInterface = "tabletInterface"
@@ -380,6 +388,8 @@ object PreferKey {
     const val readAloudAndroidMediaControl = "readAloudAndroidMediaControl"
     const val finishCurrentChapterAfterTimer = "finishCurrentChapterAfterTimer"
     const val isPredictiveBackEnabled = "isPredictiveBackEnabled"
+    const val navigationAnimationStyle = "navigationAnimationStyle"
+    const val textAnimationLevel = "textAnimationLevel"
     const val readerSharedElementEnabled = "readerSharedElementEnabled"
     const val readRecordDisplayMode = "readRecordDisplayMode"
     const val replaceSortMode = "desc"
@@ -431,6 +441,7 @@ object PreferKey {
     const val paragraphBubblePackage = "paragraphBubblePackage"
     /** 正文里图片形式的段评入口是否强制用软件气泡渲染。 */
     const val forceSoftwareParagraphBubble = "forceSoftwareParagraphBubble"
+    const val paragraphCommentHeightPercent = "paragraphCommentHeightPercent"
     //我在干什么
 
     const val disableMangaScrollAnimation = "disableMangaScrollAnimation"

@@ -44,6 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -78,7 +79,6 @@ import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.theme.ProvideAppDensity
 import io.legado.app.ui.widget.components.AppTextField
 import io.legado.app.ui.widget.components.button.series.SmallOutlinedButton
-import io.legado.app.ui.widget.components.card.NormalCard
 import io.legado.app.ui.widget.components.dialog.ColorPickerSheet
 import io.legado.app.ui.widget.components.text.AppText
 import io.legado.app.utils.GSON
@@ -176,7 +176,7 @@ fun MarkingSelectionMenu(
         mutableStateOf(MarkingEffect.fromStyle(storedStyle))
     }
     var selectedColor by remember(state.selection, state.editing?.id, storedStyle) {
-        mutableStateOf(MarkingEffect.colorOf(storedStyle))
+        mutableIntStateOf(MarkingEffect.colorOf(storedStyle))
     }
     var useRules by remember(state.selection, state.editing?.id) { mutableStateOf(false) }
     var selectedRuleId by remember(state.selection, state.editing?.id) {
@@ -193,7 +193,7 @@ fun MarkingSelectionMenu(
     var showColorPicker by remember(state.selection, state.editing?.id) { mutableStateOf(false) }
     // 打开取色器的起始色：点尾部按钮用当前色，长按预设色则用被长按的色做基准微调
     var colorPickerSeed by remember(state.selection, state.editing?.id) {
-        mutableStateOf(selectedColor)
+        mutableIntStateOf(selectedColor)
     }
     var menuVisible by remember(menuState) { mutableStateOf(false) }
     var closing by remember(menuState) { mutableStateOf(false) }
@@ -270,9 +270,8 @@ fun MarkingSelectionMenu(
                     enter = SelectionMenuMotion.enter(transformOrigin),
                     exit = SelectionMenuMotion.exit(transformOrigin),
                 ) {
-                    NormalCard(
+                    ReaderSelectionMenuSurface(
                         modifier = Modifier.width(width),
-                        containerColor = LegadoTheme.colorScheme.surfaceBright,
                         elevation = 10.dp,
                         cornerRadius = 16.dp,
                     ) {
@@ -347,6 +346,7 @@ fun MarkingSelectionMenu(
                                     .fillMaxWidth()
                                     .heightIn(min = 88.dp),
                                 placeholder = { AppText(stringResource(R.string.bookmark_mark_note_hint)) },
+                                placeholderText = stringResource(R.string.bookmark_mark_note_hint),
                             )
 
                             if (state.editing != null) {

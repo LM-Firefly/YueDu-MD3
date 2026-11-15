@@ -5,6 +5,7 @@ import io.legado.app.data.repository.manga.translation.MangaTranslationRepositor
 import io.legado.app.domain.gateway.MangaTranslationGateway
 import io.legado.app.feature.manga.translation.MangaTranslationViewModel
 import io.legado.app.feature.settings.manga.MangaConfigViewModel
+import io.legado.app.feature.settings.search.SettingsSearchViewModel
 import io.legado.app.domain.gateway.AiImageGateway
 import io.legado.app.data.repository.ai.AiImageRepository
 import io.legado.app.data.repository.manga.translation.MangaImageEditor
@@ -92,6 +93,7 @@ import io.legado.app.data.repository.RssArticleRepository
 import io.legado.app.data.repository.RssFavoriteRepository
 import io.legado.app.data.repository.RssReadRecordRepository
 import io.legado.app.data.repository.RssRepository
+import io.legado.app.data.repository.RssSourceImporter
 import io.legado.app.data.repository.RssSourceEditRepository
 import io.legado.app.data.repository.RuleSubscriptionRepository
 import io.legado.app.data.repository.SearchContentRepository
@@ -109,6 +111,7 @@ import io.legado.app.data.repository.WebDavBackupRepository
 import io.legado.app.data.repository.WebDavReadingProgressRepository
 import io.legado.app.data.repository.manga.DefaultMangaReaderSession
 import io.legado.app.data.repository.manga.MangaReaderActionRepository
+import io.legado.app.data.repository.manga.MangaExportRepository
 import io.legado.app.data.repository.manga.MangaReaderDataRepository
 import io.legado.app.data.security.CloudTtsCredentialCipher
 import io.legado.app.domain.gateway.AiArtifactGateway
@@ -158,6 +161,7 @@ import io.legado.app.domain.gateway.LabSettingsGateway
 import io.legado.app.domain.gateway.LocalBookGateway
 import io.legado.app.domain.gateway.LocalPasswordGateway
 import io.legado.app.domain.gateway.MangaReaderDataGateway
+import io.legado.app.domain.gateway.MangaExportGateway
 import io.legado.app.domain.gateway.MangaReaderSessionFactory
 import io.legado.app.domain.gateway.MangaSettingsGateway
 import io.legado.app.domain.gateway.OtherConfigSystemGateway
@@ -245,7 +249,7 @@ import io.legado.app.ui.ai.chat.AiChatViewModel
 import io.legado.app.ui.association.ImportDictRuleViewModel
 import io.legado.app.ui.association.ImportHttpTtsViewModel
 import io.legado.app.ui.association.ImportReplaceRuleViewModel
-import io.legado.app.ui.association.ImportRssSourceViewModel
+import io.legado.app.feature.rss.source.RssSourceImportViewModel
 import io.legado.app.ui.association.ImportTxtTocRuleViewModel
 import io.legado.app.ui.book.audio.AudioPlayCoordinator
 import io.legado.app.ui.book.audio.AudioPlayViewModel
@@ -386,6 +390,7 @@ val appModule = module {
     single {
         SearchContentRepository(
             titleModeProvider = { io.legado.app.help.config.ReadBookConfig.titleMode },
+            paragraphIndentProvider = { io.legado.app.help.config.ReadBookConfig.paragraphIndent },
             historyDao = get(),
             readSettingsGateway = get(),
             otherSettingsGateway = get(),
@@ -420,22 +425,17 @@ val appModule = module {
     single<LabSettingsGateway> { LabSettingsRepository() }
     single<MangaSettingsGateway> { MangaSettingsRepository() }
     single<AiImageGateway> { AiImageRepository() }
-    single { io.legado.app.data.repository.manga.translation.MangaOcrModelRepository(get()) }
-    single<io.legado.app.domain.gateway.MangaOcrModelGateway> { get<io.legado.app.data.repository.manga.translation.MangaOcrModelRepository>() }
-    single { io.legado.app.data.repository.manga.translation.MangaInpaintModelRepository(get()) }
-    single<io.legado.app.domain.gateway.MangaInpaintModelGateway> { get<io.legado.app.data.repository.manga.translation.MangaInpaintModelRepository>() }
-    single { io.legado.app.data.repository.manga.translation.MangaLocalInpainter(get(), get()) }
-    single { io.legado.app.data.repository.manga.translation.MangaPaddleOcr(get()) }
+    // 本地引擎、模型仓库与可用/不可用装配由 engine 维度提供（见 MangaEngineModule）。
     single<io.legado.app.domain.gateway.MangaCloudOcrGateway> { io.legado.app.data.repository.manga.translation.MangaCloudOcrConfigRepository(get()) }
     single { io.legado.app.data.repository.manga.translation.MangaCloudOcr(get(), get()) }
-    single<MangaTranslationGateway> { MangaTranslationRepository(get(), get(), get(), get(), translationSettings = get(), imageEditor = MangaImageEditor(get())::edit,
-        paddleDetector = get<io.legado.app.data.repository.manga.translation.MangaPaddleOcr>()::detect,
+    single<MangaTranslationGateway> { MangaTranslationRepository(get(), get(), get(), get(), translationSettings = get(),
+        localEngine = get(),
+        imageEditor = MangaImageEditor(get())::edit,
         cloudDetector = get<io.legado.app.data.repository.manga.translation.MangaCloudOcr>()::detect,
-        inpaintReady = get<io.legado.app.data.repository.manga.translation.MangaLocalInpainter>()::requireReady,
-        inpaint = get<io.legado.app.data.repository.manga.translation.MangaLocalInpainter>()::erase,
         cloudIdentity = get<io.legado.app.data.repository.manga.translation.MangaCloudOcr>()::identity) }
     viewModelOf(::MangaTranslationViewModel)
     viewModelOf(::MangaConfigViewModel)
+    viewModelOf(::SettingsSearchViewModel)
     single<ChangeSourceSettingsGateway> { ChangeSourceSettingsRepository() }
     single<ImportBookSettingsGateway> { ImportBookSettingsRepository() }
     single<TranslationSettingsGateway> { TranslationSettingsRepository() }
@@ -463,6 +463,7 @@ val appModule = module {
     single<ReadStyleGateway> { get<ReadBookStyleConfigRepository>() }
     factoryOf(::MangaReaderDataRepository)
     factoryOf(::MangaReaderActionRepository)
+    factory<MangaExportGateway> { MangaExportRepository(get(), get()) }
     factory<MangaReaderDataGateway> { get<MangaReaderDataRepository>() }
     factory<MangaReaderSessionFactory> {
         MangaReaderSessionFactory {
@@ -556,6 +557,7 @@ val appModule = module {
     single<ExploreRepository> { get<ExploreRepositoryImpl>() }
     single<ExploreBooksGateway> { get<ExploreRepositoryImpl>() }
     singleOf(::RssRepository)
+    singleOf(::RssSourceImporter)
     singleOf(::RssFavoriteRepository)
     singleOf(::RssArticleRepository)
     singleOf(::RssReadRecordRepository)
@@ -609,7 +611,7 @@ val appModule = module {
     viewModelOf(::ImportDictRuleViewModel)
     viewModelOf(::ImportHttpTtsViewModel)
     viewModelOf(::ImportReplaceRuleViewModel)
-    viewModelOf(::ImportRssSourceViewModel)
+    viewModelOf(::RssSourceImportViewModel)
     viewModelOf(::ImportTxtTocRuleViewModel)
     viewModelOf(::HighlightTagRuleViewModel)
     viewModelOf(::MultiRoleRuleViewModel)

@@ -71,10 +71,10 @@ import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurBlendMode
 import top.yukonga.miuix.kmp.blur.BlurColors
 import top.yukonga.miuix.kmp.blur.BlurDefaults
-import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.interfaces.ExperimentalScrollBarApi
+import top.yukonga.miuix.kmp.material.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.compose.ui.graphics.BlendMode as ComposeBlendMode
@@ -83,6 +83,7 @@ import androidx.compose.ui.graphics.BlendMode as ComposeBlendMode
 fun MiuixAboutScreen(
     state: AboutUiState,
     onIntent: (AboutIntent) -> Unit,
+    onOpenLicenses: () -> Unit,
     onBack: () -> Unit = {},
     versionName: String = appInfo.versionName,
 ) {
@@ -164,6 +165,7 @@ fun MiuixAboutScreen(
                     scrollProgress = scrollProgress,
                     versionName = versionName,
                     onIntent = onIntent,
+                    onOpenLicenses = onOpenLicenses,
                 )
             }
         }
@@ -178,6 +180,7 @@ private fun AboutContent(
     scrollProgress: Float,
     versionName: String,
     onIntent: (AboutIntent) -> Unit,
+    onOpenLicenses: () -> Unit,
 ) {
     val appState = LocalAppState.current
     val isWideScreen = LocalIsWideScreen.current
@@ -440,6 +443,10 @@ private fun AboutContent(
                         ArrowPreference(
                             title = stringResource(R.string.license),
                             onClick = { onIntent(AboutIntent.ShowMdFile(licenseTitle, "LICENSE.md")) },
+                        )
+                        ArrowPreference(
+                            title = stringResource(R.string.about_third_party_licenses),
+                            onClick = onOpenLicenses,
                         )
                         ArrowPreference(
                             title = stringResource(R.string.disclaimer),

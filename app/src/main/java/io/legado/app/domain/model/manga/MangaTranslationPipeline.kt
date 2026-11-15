@@ -69,7 +69,7 @@ data class MangaTranslationPipeline(
                 pageEdit -> Translation.Unused
                 settings.textEngine == MangaTranslateEngine.GOOGLE -> Translation.GoogleText
                 settings.textEngine == MangaTranslateEngine.FOLLOW_SETTINGS -> Translation.FollowSettings
-                settings.usesAiTypesetting && settings.ocrModelId.isBlank() -> Translation.FusedWithRecognition
+                settings.fusedRecognition -> Translation.FusedWithRecognition
                 else -> Translation.AiText(settings.modelId)
             }
             val composition = when (settings.composition) {

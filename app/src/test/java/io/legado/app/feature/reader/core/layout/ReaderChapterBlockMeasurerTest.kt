@@ -1,25 +1,190 @@
 package io.legado.app.feature.reader.core.layout
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import io.legado.app.feature.reader.bookForegroundOverrides
+import io.legado.app.feature.reader.core.model.ReaderElement
+import io.legado.app.feature.reader.core.model.ReaderImageDrawLayout
 import io.legado.app.feature.reader.core.model.ReaderTextStyle
 import io.legado.app.feature.reader.core.source.ReaderChapterInlineSource
 import io.legado.app.feature.reader.core.source.ReaderChapterSource
 import io.legado.app.feature.reader.core.source.ReaderChapterSourceBlock
 import io.legado.app.feature.reader.core.source.ReaderChapterSourceParser
-import io.legado.app.feature.reader.core.source.ReaderHtmlImageSpanExtent
 import io.legado.app.feature.reader.core.source.ReaderInlineSourceStyle
 import io.legado.app.feature.reader.core.source.ReaderTitleSegmentation
 import io.legado.app.feature.reader.core.style.ReaderCharacterStyle
 import io.legado.app.feature.reader.core.style.ReaderStyleRange
 import io.legado.app.feature.reader.core.style.ReaderStyleTarget
+import io.legado.app.feature.reader.platform.ReaderLocalPresentationResolver
+import io.legado.app.help.book.MixedContentSegments
+import io.legado.app.model.localBook.LocalBookSemanticHtml
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import org.jsoup.Jsoup
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.coroutines.cancellation.CancellationException
 
 class ReaderChapterBlockMeasurerTest {
+    @Test
+    fun linkedLocalIconUsesScreenDensityAndCanBeTappedAcrossItsLine() = runBlocking {
+        val doc = Jsoup.parse("""
+            <style>.notes a img { width: 16px; height: 1em; }</style>
+            <section class="notes"><p>甲<a href="#note"><img src="note.png"></a>乙</p>
+            <p id="note">注释</p></section>
+        """.trimIndent())
+        LocalBookSemanticHtml.inlineDocumentCssSemantics(doc) { null }
+        val appearance = checkNotNull(ReaderLocalPresentationResolver.resolve(doc.body().outerHtml()))
+        val paragraphs = MixedContentSegments.paragraphs(appearance.content, "", false)
+        val styled = ReaderChapterSourceParser.parse(0, "", paragraphs, false, true, localPresentation = appearance)
+        val plain = ReaderChapterSourceParser.parse(0, "", paragraphs, false, false)
+        assertEquals("甲\uFFFC乙\n注释\n", styled.semanticContent)
+        assertEquals(plain.semanticContent, styled.semanticContent)
+        assertEquals(plain.paragraphs, styled.paragraphs)
+        assertEquals(4, styled.anchorPositions["note"])
+
+        val measurer = ReaderChapterBlockMeasurer(shaper, shaper, { ReaderImageDimensions(20f, 100f) })
+        val measureStyle = style.copy(
+            bodyStyle = style.bodyStyle.copy(fontSizePx = 30f),
+            bodyIndentCharacters = 0,
+            bodyLineHeightPx = 48f,
+            bodyBaselineOffsetPx = 36f,
+            localImageDensity = 3f,
+        )
+        val measured = measurer.measure(styled, measureStyle) as ReaderChapterMeasureResult.Success
+        val page = ReaderPaginator.paginateBlocks(measured.blocks, ReaderPaginationConfig(
+            0, "", 500, 1000, 0f, 0f, 0f, 0f, 48f, 36f,
+        )).single()
+        val image = page.elements.filterIsInstance<ReaderElement.Image>().single()
+        assertTrue(image.inline)
+        assertEquals(1, image.chapterPosition)
+        assertEquals("#note", image.link)
+        assertTrue(image.touchBounds.top < image.bounds.top)
+        assertEquals(image, page.elementAt(image.bounds.left + 5f, image.bounds.top - 1f))
+        assertEquals(
+            ReaderImageDrawLayout(image.bounds.left, image.bounds.top, 48f, 30f),
+            ReaderImageDrawLayout.forElement(image, 20, 100),
+        )
+        val singlePage = measurer.measure(styled, measureStyle.copy(
+            imageLayoutMode = ReaderImageLayoutMode.SINGLE_PAGE,
+        )) as ReaderChapterMeasureResult.Success
+        val standalone = singlePage.blocks.filterIsInstance<ReaderMeasuredBlock.Image>().single()
+        assertTrue(standalone.pageBreakBefore && standalone.pageBreakAfter)
+    }
+
+    @Test
+    fun tallLocalIconDoesNotInterceptTheNextLineInTightSpacing() {
+        val paragraph = ReaderMeasuredBlock.InlineParagraph(
+            items = listOf(
+                ReaderMeasuredInlineItem.Image("note.png", 12f, 20f, 0, link = "#note", useMeasuredBounds = true),
+                ReaderMeasuredInlineItem.Text("甲", 12f, style.bodyStyle, 1),
+            ),
+            indentCharacters = 0,
+            alignment = ReaderTextAlignment.START,
+            lineHeightPx = 12f,
+            baselineOffsetPx = 9f,
+            baseTextSizePx = 10f,
+            lineSpacingMultiplier = 0.8f,
+        )
+        val page = ReaderPaginator.paginateBlocks(listOf(paragraph), ReaderPaginationConfig(
+            0, "", 15, 100, 0f, 0f, 0f, 0f, 12f, 9f,
+        )).single()
+        val image = page.elements.filterIsInstance<ReaderElement.Image>().single()
+        val text = page.elements.filterIsInstance<ReaderElement.Text>().single()
+        assertTrue(text.bounds.top >= image.bounds.bottom)
+        assertEquals(text, page.elementAt(text.bounds.left + 5f, text.bounds.top))
+    }
+
+    @Test
+    fun localPresentationKeepsCanonicalBodyAndBgmOrdinalsWhileDrawingRulesAndNumbers() = runBlocking {
+        val fixture = io.legado.app.support.ReaderSemanticFixtures
+        val canonical = io.legado.app.model.localBook.LocalBookSemanticHtml.plainText(
+            org.jsoup.Jsoup.parse(fixture.html).body().outerHtml())
+        val values = io.legado.app.help.book.MixedContentSegments.paragraphs(canonical, "", false)
+        val presentation = checkNotNull(io.legado.app.feature.reader.platform.ReaderLocalPresentationResolver
+            .resolve(fixture.html))
+        val source = ReaderChapterSourceParser.parse(0, "", values, false, true,
+            localPresentation = presentation, bgmScenes = mapOf(1 to ("rain" to "wind")))
+        val result = ReaderChapterBlockMeasurer(shaper, shaper, { null })
+            .measure(source, style.copy(bodyIndentCharacters = 0)) as ReaderChapterMeasureResult.Success
+        val page = ReaderPaginator.paginateBlocks(result.blocks, ReaderPaginationConfig(
+            0, "", 500, 1000, 0f, 0f, 0f, 0f, 10f, 8f)).single()
+        assertEquals(fixture.body, source.semanticContent)
+        assertEquals((0..8).toList(), source.paragraphs.map { it.ordinal })
+        assertEquals(listOf("3.", "8."), page.elements
+            .filterIsInstance<io.legado.app.feature.reader.core.model.ReaderElement.ParagraphMarker>().mapNotNull { it.label })
+        assertEquals(1, result.blocks.filterIsInstance<ReaderMeasuredBlock.Rule>().size)
+        assertTrue(result.blocks.filterIsInstance<ReaderMeasuredBlock.BlankLine>().any { !it.semantic })
+        val linked = page.elements.filterIsInstance<io.legado.app.feature.reader.core.model.ReaderElement.Text>()
+            .first { it.link == "#chapter" }
+        assertEquals(linked, page.elementAt((linked.bounds.left + linked.bounds.right) / 2f,
+            (linked.bounds.top + linked.bounds.bottom) / 2f))
+        val capsules = result.blocks.filterIsInstance<ReaderMeasuredBlock.InlineParagraph>()
+            .flatMap { it.items }.filterIsInstance<ReaderMeasuredInlineItem.BgmScene>()
+        assertEquals(listOf(1), capsules.map { it.paragraphIndex })
+        assertTrue(io.legado.app.feature.reader.core.semantic.ReaderSemanticContract.validate(source).isEmpty())
+        val smallPages = ReaderPaginator.paginateBlocks(result.blocks, ReaderPaginationConfig(
+            0, "", 500, 10, 0f, 0f, 0f, 0f, 10f, 8f))
+        val positions = smallPages.map(io.legado.app.feature.reader.core.navigation.ReaderPageNavigator::pageStart)
+        assertEquals(positions.sorted(), positions)
+        assertTrue(positions.all { it in 0..source.characterCount })
+        assertTrue(smallPages.flatMap { it.elements }.filterIsInstance<io.legado.app.feature.reader.core.model.ReaderElement.Spacer>()
+            .any { it.semanticLength == 0 })
+    }
+
+    @Test
+    fun localMarkColorAndSizeReachPagedGlyphsWithoutChangingPositions() = runBlocking {
+        val html = "<p id='n' style='color:black'><mark style='color:red;font-size:150%'>甲乙</mark>" +
+            "<small><a href='#n'>丙丁</a></small>戊己<span style='color:navy'>庚</span>" +
+            "<span style='color:teal'>辛</span>壬癸</p>"
+        val appearance = checkNotNull(io.legado.app.feature.reader.platform.ReaderLocalPresentationResolver.resolve(html))
+        val source = ReaderChapterSourceParser.parse(0, "",
+            io.legado.app.help.book.MixedContentSegments.paragraphs(appearance.content, "", false),
+            false, true, localPresentation = appearance)
+        val readerColor = 0xFFADADAD.toInt()
+        val black = 0xFF000000.toInt()
+        val measured = ReaderChapterBlockMeasurer(shaper, shaper, { null })
+            .measure(source, style.copy(
+                bodyIndentCharacters = 0,
+                bodyStyle = style.bodyStyle.copy(colorArgb = readerColor),
+                styleRanges = listOf(ReaderStyleRange(5, 6, ReaderStyleTarget.BODY, ReaderCharacterStyle(colorArgb = black))),
+            )) as ReaderChapterMeasureResult.Success
+        val pages = ReaderPaginator.paginateBlocks(measured.blocks, ReaderPaginationConfig(
+            0, "", 30, 30, 0f, 0f, 0f, 0f, 10f, 8f))
+        val glyphs = pages.flatMap { it.elements }.filterIsInstance<io.legado.app.feature.reader.core.model.ReaderElement.Text>()
+        assertTrue(pages.size > 1)
+        assertEquals("甲乙丙丁戊己庚辛壬癸", glyphs.joinToString("") { it.value })
+        assertEquals((0..9).toList(), glyphs.map { it.chapterPosition })
+        assertEquals(listOf(true, true) + List(8) { false }, glyphs.map { it.style.marked })
+        assertEquals(0xFFFF0000.toInt(), glyphs.first().style.colorArgb)
+        assertEquals(15f, glyphs.first().style.fontSizePx, 0.001f)
+        assertEquals(8f, glyphs[2].style.fontSizePx, 0.001f)
+        assertEquals("#n", glyphs[2].link)
+        val styles = glyphs.map { it.style }.toSet()
+        val nightOverrides = bookForegroundOverrides(styles, Color.Black)
+        assertEquals(readerColor, nightOverrides[glyphs[4].style])
+        assertEquals(black, glyphs[5].style.colorArgb)
+        assertTrue(glyphs[5].style !in nightOverrides)
+        val adjustedNavy = Color(nightOverrides.getValue(glyphs[6].style))
+        assertTrue(adjustedNavy.blue > adjustedNavy.red && adjustedNavy.red == adjustedNavy.green)
+        assertTrue(adjustedNavy.luminance() >= 0.1f)
+        assertTrue(glyphs[7].style !in nightOverrides)
+        assertTrue(bookForegroundOverrides(styles, Color.White).isEmpty())
+        val paleRed = glyphs[6].style.copy(colorArgb = 0xFFFFCCCC.toInt())
+        val adjustedRed = Color(bookForegroundOverrides(setOf(paleRed), Color.White).getValue(paleRed))
+        assertTrue(adjustedRed.red > adjustedRed.green && adjustedRed.green == adjustedRed.blue)
+        assertTrue(adjustedRed.luminance() <= 0.3f)
+        pages.forEach { page ->
+            val rows = page.elements.filterIsInstance<io.legado.app.feature.reader.core.model.ReaderElement.Text>()
+                .groupBy { it.baselinePx }.values.toList()
+            rows.zipWithNext().forEach { (previous, next) ->
+                assertTrue(previous.maxOf { it.bounds.bottom } <= next.minOf { it.bounds.top } + 0.001f)
+            }
+        }
+    }
+
     @Test
     fun profilingKeepsMeasuredBlocksIdenticalWhenMostCharactersHaveNoStyle() = runBlocking {
         val source = ReaderChapterSourceParser.parse(0, "", listOf("甲乙丙丁"), false, false)
@@ -367,34 +532,6 @@ class ReaderChapterBlockMeasurerTest {
     }
 
     /**
-     * 旧 `setTypeHtml` 的行内图占位宽/行盒高取自 ImageSpan 本身（`getPrimaryHorizontal` 差值与
-     * span 的 ascent），不是占位字 advance；带 `"，{...}"` 且 style 为 text 时按它排版。
-     */
-    @Test
-    fun `html block inline image uses the image span extent`() = runBlocking {
-        val result = measureHtml(
-            items = listOf(
-                ReaderChapterInlineSource.Image(
-                    source = "icon,{\"style\":\"text\"}",
-                    chapterPosition = 5,
-                    htmlSpanExtent = ReaderHtmlImageSpanExtent(widthPx = 40f, heightPx = 24f),
-                ),
-            ),
-            style = style,
-            options = ReaderImageOptions(ReaderImageLayoutMode.INLINE),
-            dimensions = ReaderImageDimensions(100f, 50f),
-        )
-
-        val image = (result.blocks.single() as ReaderMeasuredBlock.InlineParagraph)
-            .items.single() as ReaderMeasuredInlineItem.Image
-        // 宽 = span advance（40f，不是占位字 10f）；高 = span 撑开的行盒高（24f）。
-        assertEquals(40f, image.widthPx, 0f)
-        assertEquals(24f, image.heightPx, 0f)
-        // 旧 `setTypeHtml` 行末图宽 = `measureText("\uFFFC")`（本测试 shaper 统一给 10f）。
-        assertEquals(10f, image.lineFinalWidthPx!!, 0f)
-    }
-
-    /**
      * 旧 `setTypeHtml` 对**没有 `,{...}`** 的图直接 `setTypeImage(imageStyle)`：不做 <80px 自动
      * 行内，小图也按整图排版（书级 TEXT 也落到 `setTypeImage` 的 else 分支）。
      */
@@ -475,20 +612,75 @@ class ReaderChapterBlockMeasurerTest {
         assertEquals(1.5f, blank.lineSpacingMultiplier, 0f)
     }
 
-    @Test fun htmlParagraphDoesNotInheritPlainBodyFirstLineIndent() = runBlocking {
-        val source = ReaderChapterSource(1, "", listOf(ReaderChapterSourceBlock.Html("x", 0)), 1)
+    @Test fun bodyParagraphsUseReaderIndentAndAlignmentAcrossPresentationPaths() = runBlocking {
+        for ((css, sourceAlignment) in listOf(
+            "" to null, "left" to ReaderTextAlignment.START, "justify" to ReaderTextAlignment.JUSTIFY,
+            "center" to ReaderTextAlignment.CENTER, "right" to ReaderTextAlignment.END,
+        )) {
+            val presentation = io.legado.app.feature.reader.platform.ReaderLocalPresentationResolver.resolve(
+                "<p style='text-align:$css'>正文</p>")
+            val local = ReaderChapterSourceParser.parse(0, "", listOf("正文"), false, true,
+                localPresentation = presentation)
+            val legacy = ReaderChapterSource(1, "", listOf(ReaderChapterSourceBlock.Html("x", 0)), 2)
+            val measurer = ReaderChapterBlockMeasurer(shaper, shaper, { null },
+                htmlSourceResolver = ReaderHtmlSourceResolver { _, position -> listOf(
+                    ReaderHtmlParagraph(listOf(ReaderChapterInlineSource.Text("正文", position)),
+                        alignment = sourceAlignment),
+                ) })
+            for (bodyAlignment in listOf(ReaderTextAlignment.START, ReaderTextAlignment.JUSTIFY)) {
+                for (source in listOf(local, legacy)) {
+                    val expectedAlignment = when (css) {
+                        "center" -> ReaderTextAlignment.CENTER
+                        "right" -> ReaderTextAlignment.END
+                        else -> bodyAlignment
+                    }
+                    val paragraph = (measurer.measure(source, style.copy(bodyAlignment = bodyAlignment))
+                        as ReaderChapterMeasureResult.Success).blocks.single() as ReaderMeasuredBlock.InlineParagraph
+                    val keepsIndent = css != "center" && css != "right"
+                    val case = "$css / $bodyAlignment / ${source.blocks.first()::class.simpleName}"
+                    assertEquals(case, expectedAlignment, paragraph.alignment)
+                    assertEquals(case, if (keepsIndent) 2 else 0, paragraph.indentCharacters)
+                    assertEquals(case, if (keepsIndent) 20f else 0f, paragraph.indentWidthPx!!, 0f)
+                }
+            }
+            assertEquals("正文\n", local.semanticContent)
+            assertEquals(listOf(0), local.paragraphs.map { it.ordinal })
+        }
+    }
+
+    @Test fun htmlHeadingAndQuoteKeepTheirOwnIndent() = runBlocking {
+        val source = ReaderChapterSource(
+            1, "", listOf(ReaderChapterSourceBlock.Html("x", 0)), 1,
+        )
         val result = ReaderChapterBlockMeasurer(
             bodyShaper = shaper,
             titleShaper = shaper,
             imageDimensionsResolver = { null },
             htmlSourceResolver = ReaderHtmlSourceResolver { _, position -> listOf(
-                ReaderHtmlParagraph(listOf(ReaderChapterInlineSource.Text("正文", position))),
+                ReaderHtmlParagraph(
+                    items = listOf(ReaderChapterInlineSource.Text("标题", position)),
+                    alignment = ReaderTextAlignment.START,
+                    preserveBodyIndent = false,
+                ),
+                ReaderHtmlParagraph(
+                    items = listOf(ReaderChapterInlineSource.Text("引文", position + 3)),
+                    firstLineMarginPx = 24f,
+                    restLineMarginPx = 24f,
+                    decorations = listOf(ReaderParagraphDecoration(
+                        ReaderParagraphDecorationKind.QUOTE, null, 2f,
+                    )),
+                    preserveBodyIndent = false,
+                ),
             ) },
         ).measure(source, style.copy(bodyIndentCharacters = 2)) as ReaderChapterMeasureResult.Success
 
-        val html = result.blocks.single() as ReaderMeasuredBlock.InlineParagraph
-        assertEquals(0, html.indentCharacters)
-        assertEquals(0f, html.indentWidthPx!!, 0f)
+        val paragraphs = result.blocks.filterIsInstance<ReaderMeasuredBlock.InlineParagraph>()
+        assertEquals(2, paragraphs.size)
+        assertEquals(ReaderTextAlignment.START, paragraphs[0].alignment)
+        assertEquals(0, paragraphs[0].indentCharacters)
+        assertEquals(0f, paragraphs[0].indentWidthPx!!, 0f)
+        assertEquals(0, paragraphs[1].indentCharacters)
+        assertEquals(24f, paragraphs[1].indentWidthPx!!, 0f)
     }
 
     @Test fun htmlParagraphCarriesBlockMarginsAndAlignmentIntoCanvasLayout() = runBlocking {

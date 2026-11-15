@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Layers
@@ -19,18 +18,15 @@ import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.legado.app.R
-import io.legado.app.domain.model.AiReasoningLevel
 import io.legado.app.domain.model.manga.MangaComposition
 import io.legado.app.domain.model.manga.MangaLocalOcrEngine
 import io.legado.app.domain.model.manga.MangaLocator
 import io.legado.app.domain.model.manga.MangaOcrModelPhase
 import io.legado.app.domain.model.manga.MangaOcrModelState
-import io.legado.app.domain.model.manga.MangaTranslateEngine
 import io.legado.app.domain.model.manga.MangaTranslationStage
-import io.legado.app.ui.ai.AiReasoningModeButton
 import io.legado.app.ui.theme.LegadoTheme
-import io.legado.app.ui.widget.components.SplicedColumnGroup
 import io.legado.app.ui.widget.components.alert.AppAlertDialog
+import io.legado.app.ui.widget.components.button.series.MediumOutlinedButton
 import io.legado.app.ui.widget.components.button.series.MediumTonalButton
 import io.legado.app.ui.widget.components.button.series.SmallOutlinedButton
 import io.legado.app.ui.widget.components.button.series.SmallPlainButton
@@ -73,21 +69,29 @@ fun MangaTranslationSheet(
         show = state.open && !diagnostics,
         title = stringResource(R.string.manga_translation_title),
         startAction = {
-            MediumTonalButton(onClick = { diagnostics = true }, icon = Icons.Default.BugReport,
-                contentDescription = stringResource(R.string.feature_manga_translation_diagnostics))
+            if (state.settings.composition in setOf(MangaComposition.SMART, MangaComposition.PATCH))
+                MediumTonalButton(
+                    onClick = { onIntent(MangaTranslationIntent.Recompose(chapter = true)) },
+                    enabled = state.loaded && !state.busy && state.chapterPages > 0,
+                    icon = Icons.Default.Layers,
+                    contentDescription = stringResource(R.string.manga_translation_recompose_chapter),
+                )
         },
         endAction = {
-            if (state.settings.composition != MangaComposition.AI_PAGE &&
-                state.settings.textEngine == MangaTranslateEngine.AI) AiReasoningModeButton(
-                level = AiReasoningLevel.fromStorage(state.settings.reasoningLevel),
-                enabled = state.loaded && !state.busy,
-                onLevelChange = { level ->
-                    onIntent(MangaTranslationIntent.ChangeSettings {
-                        it.copy(
-                            reasoningLevel = level.storageValue
+            MediumTonalButton(
+                onClick = {
+                    onIntent(
+                        MangaTranslationIntent.Translate(
+                            chapter = true, force = state.chapterTranslated
                         )
-                    })
+                    )
                 },
+                enabled = state.loaded && !state.busy && state.chapterPages > 0,
+                icon = Icons.Default.Translate,
+                contentDescription = stringResource(
+                    if (state.chapterTranslated) R.string.feature_manga_translation_retry_chapter
+                    else R.string.manga_translation_chapter, state.chapterPages
+                ),
             )
         },
         onDismissRequest = { onIntent(MangaTranslationIntent.Close) }) {
@@ -98,22 +102,13 @@ fun MangaTranslationSheet(
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 16.dp)
         ) {
-            if (state.loaded) SplicedColumnGroup(
-                Modifier
-                    .fillMaxWidth()
-            ) {
-                TinySwitchSettingItem(
-                    stringResource(R.string.manga_translation_automatic_book),
-                    checked = state.settings.automatic
-                ) { enabled ->
-                    onIntent(MangaTranslationIntent.ChangeSettings { it.copy(automatic = enabled) })
-                }
+            if (state.loaded) TinySwitchSettingItem(
+                stringResource(R.string.manga_translation_automatic_book),
+                checked = state.settings.automatic,
+                color = LegadoTheme.colorScheme.onSheetContent,
+            ) { enabled ->
+                onIntent(MangaTranslationIntent.ChangeSettings { it.copy(automatic = enabled) })
             }
-            if (state.loaded) AppText(
-                mangaPipelineSummary(state),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                style = LegadoTheme.typography.bodySmall,
-            )
             if (state.busy) {
                 AppLinearProgressIndicator(
                     Modifier
@@ -154,15 +149,18 @@ fun MangaTranslationSheet(
                     text = stringResource(R.string.cancel)
                 )
             }
-            state.ocrOperation?.let { engine ->
-                if (state.busy || state.settings.locator != MangaLocator.LOCAL || state.settings.localOcrEngine != engine || state.settings.composition == MangaComposition.AI_PAGE) {
-                    MangaOcrModelControls(engine, state, onIntent)
+            // 轻量产品不内置本地运行时，因此不出现权重下载区块。
+            if (LocalMangaCapabilities.modelDownload) {
+                state.ocrOperation?.let { engine ->
+                    if (state.busy || state.settings.locator != MangaLocator.LOCAL || state.settings.localOcrEngine != engine || state.settings.composition == MangaComposition.AI_PAGE) {
+                        MangaOcrModelControls(engine, state, onIntent)
+                    }
                 }
-            }
-            state.inpaintOperation?.let { engine ->
-                if (state.busy || state.settings.composition != MangaComposition.SMART || state.settings.inpaintEngine != engine) MangaInpaintModelControls(
-                    engine, state, onIntent
-                )
+                state.inpaintOperation?.let { engine ->
+                    if (state.busy || state.settings.composition != MangaComposition.SMART || state.settings.inpaintEngine != engine) MangaInpaintModelControls(
+                        engine, state, onIntent
+                    )
+                }
             }
             state.error?.let {
                 AppText(
@@ -173,55 +171,50 @@ fun MangaTranslationSheet(
                 )
             }
             if (state.loaded && !state.busy) {
-                val settings = state.settings
                 Column(
                     Modifier
                         .fillMaxWidth()
                 ) {
                     TinySwitchSettingItem(
                         stringResource(R.string.manga_translation_use_global),
-                        checked = state.useGlobalSettings
+                        checked = state.useGlobalSettings,
+                        color = LegadoTheme.colorScheme.onSheetContent,
                     ) { enabled ->
                         onIntent(MangaTranslationIntent.SetUseGlobalSettings(enabled))
                     }
-                    TinyClickableSettingItem(
+                    // 只有全局生效时这条入口才有意义：本漫单独设置时它改不动眼前这些选项。
+                    if (state.useGlobalSettings) TinyClickableSettingItem(
                         stringResource(R.string.manga_translation_global_settings),
+                        color = LegadoTheme.colorScheme.onSheetContent,
                         onClick = onOpenGlobalSettings
                     )
+                    // 诊断紧跟设置入口：它解释的正是这组设置刚才发出了什么请求。
+                    TinyClickableSettingItem(
+                        stringResource(R.string.feature_manga_translation_diagnostics),
+                        color = LegadoTheme.colorScheme.onSheetContent,
+                        onClick = { diagnostics = true }
+                    )
 
-                    if (!state.useGlobalSettings) MangaTranslationOptions(state, onIntent)
+                    // 顶栏只剩翻译/重新排版两颗图标按钮，思考强度回到基础设置组内。
+                    if (!state.useGlobalSettings) MangaTranslationOptions(
+                        state = state,
+                        onIntent = onIntent,
+                        storedSettings = state.storedSettings,
+                        tiny = true,
+                    )
 
                     TinyClickableSettingItem(
                         stringResource(R.string.manga_translation_glossary),
+                        color = LegadoTheme.colorScheme.onSheetContent,
                         onClick = { glossary = true }
                     )
 
-
-                    MediumTonalButton(
-                        onClick = { onIntent(MangaTranslationIntent.Translate(chapter = true, force = state.chapterTranslated)) },
-                        enabled = state.chapterPages > 0,
-                        icon = Icons.Default.Translate,
-                        modifier = Modifier.fillMaxWidth(), text = stringResource(
-                            if (state.chapterTranslated) R.string.feature_manga_translation_retry_chapter else R.string.manga_translation_chapter, state.chapterPages
-                        )
-                    )
-                    if (settings.composition in setOf(
-                            MangaComposition.SMART, MangaComposition.PATCH
-                        )
-                    ) MediumTonalButton(
-                        onClick = { onIntent(MangaTranslationIntent.Recompose(chapter = true)) },
-                        enabled = state.chapterPages > 0,
-                        icon = Icons.Default.Layers,
-                        modifier = Modifier.fillMaxWidth(),
-                        text = stringResource(R.string.manga_translation_recompose_chapter)
-                    )
-                    MediumTonalButton(
+                    MediumOutlinedButton(
                         onClick = { clearConfirmation = true },
                         modifier = Modifier.fillMaxWidth(),
                         icon = Icons.Default.Delete,
                         text = stringResource(R.string.manga_translation_clear)
                     )
-
                 }
             }
         }

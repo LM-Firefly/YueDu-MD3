@@ -51,6 +51,7 @@ class MangaTranslationViewModelTest {
             global.value = transform(global.value)
         }
         override fun settings(bookUrl: String) = config
+        override suspend fun storedSettings(bookUrl: String) = config.value
         override suspend fun update(bookUrl: String, transform: (MangaTranslationSettings) -> MangaTranslationSettings) { config.value = transform(config.value) }
         override suspend fun glossary(bookUrl: String) = emptyMap<String, String>()
         override suspend fun setGlossary(bookUrl: String, terms: Map<String, String>) = Unit

@@ -36,6 +36,7 @@ import io.legado.app.data.entities.rule.ExploreRule
 import io.legado.app.data.entities.rule.SearchRule
 import io.legado.app.di.appDatabaseModule
 import io.legado.app.di.appModule
+import io.legado.app.di.mangaEngineModule
 import io.legado.app.domain.gateway.AppLocaleGateway
 import io.legado.app.domain.gateway.AppShellSettingsGateway
 import io.legado.app.domain.gateway.BackupSettingsGateway
@@ -113,7 +114,7 @@ class App : Application(), SingletonImageLoader.Factory {
         } else null
         startKoin {
             androidContext(this@App)
-            modules(appDatabaseModule, appModule)
+            modules(appDatabaseModule, appModule, mangaEngineModule)
         }
         @Suppress("DEPRECATION")
         AppConfig.initialize(
