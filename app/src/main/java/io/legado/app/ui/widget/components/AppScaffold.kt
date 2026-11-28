@@ -51,7 +51,7 @@ import io.legado.app.ui.widget.components.coui.LocalCouiPageBackdrop
 import ui.feice.mochi.effect.glass.LocalMochiBackdrop
 import ui.feice.mochi.effect.glass.rememberMochiBackdrop
 import ui.feice.mochi.effect.glass.mochiBackdropSource
-import ui.feice.mochi.ios.IosGlass
+import ui.feice.mochi.theme.MochiGlassDefaults
 import ui.feice.mochi.effect.mask.mochiScrollEdgeBlur
 import ui.feice.mochi.theme.MochiMaterialsScope
 import ui.feice.mochi.theme.MochiTheme
@@ -70,7 +70,8 @@ fun AppScaffold(
     snackbarHost: @Composable () -> Unit = {},
     floatingActionButton: @Composable () -> Unit = {},
     floatingActionButtonPosition: FabPosition = FabPosition.End,
-    contentColor: Color = contentColorFor(MiuixTheme.colorScheme.surface),
+    contentColor: Color = if (LegadoTheme.composeEngine == ComposeEngine.Oxygen) io.oxygenx.theme.OxygenTheme.colorScheme.onSurface
+        else contentColorFor(MiuixTheme.colorScheme.surface),
     contentWindowInsets: WindowInsets = ScaffoldDefaults.contentWindowInsets,
     alwaysDrawBehindBars: Boolean = false,
     /**
@@ -122,7 +123,6 @@ fun AppScaffold(
     val density = LocalDensity.current
     val miuixEngine = composeEngine == ComposeEngine.Miuix
     val miuixSurfaceColor = MiuixTheme.colorScheme.surface
-    // Miuix 的顶/底栏模糊同样常开，enableBlur 只作用于 Material / Mochi。
     val miuixBarBlur = miuixEngine && nativeSamplingSupported && hasBars
     val miuixGlassMenus = miuixEngine && themeSettings.useHyperOs4Components &&
         ThemeResolver.isBlurSupported()
@@ -138,8 +138,7 @@ fun AppScaffold(
     val mochiScrollBlur = composeEngine == ComposeEngine.Mochi &&
         nativeSamplingSupported && topBar != null && themeSettings.mochiScrollEdgeBlurEnabled
     val mochiScrollProgress = if (mochiScrollBlur) remember { mutableStateOf<() -> Float>({ 1f }) } else null
-    val mochiBackdrop = if (composeEngine == ComposeEngine.Mochi && nativeSamplingSupported &&
-        (mochiTopBarGlassEnabled || bottomBar != null && configuration.appShell.useFloatingBottomBarLiquidGlass)) {
+    val mochiBackdrop = if (mochiTopBarGlassEnabled) {
         rememberMochiBackdrop(backdropBaseColor)
     } else null
     val mochiRegistry = LocalMochiBackdropRegistry.current
@@ -250,7 +249,7 @@ fun AppScaffold(
                 }
             }
 
-            ComposeEngine.Material, ComposeEngine.Mochi, ComposeEngine.Coui -> {
+            ComposeEngine.Oxygen, ComposeEngine.Material, ComposeEngine.Mochi, ComposeEngine.Coui -> {
                 Box(modifier = modifier.fillMaxSize()) {
                     if (mochiBackdrop == null && !mochiScrollBlur && couiBackdrop == null) {
                         Box(
@@ -276,9 +275,9 @@ fun AppScaffold(
                                         if (mochiScrollBlur) it else it.copy(scrollEdge = null)
                                     }
                                     val barMaterials = if (mochiTopBarGlassEnabled) {
-                                        materials.copy(control = remember(isDark) { IosGlass.regular(isDark) })
+                                        materials.copy(control = MochiGlassDefaults.Regular)
                                     } else {
-                                        materials.copy(bar = null, control = null, clear = null)
+                                        materials.copy(bar = null, control = null)
                                     }
                                     MochiMaterialsScope(barMaterials) { topBar() }
                                 } else if (composeEngine == ComposeEngine.Coui) {

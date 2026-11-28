@@ -228,6 +228,7 @@ import io.legado.app.domain.usecase.StartBookSourceCheckUseCase
 import io.legado.app.domain.usecase.SyncHttpTtsCatalogUseCase
 import io.legado.app.domain.usecase.SyncReadAloudVoicesUseCase
 import io.legado.app.domain.usecase.TranslateChapterUseCase
+import io.legado.app.domain.usecase.BookshelfSeriesUseCase
 import io.legado.app.domain.usecase.UpdateBooksGroupUseCase
 import io.legado.app.domain.usecase.UploadReadingProgressUseCase
 import io.legado.app.domain.usecase.VerifyBookmarkTargetUseCase
@@ -301,7 +302,6 @@ import io.legado.app.ui.config.ai.AiProviderEditViewModel
 import io.legado.app.ui.config.ai.prompt.AiPromptConfigViewModel
 import io.legado.app.ui.config.ai.summary.AiSummaryConfigViewModel
 import io.legado.app.ui.config.backupConfig.BackupConfigViewModel
-import io.legado.app.ui.config.bookshelfConfig.BookshelfManageScreenConfig
 import io.legado.app.ui.config.coverConfig.CoverAlbumManageViewModel
 import io.legado.app.ui.config.coverConfig.CoverConfigViewModel
 import io.legado.app.ui.config.bubble.BubbleConfigViewModel
@@ -364,6 +364,7 @@ val appModule = module {
 
     single { get<AppDatabase>().readRecordDao }
     single { get<AppDatabase>().bookDao }
+    single { get<AppDatabase>().bookSeriesDao }
     single { get<AppDatabase>().bookChapterDao }
     single { get<AppDatabase>().bookGroupDao }
     single { get<AppDatabase>().bookSourceDao }
@@ -384,7 +385,7 @@ val appModule = module {
     single<BookshelfAutoGroupGateway> { BookshelfAutoGroupRepository(get()) }
     single<BookshelfAutoGroupPromptGateway> { BookshelfAutoGroupPromptRepository(get()) }
     singleOf(::BookSourceRepository)
-    singleOf(::BookshelfRepository)
+    single { BookshelfRepository(get(), get()) }
     singleOf(::DictRuleRepository)
     singleOf(::TxtTocRuleRepository)
     single {
@@ -410,7 +411,7 @@ val appModule = module {
     }
     single<OtherSettingsGateway> { OtherSettingsRepository() }
     single<CheckSourceSettingsGateway> { CheckSourceSettingsRepository() }
-    single { BookSourceCheckRepository(get(), get(), get()) }
+    single { BookSourceCheckRepository(get(), get()) }
     single<BookSourceCheckGateway> { get<BookSourceCheckRepository>() }
     singleOf(::StartBookSourceCheckUseCase)
     single<DirectLinkSettingsGateway> { DirectLinkSettingsRepository() }
@@ -496,6 +497,7 @@ val appModule = module {
     single { HomeDashboardUseCase(get(), Clock.System) }
     singleOf(::RemoveBookGroupAssignmentUseCase)
     singleOf(::UpdateBooksGroupUseCase)
+    singleOf(::BookshelfSeriesUseCase)
     singleOf(::UploadReadingProgressUseCase)
     singleOf(::ResolveBookShelfStateUseCase)
     singleOf(::RefreshTocUseCase)
@@ -508,7 +510,6 @@ val appModule = module {
     factory { GetReadRecordOverviewUseCase() }
     singleOf(::ShrinkDatabaseUseCase)
     singleOf(::WebDavBackupUseCase)
-    singleOf(::BookshelfManageScreenConfig)
     singleOf(::ThemePackageManager)
 
     single<UploadRepository> { DirectLinkUploadRepository() }
@@ -545,7 +546,7 @@ val appModule = module {
     single<WebDavBackupGateway> { WebDavBackupRepository() }
     single<ReadingProgressGateway> { WebDavReadingProgressRepository() }
     single<HomepageModulesGateway> { HomepageModulesRepository(get(), get()) }
-    single<BookDomainRepository> { BookDomainRepositoryImpl(get(), get()) }
+    single<BookDomainRepository> { BookDomainRepositoryImpl(get(), get(), get()) }
     single<BookContentProcessGateway> { BookContentProcessRepository(get()) }
     single<BookMarkingGateway> { BookMarkingRepository(get()) }
     single<BookKnowledgeGateway> { BookKnowledgeRepository(get()) }
@@ -864,10 +865,10 @@ val appModule = module {
         BookshelfManageScreenViewModel(
             application = get(),
             bookRepository = get(),
+            bookshelfRepository = get(),
             bookSourceRepository = get(),
             bookGroupRepository = get(),
             searchRepository = get(),
-            bookshelfManageScreenConfig = get(),
             bookExportSettingsGateway = get(),
             batchCacheDownloadUseCase = get(),
             cacheBookChaptersUseCase = get(),

@@ -307,6 +307,8 @@ private fun BookInfoScreenContent(
     onOpenExplore: (title: String, url: String) -> Unit,
 ) {
     val isMiuix = LegadoTheme.composeEngine == ComposeEngine.Miuix
+    val intro = state.book?.intro
+    val hasWebIntro = remember(intro) { parseBookInfoIntro(intro) is BookInfoIntroContent.Web }
     val scrollBehavior = if (isMiuix) {
         MiuixGlassScrollBehavior(MiuixScrollBehavior())
     } else {
@@ -362,6 +364,8 @@ private fun BookInfoScreenContent(
             }
         },
         alwaysDrawBehindBars = true,
+        // 避免把 WebView 简介录入模糊或玻璃的正文采样图层（#2610）。
+        disableContentSampling = hasWebIntro,
     ) { paddingValues ->
         val book = state.book
         if (book == null) {
@@ -1611,7 +1615,9 @@ private fun BookInfoActionCard(
     GlassCard(
         modifier = modifier.semantics(mergeDescendants = true) {
             role = Role.Button
-            this.contentDescription = contentDescription
+            // 描述与可见文案一致时交给文本节点朗读，避免同一名称念两遍；
+            // 仅冲突提示等补充信息才覆盖。
+            if (contentDescription != label) this.contentDescription = contentDescription
         },
         onLongClick = onLongClick,
         onClick = onClick,
@@ -1851,9 +1857,7 @@ private fun parseBookInfoIntro(intro: String?): BookInfoIntroContent? {
  * （WebCacheManager 缓存、书源对象、WebJsExtensions），
  * 并处理 legado/yuedu scheme（导入）与其他 scheme（确认后跳转）。
  *
- * WebView 经 [WebViewContainerCompose] 的 FrameLayout 间接挂载：直接作为
- * AndroidView 子 View 时，加载后改高度会触发 Vulkan functor 重绘路径，
- * 在 Android 16 HWUI Vulkan 后端上引发 drawVk SIGTRAP 原生崩溃（issue #2468）。
+ * WebView 经 [WebViewContainerCompose] 的 FrameLayout 间接挂载（#2468）。
  */
 @Composable
 private fun BookInfoWebIntro(

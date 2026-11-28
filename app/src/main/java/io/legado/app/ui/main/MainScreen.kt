@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
@@ -60,12 +62,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -253,16 +263,42 @@ fun MainScreen(
     val pagerState = rememberPagerState(initialPage = initialPage) { destinations.size }
     var lastSettledMainPage by remember(pagerState) { mutableIntStateOf(pagerState.settledPage) }
     val currentOnMainDestinationChanged by rememberUpdatedState(onMainDestinationChanged)
+    val mainPagerBottomBarState = remember { MainPagerBottomBarState() }
     LaunchedEffect(pagerState.settledPage) {
         if (lastSettledMainPage != pagerState.settledPage) {
             lastSettledMainPage = pagerState.settledPage
             currentOnMainDestinationChanged()
+            mainPagerBottomBarState.reveal()
         }
     }
     val pagerNestedScrollConnection = rememberPagerFlingPassThroughConnection(
         state = pagerState,
         orientation = Orientation.Horizontal,
     )
+    // 只旁听页面滚动的纵向位移，仍把事件原样交给 pager 自己的 fling 连接。
+    val bottomBarScrollConnection = remember(pagerNestedScrollConnection, mainPagerBottomBarState) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                mainPagerBottomBarState.onScroll(available.y)
+                return pagerNestedScrollConnection.onPreScroll(available, source)
+            }
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource,
+            ): Offset {
+                mainPagerBottomBarState.onScroll(available.y)
+                return pagerNestedScrollConnection.onPostScroll(consumed, available, source)
+            }
+
+            override suspend fun onPreFling(available: Velocity): Velocity =
+                pagerNestedScrollConnection.onPreFling(available)
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity =
+                pagerNestedScrollConnection.onPostFling(consumed, available)
+        }
+    }
     var bookshelfScrollToTopRequest by remember { mutableLongStateOf(0L) }
     fun requestBookshelfScrollToTop() {
         bookshelfScrollToTopRequest++
@@ -290,13 +326,24 @@ fun MainScreen(
     val isUnlabeled = labelVisibilityMode == "unlabeled"
     val engine = LegadoTheme.composeEngine
     val isCoui = engine == ComposeEngine.Coui
+    // 横划顶栏只在 Oxygen 引擎下接管：它取 OxygenX 的配色、排版与收拢动画。
+    val usePagerTopBar = engine == ComposeEngine.Oxygen && mainUiState.usePagerTopBar
+    val showMainBottomNavigation = mainUiState.showBottomView && !usePagerTopBar
+    val pagerTopBarTitles = destinations.map { stringResource(it.labelId) }
+        .let { labels -> remember(labels) { labels.toImmutableList() } }
+    val mainPagerTopBarHost = remember { MainPagerTopBarHost() }
+    val mainPagerTopBarAppBarState = rememberMainPagerTopBarAppBarState(usePagerTopBar)
+    // 横划顶栏隐藏底栏后内容要自己延伸到导航栏后面，底部的可滚动留白由各页补。
+    val navigationBarsBottom = WindowInsets.navigationBars
+        .asPaddingValues()
+        .calculateBottomPadding()
     val useFloatingBottomBar =
         shouldUseHomePlaybackCapsule(
-            onMainRoute = true, showBottomView = mainUiState.showBottomView,
+            onMainRoute = true, showBottomView = showMainBottomNavigation,
             useFloatingBottomBar = ThemeResolver.useFloatingBottomBar(engine, mainUiState.useFloatingBottomBar),
             useRail = useRail,
         )
-    val useLiquidGlass = useFloatingBottomBar &&
+    val useLiquidGlass = useFloatingBottomBar && engine != ComposeEngine.Oxygen &&
             mainUiState.useFloatingBottomBarLiquidGlass &&
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
     var floatingFooterHeight by remember { mutableStateOf(0.dp) }
@@ -362,7 +409,7 @@ fun MainScreen(
             .fillMaxSize()
             .windowInsetsPadding(mainAdaptiveInsets.only(WindowInsetsSides.Horizontal))
     ) {
-        if (useRail && mainUiState.showBottomView) {
+        if (useRail && showMainBottomNavigation) {
             if (LegadoTheme.composeEngine == ComposeEngine.Miuix) {
                 val miuixNavState = rememberNavigationRailState(
                     initialValue = if (mainUiState.navExtended) {
@@ -400,11 +447,10 @@ fun MainScreen(
                         val haptic = LocalHapticFeedback.current
                         val destinationLabel = stringResource(destination.labelId)
                         Box {
+                            // 标签文本由 MiuixNavigationRailItem 自行渲染并随合并语义读出；
+                            // 这里再写 contentDescription 会让 TalkBack 把同一名称念两遍。
                             MiuixNavigationRailItem(
-                                modifier = Modifier
-                                    .semantics(mergeDescendants = true) {
-                                        contentDescription = destinationLabel
-                                    }
+                                modifier = Modifier.semantics(mergeDescendants = true) {}
                                     .then(
                                         if (destination == MainDestination.Bookshelf) {
                                             Modifier.combinedClickable(
@@ -490,10 +536,9 @@ fun MainScreen(
                     val haptic = LocalHapticFeedback.current
                     val destinationLabel = stringResource(destination.labelId)
 
+                    // 同 Miuix rail：标签文本已由 label 槽渲染，重复描述会被朗读两遍。
                     WideNavigationRailItem(
-                        modifier = Modifier.semantics(mergeDescendants = true) {
-                            contentDescription = destinationLabel
-                        },
+                        modifier = Modifier.semantics(mergeDescendants = true) {},
                         railExpanded = navState.targetValue == WideNavigationRailValue.Expanded,
                         selected = selected,
                         onClick = {
@@ -543,8 +588,24 @@ fun MainScreen(
         }
 
         AppScaffold(
-            modifier = Modifier.weight(1f),
-            bottomBar = if (!useRail && mainUiState.showBottomView && !useFloatingBottomBar) {
+            modifier = if (mainPagerTopBarAppBarState != null) {
+                Modifier
+                    .weight(1f)
+                    .nestedScroll(mainPagerTopBarAppBarState.nestedScrollConnection)
+            } else {
+                Modifier.weight(1f)
+            },
+            topBar = {
+                if (usePagerTopBar) {
+                    MainPagerTopBar(
+                        pagerState = pagerState,
+                        titles = pagerTopBarTitles,
+                        host = mainPagerTopBarHost,
+                        appBarState = mainPagerTopBarAppBarState,
+                    )
+                }
+            },
+            bottomBar = if (!useRail && showMainBottomNavigation && !useFloatingBottomBar) {
                 {
                     if (isMochi) AppMochiNavigationBar(
                         mochiTabs, pagerState.targetPage, onMochiTabSelect,
@@ -560,9 +621,16 @@ fun MainScreen(
                                 val selectedCustomIconPath =
                                     mainUiState.selectedCustomIconPath(destination)
                                 val destinationLabel = stringResource(destination.labelId)
+                                // 标签可见时交给合并的文本节点朗读；只有标签被隐藏
+                                // （unlabeled / 未选中不带标签）时才用 contentDescription 兜底，
+                                // 否则 TalkBack 会把同一名称念两遍。
+                                val labelShown = labelVisibilityMode != "unlabeled" &&
+                                        showLabel && (alwaysShowLabel || selected)
                                 AppNavigationBarItem(
                                     modifier = Modifier.semantics(mergeDescendants = true) {
-                                        contentDescription = destinationLabel
+                                        role = Role.Tab
+                                        this.selected = selected
+                                        if (!labelShown) contentDescription = destinationLabel
                                     },
                                     selected = selected,
                                     onClick = {
@@ -596,7 +664,7 @@ fun MainScreen(
             // Floating content draws to the window edge; only scrollable content's end padding
             // reserves the measured overlay (including the system inset it actually handles).
             contentWindowInsets =
-                if (useFloatingBottomBar) WindowInsets(0)
+                if (useFloatingBottomBar || usePagerTopBar) WindowInsets(0)
                 else mainAdaptiveInsets.only(WindowInsetsSides.Bottom)
         ) { padding ->
             Box(
@@ -617,7 +685,7 @@ fun MainScreen(
                 ) {
                     HorizontalPager(
                         state = pagerState,
-                        pageNestedScrollConnection = pagerNestedScrollConnection,
+                        pageNestedScrollConnection = bottomBarScrollConnection,
                         modifier = Modifier
                             .fillMaxSize()
                             .then(
@@ -634,8 +702,17 @@ fun MainScreen(
                         )
                         CompositionLocalProvider(
                             LocalLifecycleOwner provides pageLifecycleOwner,
-                            LocalBottomOverlayPadding provides
-                                if (useFloatingBottomBar) floatingFooterHeight + 12.dp else 0.dp,
+                            LocalBottomOverlayPadding provides when {
+                                useFloatingBottomBar -> floatingFooterHeight + 12.dp
+                                // 内容已铺到导航栏下，列表至少要让出导航栏高度。
+                                usePagerTopBar -> navigationBarsBottom
+                                else -> 0.dp
+                            },
+                            LocalMainPageIndex provides page,
+                            LocalMainPagerTopBarHost provides
+                                if (usePagerTopBar) mainPagerTopBarHost else null,
+                            LocalMainPagerBottomBarState provides
+                                if (usePagerTopBar) mainPagerBottomBarState else null,
                         ) {
                             when (destination) {
                             MainDestination.Home -> HomeRouteScreen(

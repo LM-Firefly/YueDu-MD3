@@ -11,6 +11,7 @@ import io.legado.app.data.repository.BookshelfRepository
 import io.legado.app.domain.gateway.BookshelfSettingsGateway
 import io.legado.app.domain.gateway.CoverSettingsGateway
 import io.legado.app.domain.gateway.PrivateContentGateway
+import io.legado.app.domain.model.LocalBookshelfSort
 import io.legado.app.domain.model.isPrivateBook
 import io.legado.app.domain.model.settings.BookshelfSettings
 import io.legado.app.ui.widget.components.image.cover.bookshelfCoverMemoryCacheKey
@@ -43,6 +44,9 @@ private const val COVER_ITEM_PADDING_DP = 4
 
 /** 网格间距（[BookshelfScreen] 的 `Arrangement.spacedBy(8.dp)`）。 */
 private const val GRID_SPACING_DP = 8
+
+/** 沉浸网格间距（[BookshelfScreen] 的 `Arrangement.spacedBy(1.dp)`）。 */
+private const val IMMERSIVE_GRID_SPACING_DP = 1
 
 /** 网格内容左右内边距合计（M3 引擎 12dp×2，Miuix 14dp×2；取 M3 值误差只影响解码尺寸）。 */
 private const val GRID_CONTENT_HORIZONTAL_PADDING_DP = 24
@@ -135,16 +139,19 @@ internal fun resolveBookshelfGridMetrics(
     configuredCoverWidthDp: Int,
     fixedColumns: Boolean,
     fixedCoverWidth: Boolean,
+    /** 沉浸网格：卡片没有内边距、间距只有 1dp，封面铺满列宽。 */
+    immersive: Boolean = false,
 ): BookshelfGridMetrics {
-    val spacing = GRID_SPACING_DP.toFloat()
-    val minCellWidth = configuredCoverWidthDp + 2 * COVER_ITEM_PADDING_DP
+    val spacing = (if (immersive) IMMERSIVE_GRID_SPACING_DP else GRID_SPACING_DP).toFloat()
+    val itemPadding = if (immersive) 0 else COVER_ITEM_PADDING_DP
+    val minCellWidth = configuredCoverWidthDp + 2 * itemPadding
     val columns = if (fixedColumns) {
         configuredColumns.coerceAtLeast(1)
     } else {
         ((availableWidthDp + spacing) / (minCellWidth + spacing)).toInt().coerceAtLeast(1)
     }
     val cellWidth = (availableWidthDp - (columns - 1) * spacing) / columns
-    val filledCoverWidth = (cellWidth - 2 * COVER_ITEM_PADDING_DP).roundToInt().coerceAtLeast(1)
+    val filledCoverWidth = (cellWidth - 2 * itemPadding).roundToInt().coerceAtLeast(1)
     return BookshelfGridMetrics(
         columns = columns,
         coverWidthDp = if (fixedCoverWidth) {
@@ -201,9 +208,11 @@ class BookshelfCoverPreloader(
 
         val groupId = settings.saveTabPosition
         val layout = resolveFirstScreenLayout(settings)
+        val groupBookSort = withContext(Dispatchers.IO) { bookGroupRepository.getByID(groupId)?.bookSort }
+        val effectiveSort = LocalBookshelfSort.resolveEffectiveSort(groupBookSort, settings.bookshelfSort)
         val signature = listOf(
             groupId,
-            settings.bookshelfSort,
+            effectiveSort,
             settings.bookshelfSortOrder,
             layout.grid,
             layout.coverWidthDp,
@@ -211,7 +220,7 @@ class BookshelfCoverPreloader(
         if (signature == warmedSignature) return 0
 
         return withContext(Dispatchers.IO) {
-            val targets = buildTargets(groupId, settings, layout)
+            val targets = buildTargets(groupId, settings, layout, effectiveSort)
             if (targets.isEmpty()) return@withContext 0
             val pending = targets.filterNot { isAlreadyCached(it.memoryCacheKey) }
             if (pending.isEmpty()) {
@@ -246,6 +255,7 @@ class BookshelfCoverPreloader(
         groupId: Long,
         settings: BookshelfSettings,
         layout: FirstScreenLayout,
+        effectiveSort: Int,
     ): List<CoverPreloadTarget> {
         // 排序输入与书架完全一致：分组取 flowShow（书架的 groupsFlow），
         // 私密掩码取 flowAll（书架的 allGroupsFlow），两边都用同一个纯函数判定
@@ -257,11 +267,19 @@ class BookshelfCoverPreloader(
             if (it.groupId > 0 && it.isPrivate) acc or it.groupId else acc
         }
 
+        val shelfBooks = bookRepository.flowBookShelfByGroup(groupId).first()
+        val localMetrics = if (LocalBookshelfSort.isMetric(effectiveSort)) {
+            bookshelfRepository.tryGetCachedMetrics(effectiveSort, shelfBooks) ?: return emptyList()
+        } else {
+            emptyMap()
+        }
+
         val candidates = bookshelfRepository.sortBooks(
-            list = bookRepository.flowBookShelfByGroup(groupId).first(),
+            list = shelfBooks,
             group = group,
             sort = settings.bookshelfSort,
             sortOrder = settings.bookshelfSortOrder,
+            localMetrics = localMetrics,
         ).asSequence()
             // 锁定态的卡片用的是另一套内存键，预热清晰封面既无用也只是白解码
             .filterNot { isPrivateBook(it.bookUrl, it.group, privateBookUrls, privateGroupMask) }
@@ -320,13 +338,16 @@ class BookshelfCoverPreloader(
             settings.bookshelfLayoutGridPortrait
         }
         val displayMetrics = application.resources.displayMetrics
+        // 沉浸网格的封面铺满列宽：预热尺寸必须跟着铺满口径走，否则缓存图会被放大发虚
+        val immersive = grid && settings.gridImmersiveActive
         val gridMetrics = resolveBookshelfGridMetrics(
             availableWidthDp = displayMetrics.widthPixels / displayMetrics.density -
-                    GRID_CONTENT_HORIZONTAL_PADDING_DP,
+                    if (immersive) 0 else GRID_CONTENT_HORIZONTAL_PADDING_DP,
             configuredColumns = configuredColumns,
             configuredCoverWidthDp = settings.bookshelfGridCoverWidth,
             fixedColumns = settings.bookshelfGridFixedColumns,
-            fixedCoverWidth = settings.bookshelfGridFixedCoverWidth,
+            fixedCoverWidth = settings.bookshelfGridFixedCoverWidth && !immersive,
+            immersive = immersive,
         )
         val limit = if (grid) {
             (gridMetrics.columns * ESTIMATED_VISIBLE_ROWS).coerceIn(1, MAX_PRELOAD_BOOKS)

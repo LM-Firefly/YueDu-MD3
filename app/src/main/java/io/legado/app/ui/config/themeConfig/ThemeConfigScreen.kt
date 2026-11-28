@@ -4,14 +4,13 @@ import io.legado.app.feature.settings.search.SearchableSetting
 import io.legado.app.feature.settings.search.SearchableSettingsList
 import android.annotation.SuppressLint
 import android.content.Context
-import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,12 +34,9 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material3.ButtonGroupDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
@@ -79,10 +75,11 @@ import io.legado.app.ui.widget.components.FontFolderState
 import io.legado.app.ui.widget.components.FontSelectSheet
 import io.legado.app.ui.widget.components.SplicedColumnGroup
 import io.legado.app.ui.widget.components.alert.AppAlertDialog
-import io.legado.app.ui.widget.components.button.series.MediumTonalButton
 import io.legado.app.ui.widget.components.card.InfoCard
 import io.legado.app.ui.widget.components.dialog.ColorPickerSheet
 import io.legado.app.ui.widget.components.dialog.TimePickerDialog
+import io.legado.app.ui.widget.components.icon.AppIcon
+import io.legado.app.ui.widget.components.modalBottomSheet.SheetAction
 import io.legado.app.ui.widget.components.settingItem.ClickableSettingItem
 import io.legado.app.ui.widget.components.settingItem.DropdownListSettingItem
 import io.legado.app.ui.widget.components.settingItem.SliderSettingItem
@@ -100,9 +97,11 @@ fun ThemeConfigScreen(
     onBackClick: () -> Unit,
     onNavigateToCustomTheme: () -> Unit,
     onNavigateToThemeManage: () -> Unit,
+    useNavigationRail: Boolean = false,
 ) {
     val appShell = state.appShell
     val theme = state.theme
+    val composeEngine = ThemeResolver.resolveComposeEngine(appShell.composeEngine)
     val scrollBehavior = GlassTopAppBarDefaults.defaultScrollBehavior()
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -131,18 +130,22 @@ fun ThemeConfigScreen(
                 bottom = 120.dp
             )
         ) {
-            item {
-                val composeEngine = ThemeResolver.resolveComposeEngine(appShell.composeEngine)
-                val isMiuixEngine = remember(composeEngine) {
-                    composeEngine == ComposeEngine.Miuix
-                }
-                val isCouiEngine = remember(composeEngine) {
-                    composeEngine == ComposeEngine.Coui
-                }
-                // Miuix / COUI 未启用自定义主题色时配色由引擎内置方案决定，
+            item("theme-palette") {
+                val isMiuixEngine = composeEngine == ComposeEngine.Miuix
+                val isCouiEngine = composeEngine == ComposeEngine.Coui
+                // Miuix / COUI / Oxygen 未启用自定义主题色时配色由引擎内置方案决定，
                 // 不显示项目自绘色板预览卡，也不提供主题配色列表。
-                val useBuiltInPaletteEngine = isMiuixEngine || isCouiEngine
+                val useBuiltInPaletteEngine = isMiuixEngine || isCouiEngine || composeEngine == ComposeEngine.Oxygen
                 val isDarkTheme = LegadoTheme.isDark
+
+                val themeItems = stringArrayResource(R.array.themes_item)
+                val themeValues = stringArrayResource(R.array.themes_value)
+                val themes = remember(themeItems, themeValues) {
+                    themeItems.zip(themeValues).toList()
+                }
+                val visibleThemes = themes.filter { (_, value) ->
+                    value != "4" || state.showEInkTheme
+                }
 
                 if (!useBuiltInPaletteEngine) {
                     Column(
@@ -158,16 +161,40 @@ fun ThemeConfigScreen(
                             customLightSeedColor = theme.customPrimary,
                             customNightSeedColor = theme.customNightPrimary
                         )
+
+                        if (composeEngine == ComposeEngine.Material) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            SearchableSetting("theme.theme_mode") {
+                                ThemeModeSelector(
+                                    selectedMode = appShell.themeMode,
+                                    onModeSelected = { mode ->
+                                        onIntent(ThemeConfigIntent.SetThemeMode(mode))
+                                    }
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            SearchableSetting("theme.theme") {
+                                ThemeColorSelector(
+                                    context = context,
+                                    themes = visibleThemes,
+                                    selectedTheme = theme.appTheme,
+                                    isDark = isDarkTheme,
+                                    isAmoled = theme.isPureBlack,
+                                    paletteStyle = theme.paletteStyle,
+                                    customLightSeedColor = theme.customPrimary,
+                                    customNightSeedColor = theme.customNightPrimary,
+                                    onThemeSelected = {
+                                        onIntent(ThemeConfigIntent.SelectTheme(it))
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-
-                val themeItems = stringArrayResource(R.array.themes_item)
-                val themeValues = stringArrayResource(R.array.themes_value)
-                val themes = remember(themeItems, themeValues) {
-                    themeItems.zip(themeValues).toList()
-                }
 
                 AnimatedVisibility(visible = theme.showRefactorTip) {
                     InfoCard(
@@ -178,118 +205,7 @@ fun ThemeConfigScreen(
                     )
                 }
 
-
-                SplicedColumnGroup(title = stringResource(R.string.theme)) {
-                    // 非 M3 主题风格（Miuix/Mochi/Coui）统一使用下拉组件，与 Miuix 开启时一致。
-                    val useDropdownItems = composeEngine != ComposeEngine.Material
-
-                    if (useDropdownItems) {
-                        SearchableSetting("theme.theme_mode") {
-                            DropdownListSettingItem(
-                                title = stringResource(R.string.theme_mode),
-                                selectedValue = appShell.themeMode,
-                                displayEntries = stringArrayResource(R.array.theme_mode),
-                                entryValues = stringArrayResource(R.array.theme_mode_v),
-                                onValueChange = { mode ->
-                                    onIntent(
-                                        ThemeConfigIntent.SetThemeMode(mode)
-                                    )
-                                }
-                            )
-                        }
-
-                        // Miuix / COUI 都提供「自定义主题色」：关闭时配色由引擎内置方案决定。
-                        if (useBuiltInPaletteEngine) {
-                            SearchableSetting("theme.miuix_monet") {
-                                SwitchSettingItem(
-                                    title = stringResource(R.string.miuix_monet),
-                                    description = stringResource(R.string.miuix_monet_summary),
-                                    checked = theme.useMiuixMonet,
-                                    onCheckedChange = {
-                                        onIntent(ThemeConfigIntent.SetMiuixMonet(it))
-                                    }
-                                )
-                            }
-                        }
-
-                        // 未启用自定义主题色时内置配色引擎不提供主题选择；开启后走统一 14 项。
-                        // 首项（appTheme == "0"）恒为「动态取色」：COUI 开启自定义主题色后
-                        // 也真正走系统动态取色，不再替换成引擎内置预设的别名。
-                        if (!useBuiltInPaletteEngine || theme.useMiuixMonet) {
-                            val visibleThemes = themes.filter { (_, value) ->
-                                value != "4" || state.showEInkTheme
-                            }
-                            SearchableSetting("theme.theme") {
-                                DropdownListSettingItem(
-                                    title = stringResource(R.string.theme),
-                                    selectedValue = theme.appTheme,
-                                    displayEntries = visibleThemes.map { it.first }.toTypedArray(),
-                                    entryValues = visibleThemes.map { it.second }.toTypedArray(),
-                                    onValueChange = { value ->
-                                        onIntent(ThemeConfigIntent.SelectTheme(value))
-                                    }
-                                )
-                            }
-                        }
-                    } else {
-                        SearchableSetting("theme.theme_mode") {
-                            ThemeModeSelector(
-                                selectedMode = appShell.themeMode,
-                                onModeSelected = { mode ->
-                                    onIntent(ThemeConfigIntent.SetThemeMode(mode))
-                                }
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        val visibleThemes = themes.filter { (_, value) ->
-                            value != "4" || state.showEInkTheme
-                        }
-                        SearchableSetting("theme.theme") {
-                            ThemeColorSelector(
-                                context = context,
-                                themes = visibleThemes,
-                                selectedTheme = theme.appTheme,
-                                isDark = isDarkTheme,
-                                isAmoled = theme.isPureBlack,
-                                paletteStyle = theme.paletteStyle,
-                                customLightSeedColor = theme.customPrimary,
-                                customNightSeedColor = theme.customNightPrimary,
-                                onThemeSelected = {
-                                    onIntent(ThemeConfigIntent.SelectTheme(it))
-                                }
-                            )
-                        }
-                    }
-                }
-
                 SplicedColumnGroup {
-                    if (!isMiuixEngine) {
-                        SearchableSetting("theme.pure_black") {
-                            SwitchSettingItem(
-                                title = stringResource(R.string.pure_black),
-                                checked = theme.isPureBlack,
-                                onCheckedChange = { value ->
-                                    updateTheme { it.copy(isPureBlack = value) }
-                                }
-                            )
-                        }
-                    }
-                    SearchableSetting("theme.font_setting") {
-                        ClickableSettingItem(
-                            title = stringResource(R.string.font_setting),
-                            onClick = { onIntent(ThemeConfigIntent.ShowSheet(ThemeConfigSheet.Font)) }
-                        )
-                    }
-                    if (theme.appTheme == "12" && (!useBuiltInPaletteEngine || theme.useMiuixMonet)) {
-                        SearchableSetting("theme.custom_theme_colors") {
-                            ClickableSettingItem(
-                                title = stringResource(R.string.custom_theme_colors),
-                                onClick = onNavigateToCustomTheme
-                            )
-                        }
-                    }
                     SearchableSetting("theme.compose_engine") {
                         val couiSupported = ThemeResolver.isCouiSupported()
                         val coui = ThemeResolver.COMPOSE_ENGINE_COUI
@@ -299,8 +215,9 @@ fun ThemeConfigScreen(
                             appShell.composeEngine
                         }
                         val entries = stringArrayResource(R.array.composeEngine) +
-                            (if (couiSupported) "COUI" else stringResource(R.string.coui_theme_requires_android_14))
-                        val values = stringArrayResource(R.array.composeEngine_value) + coui
+                            (if (couiSupported) "COUI" else stringResource(R.string.coui_theme_requires_android_14)) +
+                            stringResource(R.string.oxygen_ui_engine)
+                        val values = stringArrayResource(R.array.composeEngine_value) + arrayOf(coui, "oxygen")
                         DropdownListSettingItem(
                             title = stringResource(R.string.compose_engine),
                             selectedValue = selectedValue,
@@ -332,6 +249,78 @@ fun ThemeConfigScreen(
                             )
                         }
                     }
+                    if (composeEngine != ComposeEngine.Material) {
+                        SearchableSetting("theme.theme_mode") {
+                            DropdownListSettingItem(
+                                title = stringResource(R.string.theme_mode),
+                                selectedValue = appShell.themeMode,
+                                displayEntries = stringArrayResource(R.array.theme_mode),
+                                entryValues = stringArrayResource(R.array.theme_mode_v),
+                                onValueChange = { mode ->
+                                    onIntent(
+                                        ThemeConfigIntent.SetThemeMode(mode)
+                                    )
+                                }
+                            )
+                        }
+
+                        // Miuix / COUI / Oxygen 都提供「自定义主题色」：关闭时配色由引擎内置方案决定。
+                        if (useBuiltInPaletteEngine) {
+                            SearchableSetting("theme.miuix_monet") {
+                                SwitchSettingItem(
+                                    title = stringResource(R.string.miuix_monet),
+                                    description = stringResource(R.string.miuix_monet_summary),
+                                    checked = theme.useMiuixMonet,
+                                    onCheckedChange = {
+                                        onIntent(ThemeConfigIntent.SetMiuixMonet(it))
+                                    }
+                                )
+                            }
+                        }
+
+                        // 未启用自定义主题色时内置配色引擎不提供主题选择；开启后走统一 14 项。
+                        // 首项（appTheme == "0"）恒为「动态取色」：COUI 开启自定义主题色后
+                        // 也真正走系统动态取色，不再替换成引擎内置预设的别名。
+                        if (!useBuiltInPaletteEngine || theme.useMiuixMonet) {
+                            SearchableSetting("theme.theme") {
+                                DropdownListSettingItem(
+                                    title = stringResource(R.string.theme),
+                                    selectedValue = theme.appTheme,
+                                    displayEntries = visibleThemes.map { it.first }.toTypedArray(),
+                                    entryValues = visibleThemes.map { it.second }.toTypedArray(),
+                                    onValueChange = { value ->
+                                        onIntent(ThemeConfigIntent.SelectTheme(value))
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    if (theme.appTheme == "12" && (!useBuiltInPaletteEngine || theme.useMiuixMonet)) {
+                        SearchableSetting("theme.custom_theme_colors") {
+                            ClickableSettingItem(
+                                title = stringResource(R.string.custom_theme_colors),
+                                onClick = onNavigateToCustomTheme
+                            )
+                        }
+                    }
+                    if (!isMiuixEngine) {
+                        SearchableSetting("theme.pure_black") {
+                            SwitchSettingItem(
+                                title = stringResource(R.string.pure_black),
+                                checked = theme.isPureBlack,
+                                onCheckedChange = { value ->
+                                    updateTheme { it.copy(isPureBlack = value) }
+                                }
+                            )
+                        }
+                    }
+                    SearchableSetting("theme.theme_pack") {
+                        ClickableSettingItem(
+                            title = stringResource(R.string.theme_pack),
+                            description = stringResource(R.string.theme_pack_s),
+                            onClick = onNavigateToThemeManage
+                        )
+                    }
                     SearchableSetting("theme.change_icon") {
                         ClickableSettingItem(
                             title = stringResource(R.string.change_icon),
@@ -341,49 +330,15 @@ fun ThemeConfigScreen(
                             }
                         )
                     }
-                    SearchableSetting("theme.navigation_animation") {
-                        val styles = NavigationAnimationStyle.entries
-                        DropdownListSettingItem(
-                            title = stringResource(R.string.navigation_animation),
-                            selectedValue = appShell.navigationAnimationStyle.storedValue,
-                            displayEntries = styles.map { style ->
-                                when (style) {
-                                    NavigationAnimationStyle.Default -> stringResource(R.string.text_default)
-                                    NavigationAnimationStyle.Miuix -> "Miuix"
-                                    NavigationAnimationStyle.Scale -> stringResource(R.string.navigation_animation_scale)
-                                }
-                            }.toTypedArray(),
-                            entryValues = styles.map { it.storedValue }.toTypedArray(),
-                            onValueChange = {
-                                onIntent(ThemeConfigIntent.SetNavigationAnimationStyle(
-                                    NavigationAnimationStyle.fromStoredValue(it)
-                                ))
-                            }
-                        )
-                    }
-                    TextAnimationSettings(appShell.textAnimationLevel) { level ->
-                        onIntent(ThemeConfigIntent.SetTextAnimationLevel(level))
-                    }
-                    SearchableSetting("theme.predictive_back") {
-                        SwitchSettingItem(
-                            title = stringResource(R.string.predictive_back),
-                            description = stringResource(R.string.predictive_back_summary),
-                            checked = appShell.predictiveBackEnabled,
-                            onCheckedChange = {
-                                onIntent(
-                                    ThemeConfigIntent.SetPredictiveBackEnabled(it)
-                                )
-                            }
-                        )
-                    }
-                    SearchableSetting("theme.reader_shared_element") {
-                        SwitchSettingItem(
-                            title = stringResource(R.string.reader_shared_element),
-                            description = stringResource(R.string.reader_shared_element_summary),
-                            checked = appShell.readerSharedElementEnabled,
-                            onCheckedChange = {
-                                onIntent(ThemeConfigIntent.SetReaderSharedElementEnabled(it))
-                            }
+                }
+            }
+
+            item("theme-fonts-background") {
+                SplicedColumnGroup(title = stringResource(R.string.theme_fonts_and_background)) {
+                    SearchableSetting("theme.font_setting") {
+                        ClickableSettingItem(
+                            title = stringResource(R.string.font_setting),
+                            onClick = { onIntent(ThemeConfigIntent.ShowSheet(ThemeConfigSheet.Font)) }
                         )
                     }
                     SearchableSetting("theme.font_scale") {
@@ -403,17 +358,10 @@ fun ThemeConfigScreen(
                             }
                         )
                     }
-                    SearchableSetting("theme.theme_pack") {
-                        ClickableSettingItem(
-                            title = stringResource(R.string.theme_pack),
-                            description = stringResource(R.string.theme_pack_s),
-                            onClick = onNavigateToThemeManage
-                        )
-                    }
                     SearchableSetting("theme.background_image") {
                         ClickableSettingItem(
                             title = stringResource(R.string.background_image),
-                            description = "日间/夜间背景图与背景虚化",
+                            description = stringResource(R.string.theme_app_background_summary),
                             onClick = {
                                 onIntent(
                                     ThemeConfigIntent.ShowSheet(
@@ -426,17 +374,47 @@ fun ThemeConfigScreen(
                         )
                     }
                 }
+            }
 
-                SplicedColumnGroup(title = stringResource(R.string.main_activity)) {
-                    SearchableSetting("theme.main_navigation_settings") {
-                        ClickableSettingItem(
-                            title = stringResource(R.string.main_navigation_settings),
-                            description = stringResource(R.string.main_navigation_settings_summary),
-                            onClick = {
-                                onIntent(ThemeConfigIntent.ShowSheet(ThemeConfigSheet.MainNavigation))
-                            },
-                        )
+            item("theme-top-bar") {
+                if (composeEngine != ComposeEngine.Miuix ||
+                    (ThemeResolver.isBlurSupported() && !theme.useHyperOs4Components)
+                ) {
+                    SplicedColumnGroup(title = stringResource(R.string.theme_top_bar_group)) {
+                        TopBarSettingsSection(theme = theme, onIntent = onIntent)
                     }
+                }
+            }
+
+            item("theme-home-navigation") {
+                SplicedColumnGroup(title = stringResource(R.string.main_navigation_settings)) {
+                    MainNavigationSettingsSection(
+                        settings = appShell,
+                        onSetDefault = { onIntent(ThemeConfigIntent.SetDefaultHomePage(it)) },
+                        onSetLabelVisibilityMode = {
+                            onIntent(ThemeConfigIntent.SetLabelVisibilityMode(it))
+                        },
+                        onOpenNavIcons = {
+                            onIntent(ThemeConfigIntent.ShowSheet(ThemeConfigSheet.NavIcons))
+                        },
+                        onOpenNavigationOrder = {
+                            onIntent(ThemeConfigIntent.ShowSheet(ThemeConfigSheet.NavigationOrder))
+                        },
+                        navigationLayout = { appearance ->
+                            BottomBarSettingsSection(
+                                appShell = appShell,
+                                theme = theme,
+                                useNavigationRail = useNavigationRail,
+                                onIntent = onIntent,
+                                navigationAppearance = appearance,
+                            )
+                        },
+                    )
+                }
+            }
+
+            item("theme-layout-motion") {
+                SplicedColumnGroup(title = stringResource(R.string.theme_layout_and_motion)) {
                     SearchableSetting("theme.show_status") {
                         SwitchSettingItem(
                             title = stringResource(R.string.show_status),
@@ -446,27 +424,6 @@ fun ThemeConfigScreen(
                                     ThemeConfigIntent.SetShowStatusBar(it)
                                 )
                             }
-                        )
-                    }
-                    //TODO:这个可以不要了，在删掉原来的设置页以后删
-                    SearchableSetting("theme.show_swipe_animation") {
-                        SwitchSettingItem(
-                            title = stringResource(R.string.show_swipe_animation),
-                            checked = appShell.swipeAnimation,
-                            onCheckedChange = {
-                                onIntent(
-                                    ThemeConfigIntent.SetSwipeAnimation(it)
-                                )
-                            }
-                        )
-                    }
-                    SearchableSetting("theme.top_bottom_bar_settings") {
-                        ClickableSettingItem(
-                            title = stringResource(R.string.top_bottom_bar_settings),
-                            description = stringResource(R.string.top_bottom_bar_settings_summary),
-                            onClick = {
-                                onIntent(ThemeConfigIntent.ShowSheet(ThemeConfigSheet.TopBottomBar))
-                            },
                         )
                     }
                     SearchableSetting("theme.tabletInterface") {
@@ -491,185 +448,56 @@ fun ThemeConfigScreen(
                             onValueChange = { onIntent(ThemeConfigIntent.SetMultiPaneMode(it)) },
                         )
                     }
-                }
-
-                SplicedColumnGroup(title = stringResource(R.string.book_info_page)) {
-                    SearchableSetting("theme.book_info_follow_cover_color") {
-                        SwitchSettingItem(
-                            title = stringResource(R.string.book_info_follow_cover_color),
-                            description = stringResource(R.string.book_info_follow_cover_color_summary),
-                            checked = theme.bookInfoFollowCoverColor,
-                            onCheckedChange = { value ->
-                                updateTheme { it.copy(bookInfoFollowCoverColor = value) }
-                            }
-                        )
-                    }
-                    SearchableSetting("theme.book_info_network_cover_background") {
+                    SearchableSetting("theme.navigation_animation") {
+                        val styles = NavigationAnimationStyle.entries
                         DropdownListSettingItem(
-                            title = stringResource(R.string.book_info_network_cover_background),
-                            selectedValue = theme.bookInfoNetworkCoverBackground,
-                            displayEntries = stringArrayResource(R.array.book_info_background_blur_entries),
-                            entryValues = stringArrayResource(R.array.book_info_background_blur_values),
-                            onValueChange = { value ->
-                                updateTheme { it.copy(bookInfoNetworkCoverBackground = value) }
-                            }
-                        )
-                    }
-                    SearchableSetting("theme.book_info_default_cover_background") {
-                        DropdownListSettingItem(
-                            title = stringResource(R.string.book_info_default_cover_background),
-                            selectedValue = theme.bookInfoDefaultCoverBackground,
-                            displayEntries = stringArrayResource(R.array.book_info_background_blur_entries),
-                            entryValues = stringArrayResource(R.array.book_info_background_blur_values),
-                            onValueChange = { value ->
-                                updateTheme { it.copy(bookInfoDefaultCoverBackground = value) }
-                            }
-                        )
-                    }
-                    SearchableSetting("theme.book_info_author_search_fallback") {
-                        SwitchSettingItem(
-                            title = stringResource(R.string.book_info_author_search_fallback),
-                            description = stringResource(R.string.book_info_author_search_fallback_summary),
-                            checked = theme.bookInfoAuthorSearchFallback,
-                            onCheckedChange = { value ->
-                                updateTheme { it.copy(bookInfoAuthorSearchFallback = value) }
-                            }
-                        )
-                    }
-                }
-
-                SplicedColumnGroup(title = stringResource(R.string.eye_protection)) {
-                    SearchableSetting("theme.eye_protection_enabled") {
-                        SwitchSettingItem(
-                            title = stringResource(R.string.eye_protection_enabled),
-                            description = stringResource(R.string.eye_protection_enabled_summary),
-                            checked = theme.eyeProtectionEnabled,
-                            onCheckedChange = { value ->
-                                updateTheme { it.copy(eyeProtectionEnabled = value) }
-                            }
-                        )
-                    }
-
-                    SearchableSetting("theme.eye_protection_auto_night") {
-                        SwitchSettingItem(
-                            title = stringResource(R.string.eye_protection_auto_night),
-                            description = stringResource(R.string.eye_protection_auto_night_summary),
-                            checked = theme.eyeProtectionAutoNight,
-                            onCheckedChange = { value ->
-                                updateTheme { it.copy(eyeProtectionAutoNight = value) }
-                            }
-                        )
-                    }
-
-                    AnimatedVisibility(visible = theme.isEyeProtectionConfigured) {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
-                        ) {
-                            SearchableSetting("theme.color_temperature") {
-                                SliderSettingItem(
-                                    title = stringResource(R.string.color_temperature),
-                                    description = stringResource(
-                                        R.string.color_temperature_summary,
-                                        theme.colorTemperature
-                                    ),
-                                    value = theme.colorTemperature.toFloat(),
-                                    defaultValue = 50f,
-                                    valueRange = 0f..100f,
-                                    onValueChange = { value ->
-                                        updateTheme { it.copy(colorTemperature = value.toInt()) }
-                                    }
-                                )
-                            }
-
-                            SearchableSetting("theme.eye_protection_schedule") {
-                                SwitchSettingItem(
-                                    title = stringResource(R.string.eye_protection_schedule),
-                                    description = stringResource(R.string.eye_protection_schedule_summary),
-                                    checked = theme.eyeProtectionSchedule,
-                                    onCheckedChange = { value ->
-                                        updateTheme { it.copy(eyeProtectionSchedule = value) }
-                                    }
-                                )
-                            }
-
-                            AnimatedVisibility(visible = theme.eyeProtectionSchedule) {
-                                Column(
-                                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    SearchableSetting("theme.eye_protection_start_time") {
-                                        ClickableSettingItem(
-                                            title = stringResource(R.string.eye_protection_start_time),
-                                            option = theme.eyeProtectionStartTime,
-                                            onClick = {
-                                                onIntent(
-                                                    ThemeConfigIntent.RequestTimePicker(
-                                                        ThemeTimeField.EyeProtectionStart,
-                                                        theme.eyeProtectionStartTime,
-                                                    )
-                                                )
-                                            }
-                                        )
-                                    }
-                                    SearchableSetting("theme.eye_protection_end_time") {
-                                        ClickableSettingItem(
-                                            title = stringResource(R.string.eye_protection_end_time),
-                                            option = theme.eyeProtectionEndTime,
-                                            onClick = {
-                                                onIntent(
-                                                    ThemeConfigIntent.RequestTimePicker(
-                                                        ThemeTimeField.EyeProtectionEnd,
-                                                        theme.eyeProtectionEndTime,
-                                                    )
-                                                )
-                                            }
-                                        )
-                                    }
+                            title = stringResource(R.string.navigation_animation),
+                            selectedValue = appShell.navigationAnimationStyle.storedValue,
+                            displayEntries = styles.map { style ->
+                                when (style) {
+                                    NavigationAnimationStyle.Default -> stringResource(R.string.text_default)
+                                    NavigationAnimationStyle.Miuix -> "Miuix"
+                                    NavigationAnimationStyle.Scale -> stringResource(R.string.navigation_animation_scale)
                                 }
+                            }.toTypedArray(),
+                            entryValues = styles.map { it.storedValue }.toTypedArray(),
+                            onValueChange = {
+                                onIntent(ThemeConfigIntent.SetNavigationAnimationStyle(
+                                    NavigationAnimationStyle.fromStoredValue(it)
+                                ))
                             }
-                        }
+                        )
                     }
-                }
-
-                // COUI / Miuix 的模糊是外观本身，不能关闭；只有 Material / Mochi 保留开关。
-                if (composeEngine == ComposeEngine.Material || composeEngine == ComposeEngine.Mochi) {
-                    SplicedColumnGroup(title = stringResource(R.string.blur_effects)) {
-                        val isMochi = composeEngine == ComposeEngine.Mochi
-                        val blurSupported = if (isMochi) {
-                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                        } else {
-                            true
-                        }
-                        val blurEnabled = if (isMochi) theme.mochiScrollEdgeBlurEnabled else theme.enableBlur
-                        SearchableSetting("theme.is_blur_enable") {
-                            SwitchSettingItem(
-                                title = stringResource(R.string.is_blur_enable),
-                                checked = blurSupported && blurEnabled,
-                                enabled = blurSupported,
-                                onCheckedChange = { enabled ->
-                                    if (isMochi) updateTheme { it.copy(mochiScrollEdgeBlurEnabled = enabled) }
-                                    else onIntent(ThemeConfigIntent.SetBlurEnabled(enabled))
-                                }
-                            )
-                        }
-                        AnimatedVisibility(visible = !isMochi && blurSupported && theme.enableBlur) {
-                            SearchableSetting("theme.is_blur_progressive_enable") {
-                                SwitchSettingItem(
-                                    title = stringResource(R.string.is_blur_progressive_enable),
-                                    checked = theme.enableProgressiveBlur,
-                                    onCheckedChange = { value ->
-                                        updateTheme { it.copy(enableProgressiveBlur = value) }
-                                    }
+                    SearchableSetting("theme.predictive_back") {
+                        SwitchSettingItem(
+                            title = stringResource(R.string.predictive_back),
+                            description = stringResource(R.string.predictive_back_summary),
+                            checked = appShell.predictiveBackEnabled,
+                            onCheckedChange = {
+                                onIntent(
+                                    ThemeConfigIntent.SetPredictiveBackEnabled(it)
                                 )
                             }
-                        }
+                        )
+                    }
+                    SearchableSetting("theme.reader_shared_element") {
+                        SwitchSettingItem(
+                            title = stringResource(R.string.reader_shared_element),
+                            description = stringResource(R.string.reader_shared_element_summary),
+                            checked = appShell.readerSharedElementEnabled,
+                            onCheckedChange = {
+                                onIntent(ThemeConfigIntent.SetReaderSharedElementEnabled(it))
+                            }
+                        )
+                    }
+                    TextAnimationSettings(appShell.textAnimationLevel) { level ->
+                        onIntent(ThemeConfigIntent.SetTextAnimationLevel(level))
                     }
                 }
-
             }
 
-            // Container settings
-            item {
-                SplicedColumnGroup(title = stringResource(R.string.theme_manage_section_container)) {
+            item("theme-cards-lists") {
+                SplicedColumnGroup(title = stringResource(R.string.theme_cards_and_lists)) {
                     SearchableSetting("theme.settings_search_container_background") {
                         SwitchSettingItem(
                             title = stringResource(R.string.settings_search_container_background),
@@ -892,7 +720,7 @@ fun ThemeConfigScreen(
                                                 .background(Color(theme.itemDividerColor))
                                                 .border(
                                                     1.dp,
-                                                    MaterialTheme.colorScheme.outlineVariant,
+                                                    LegadoTheme.colorScheme.outlineVariant,
                                                     CircleShape
                                                 )
                                         )
@@ -904,7 +732,150 @@ fun ThemeConfigScreen(
                 }
             }
 
-            item {
+            item("theme-eye-protection") {
+                SplicedColumnGroup(title = stringResource(R.string.eye_protection)) {
+                    SearchableSetting("theme.eye_protection_enabled") {
+                        SwitchSettingItem(
+                            title = stringResource(R.string.eye_protection_enabled),
+                            description = stringResource(R.string.eye_protection_enabled_summary),
+                            checked = theme.eyeProtectionEnabled,
+                            onCheckedChange = { value ->
+                                updateTheme { it.copy(eyeProtectionEnabled = value) }
+                            }
+                        )
+                    }
+
+                    SearchableSetting("theme.eye_protection_auto_night") {
+                        SwitchSettingItem(
+                            title = stringResource(R.string.eye_protection_auto_night),
+                            description = stringResource(R.string.eye_protection_auto_night_summary),
+                            checked = theme.eyeProtectionAutoNight,
+                            onCheckedChange = { value ->
+                                updateTheme { it.copy(eyeProtectionAutoNight = value) }
+                            }
+                        )
+                    }
+
+                    AnimatedVisibility(visible = theme.isEyeProtectionConfigured) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            SearchableSetting("theme.color_temperature") {
+                                SliderSettingItem(
+                                    title = stringResource(R.string.color_temperature),
+                                    description = stringResource(
+                                        R.string.color_temperature_summary,
+                                        theme.colorTemperature
+                                    ),
+                                    value = theme.colorTemperature.toFloat(),
+                                    defaultValue = 50f,
+                                    valueRange = 0f..100f,
+                                    onValueChange = { value ->
+                                        updateTheme { it.copy(colorTemperature = value.toInt()) }
+                                    }
+                                )
+                            }
+
+                            SearchableSetting("theme.eye_protection_schedule") {
+                                SwitchSettingItem(
+                                    title = stringResource(R.string.eye_protection_schedule),
+                                    description = stringResource(R.string.eye_protection_schedule_summary),
+                                    checked = theme.eyeProtectionSchedule,
+                                    onCheckedChange = { value ->
+                                        updateTheme { it.copy(eyeProtectionSchedule = value) }
+                                    }
+                                )
+                            }
+
+                            AnimatedVisibility(visible = theme.eyeProtectionSchedule) {
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    SearchableSetting("theme.eye_protection_start_time") {
+                                        ClickableSettingItem(
+                                            title = stringResource(R.string.eye_protection_start_time),
+                                            option = theme.eyeProtectionStartTime,
+                                            onClick = {
+                                                onIntent(
+                                                    ThemeConfigIntent.RequestTimePicker(
+                                                        ThemeTimeField.EyeProtectionStart,
+                                                        theme.eyeProtectionStartTime,
+                                                    )
+                                                )
+                                            }
+                                        )
+                                    }
+                                    SearchableSetting("theme.eye_protection_end_time") {
+                                        ClickableSettingItem(
+                                            title = stringResource(R.string.eye_protection_end_time),
+                                            option = theme.eyeProtectionEndTime,
+                                            onClick = {
+                                                onIntent(
+                                                    ThemeConfigIntent.RequestTimePicker(
+                                                        ThemeTimeField.EyeProtectionEnd,
+                                                        theme.eyeProtectionEndTime,
+                                                    )
+                                                )
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            item("theme-book-details") {
+                SplicedColumnGroup(title = stringResource(R.string.book_info_page)) {
+                    SearchableSetting("theme.book_info_follow_cover_color") {
+                        SwitchSettingItem(
+                            title = stringResource(R.string.book_info_follow_cover_color),
+                            description = stringResource(R.string.book_info_follow_cover_color_summary),
+                            checked = theme.bookInfoFollowCoverColor,
+                            onCheckedChange = { value ->
+                                updateTheme { it.copy(bookInfoFollowCoverColor = value) }
+                            }
+                        )
+                    }
+                    SearchableSetting("theme.book_info_network_cover_background") {
+                        DropdownListSettingItem(
+                            title = stringResource(R.string.book_info_network_cover_background),
+                            selectedValue = theme.bookInfoNetworkCoverBackground,
+                            displayEntries = stringArrayResource(R.array.book_info_background_blur_entries),
+                            entryValues = stringArrayResource(R.array.book_info_background_blur_values),
+                            onValueChange = { value ->
+                                updateTheme { it.copy(bookInfoNetworkCoverBackground = value) }
+                            }
+                        )
+                    }
+                    SearchableSetting("theme.book_info_default_cover_background") {
+                        DropdownListSettingItem(
+                            title = stringResource(R.string.book_info_default_cover_background),
+                            selectedValue = theme.bookInfoDefaultCoverBackground,
+                            displayEntries = stringArrayResource(R.array.book_info_background_blur_entries),
+                            entryValues = stringArrayResource(R.array.book_info_background_blur_values),
+                            onValueChange = { value ->
+                                updateTheme { it.copy(bookInfoDefaultCoverBackground = value) }
+                            }
+                        )
+                    }
+                }
+                SplicedColumnGroup(title = stringResource(R.string.theme_book_relationships)) {
+                    SearchableSetting("theme.book_info_author_search_fallback") {
+                        SwitchSettingItem(
+                            title = stringResource(R.string.book_info_author_search_fallback),
+                            description = stringResource(R.string.book_info_author_search_fallback_summary),
+                            checked = theme.bookInfoAuthorSearchFallback,
+                            onCheckedChange = { value ->
+                                updateTheme { it.copy(bookInfoAuthorSearchFallback = value) }
+                            }
+                        )
+                    }
+                }
+            }
+
+            item("theme-reset-defaults") {
                 SplicedColumnGroup {
                     SearchableSetting("theme.theme_config_reset_defaults") {
                         ClickableSettingItem(
@@ -919,7 +890,6 @@ fun ThemeConfigScreen(
                     }
                 }
             }
-
         }
     }
 
@@ -1055,29 +1025,22 @@ fun ThemeConfigScreen(
         onRemoveDark = { removeImage(true) },
     )
 
-    MainNavigationSettingsSheet(
-        show = state.activeSheet == ThemeConfigSheet.MainNavigation,
+    MainNavigationOrderSheet(
+        show = state.activeSheet == ThemeConfigSheet.NavigationOrder,
         settings = appShell,
         onDismissRequest = { onIntent(ThemeConfigIntent.DismissSheet) },
         onSetVisible = { route, visible ->
             onIntent(ThemeConfigIntent.SetMainDestinationVisible(route, visible))
         },
         onSetOrder = { onIntent(ThemeConfigIntent.SetMainNavigationOrder(it)) },
-        onSetDefault = { onIntent(ThemeConfigIntent.SetDefaultHomePage(it)) },
-        onRequestNavigationIcon = { onIntent(ThemeConfigIntent.RequestNavigationIcon(it)) },
-        onClearNavigationIcon = { onIntent(ThemeConfigIntent.SelectNavigationIcon(it, "")) },
-        onSetLabelVisibilityMode = {
-            onIntent(ThemeConfigIntent.SetLabelVisibilityMode(it))
-        },
     )
 
-    TopBottomBarSettingsSheet(
-        show = state.activeSheet == ThemeConfigSheet.TopBottomBar,
-        appShell = appShell,
-        theme = theme,
-        isMiuixEngine = ThemeResolver.resolveComposeEngine(appShell.composeEngine) == ComposeEngine.Miuix,
+    NavIconManageSheet(
+        show = state.activeSheet == ThemeConfigSheet.NavIcons,
+        settings = appShell,
         onDismissRequest = { onIntent(ThemeConfigIntent.DismissSheet) },
-        onIntent = onIntent,
+        onSelectIcon = { onIntent(ThemeConfigIntent.RequestNavigationIcon(it)) },
+        onClearIcon = { onIntent(ThemeConfigIntent.SelectNavigationIcon(it, "")) },
     )
 
 
@@ -1127,16 +1090,14 @@ fun ThemeConfigScreen(
         onDismissRequest = { onIntent(ThemeConfigIntent.DismissSheet) },
         onSelectFont = { onIntent(ThemeConfigIntent.SelectAppFont(it)) },
         onOpenFolderPicker = { onIntent(ThemeConfigIntent.RequestFontFolder) },
-        startAction = {
-            MediumTonalButton(
-                icon = Icons.Default.Delete,
-                contentDescription = stringResource(R.string.clear),
-                onClick = {
-                    onIntent(ThemeConfigIntent.ClearAppFont)
-                    onIntent(ThemeConfigIntent.DismissSheet)
-                }
-            )
-        },
+        startSheetAction = SheetAction(
+            icon = Icons.Default.Delete,
+            contentDescription = stringResource(R.string.clear),
+            onClick = {
+                onIntent(ThemeConfigIntent.ClearAppFont)
+                onIntent(ThemeConfigIntent.DismissSheet)
+            },
+        ),
         folderIcon = Icons.Default.Add,
         folderContentDescription = stringResource(R.string.select_folder),
         emptyText = stringResource(R.string.theme_config_no_font_files),
@@ -1193,7 +1154,7 @@ private fun BaseCardBorderColorSettingItem(
                         color.takeIf { it != 0 }?.let(::Color)
                             ?: LegadoTheme.colorScheme.outlineVariant
                     )
-                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                    .border(1.dp, LegadoTheme.colorScheme.outlineVariant, CircleShape)
             )
         }
     )
@@ -1310,15 +1271,24 @@ fun ThemeColorButton(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Card(
-            onClick = onClick,
-            modifier = Modifier.size(64.dp),
-            shape = RoundedCornerShape(16.dp),
-            border = if (isSelected) BorderStroke(
-                borderWidth,
-                LegadoTheme.colorScheme.primary
-            ) else null,
-            colors = CardDefaults.cardColors(containerColor = colors.surfaceContainer)
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(colors.surfaceContainer)
+                .then(
+                    if (isSelected) {
+                        Modifier.border(
+                            borderWidth,
+                            LegadoTheme.colorScheme.primary,
+                            RoundedCornerShape(16.dp)
+                        )
+                    } else {
+                        Modifier
+                    }
+                )
+                .clickable(role = Role.Button, onClick = onClick),
+            contentAlignment = Alignment.Center,
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -1363,10 +1333,10 @@ fun ThemeColorButton(
                             .clip(RoundedCornerShape(12.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
+                        AppIcon(
                             imageVector = Icons.Default.Check,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimary,
+                            tint = LegadoTheme.colorScheme.onPrimary,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -1413,13 +1383,13 @@ fun ThemeCard(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Card(
+        Box(
             modifier = Modifier
                 .width(128.dp)
-                .height(256.dp),
-            shape = MaterialTheme.shapes.large,
-            border = BorderStroke(1.dp, colors.primary),
-            colors = CardDefaults.cardColors(containerColor = colors.surface)
+                .height(256.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(colors.surface)
+                .border(1.dp, colors.primary, RoundedCornerShape(16.dp))
         ) {
             ConstraintLayout(
                 modifier = Modifier.fillMaxSize()

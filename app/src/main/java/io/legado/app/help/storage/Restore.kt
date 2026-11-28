@@ -15,6 +15,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookMarking
+import io.legado.app.data.entities.BookSeries
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.entities.DictRule
@@ -43,6 +44,7 @@ import io.legado.app.data.repository.HttpTtsRepository
 import io.legado.app.data.entities.ReadAloudVoiceEntity
 import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.LauncherIconHelp
+import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.readaloud.speech.HttpTtsCatalogParser
 import io.legado.app.help.book.upType
@@ -175,6 +177,14 @@ object Restore : KoinComponent {
                 appDb.bookGroupDao.replaceAll(it)
             }
         }
+        // 系列独立封面：旧备份里没有这个文件，取不到时保持现有封面不动
+        if (BackupConfig.dbIsNotIgnored("bookSeries")) {
+            fileToListT<BookSeries>(path, "bookSeries.json")?.let { seriesList ->
+                // Gson 反序列化不走构造器，缺字段时 name 可能是 null，主键为空的行直接跳过
+                seriesList.filter { !it.name.isNullOrBlank() }
+                    .forEach { appDb.bookSeriesDao.upsert(it) }
+            }
+        }
         if (BackupConfig.dbIsNotIgnored("bookSource")) {
             fileToListT<BookSource>(path, "bookSource.json")?.let {
                 try {
@@ -209,6 +219,8 @@ object Restore : KoinComponent {
             fileToListT<ReplaceRule>(path, "replaceRule.json")?.let {
                 try {
                     appDb.replaceRuleDao.insert(*it.toTypedArray())
+                    // 恢复不走 ReplaceRuleRepository，需显式失效净化规则缓存。
+                    ContentProcessor.upReplaceRules()
                 } catch (_: SQLiteConstraintException) {
                 }
             }

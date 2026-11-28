@@ -762,7 +762,7 @@ fun MainActivity.mainEntryProvider(
     }
 
     entry<MainRouteSettingsTheme> {
-        SettingsDestinationContent(SettingsSearchPage.Theme, onNavigateBack)
+        SettingsDestinationContent(SettingsSearchPage.Theme, onNavigateBack, useNavigationRail = useRail)
     }
 
     entry<MainRouteSettingsBackup> {
@@ -1381,6 +1381,16 @@ fun MainActivity.mainEntryProvider(
                         )
                     )
                 }
+            },
+            onOpenVideoPlayer = { article ->
+                onNavigateToRoute(
+                    MainRouteVideoPlay(
+                        rssOrigin = article.origin,
+                        rssLink = article.link,
+                        rssSort = article.sort,
+                        rssTitle = article.title,
+                    )
+                )
             },
             onEditSource = { onNavigateToRoute(MainRouteRssSourceEdit(it)) },
             onLogin = {
@@ -2170,6 +2180,7 @@ private fun MainEntryNavigation.SettingsDestinationContent(
     page: SettingsSearchPage,
     onNavigateBack: () -> Unit,
     startAtMangaTranslation: Boolean = false,
+    useNavigationRail: Boolean = false,
 ) {
     when (page) {
         SettingsSearchPage.Reading -> {
@@ -2179,7 +2190,8 @@ private fun MainEntryNavigation.SettingsDestinationContent(
             ThemeConfigRouteScreen(
                 onBackClick = { onNavigateBack() },
                 onNavigateToCustomTheme = { pushRoute(MainRouteSettingsCustomTheme) },
-                onNavigateToThemeManage = { pushRoute(MainRouteSettingsThemeManage) }
+                onNavigateToThemeManage = { pushRoute(MainRouteSettingsThemeManage) },
+                useNavigationRail = useNavigationRail,
             )
         }
         SettingsSearchPage.Other -> {

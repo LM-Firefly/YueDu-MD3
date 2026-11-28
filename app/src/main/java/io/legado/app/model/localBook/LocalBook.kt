@@ -14,6 +14,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.BaseSource
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.domain.model.LocalBookMetricInvalidation
 import io.legado.app.domain.gateway.ImportBookSettingsGateway
 import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.domain.gateway.ReadSettingsGateway
@@ -138,6 +139,10 @@ object LocalBook {
 
     @Throws(TocEmptyException::class)
     fun getChapterList(book: Book): ArrayList<BookChapter> {
+        if (book.isLocalManga) {
+            // 目录重建同样是一次书本初始化：历史导入的 CBZ 在这里补生成封面。
+            LocalMangaFiles.upBookCover(book)
+        }
         val chapters = when {
             book.isLocalManga -> LocalMangaFiles.chapters(book)
 
@@ -234,6 +239,19 @@ object LocalBook {
         return content
     }
 
+    internal fun upgradeCachedRubyText(book: Book, chapter: BookChapter, cached: String): String? = try {
+        when {
+            book.isEpub -> EpubFile.upgradeCachedRubyText(book, chapter, cached)
+            book.isMobi -> MobiFile.upgradeCachedRubyText(book, chapter, cached)
+            else -> null
+        }
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        AppLog.put("本地注音缓存检查失败: chapter=${chapter.index}, ${error.javaClass.simpleName}")
+        null
+    }
+
     /** Optional original markup. Failure must never replace the authoritative chapter text. */
     fun getPresentation(book: Book, chapter: BookChapter): io.legado.app.feature.reader.core.source.ReaderLocalPresentation? = try {
         when {
@@ -318,6 +336,9 @@ object LocalBook {
             appDb.bookChapterDao.delByBook(bookUrl)
             appDb.bookDao.update(book)
         }
+        // 同路径重导时 latestChapterTime 固定为 0、新建导入也可能沿用移出书架前的校验戳，
+        // 替换后的文件可能保持同一校验戳，必须按书籍失效大小缓存，否则会继续命中旧文件的大小
+        LocalBookMetricInvalidation.notifyChanged(bookUrl)
         return book
     }
 
@@ -376,6 +397,8 @@ object LocalBook {
         }
         oldBook.removeLocalUriCache()
         reboundBook.removeLocalUriCache()
+        // 新路径之前可能被测过大小（如曾导入后又移除），接回后同样按书籍失效
+        LocalBookMetricInvalidation.notifyChanged(newBookUrl)
         return reboundBook
     }
 
@@ -402,11 +425,14 @@ object LocalBook {
             appDb.bookChapterDao.delByBook(bookUrl)
             appDb.bookDao.update(book)
         }
+        // 原地覆盖图片不改变目录时间；移出书架后再导入同一目录同样可能沿用旧校验戳
+        LocalBookMetricInvalidation.notifyChanged(bookUrl)
         return book
     }
 
     fun upBookInfo(book: Book) {
         when {
+            book.isLocalManga -> LocalMangaFiles.upBookCover(book)
             book.isEpub -> EpubFile.upBookInfo(book)
             book.isUmd -> UmdFile.upBookInfo(book)
             book.isPdf -> PdfFile.upBookInfo(book)
@@ -673,6 +699,8 @@ object LocalBook {
                             localBook.origin = newBook.origin
                         }
                     }
+                    // 远程恢复的文件可能落在原路径（校验戳不变）或新路径，之前可能记为测不到
+                    LocalBookMetricInvalidation.notifyChanged(localBook.bookUrl)
                 }
             }
             return true

@@ -24,7 +24,7 @@ data class GroupBookCount(
     val count: Int
 )
 
-private const val PRIVATE_GROUP_MASK =
+internal const val PRIVATE_GROUP_MASK =
     "(SELECT COALESCE(SUM(groupId), 0) FROM book_groups WHERE groupId > 0 AND isPrivate = 1)"
 
 private const val PUBLIC_GROUP_MASK =
@@ -65,6 +65,8 @@ private const val BOOK_SHELF_ITEM_COLUMNS = """
     substr(ifnull(customIntro, ifnull(listIntro, intro)), 1, $BOOK_SHELF_INTRO_LIMIT) AS intro,
     substr(kind, 1, $BOOK_SHELF_TEXT_LIMIT) AS kind,
     substr(customTag, 1, $BOOK_SHELF_TEXT_LIMIT) AS customTag,
+    seriesId,
+    seriesOrder,
     substr(wordCount, 1, $BOOK_SHELF_TEXT_LIMIT) AS wordCount
 """
 
@@ -186,6 +188,17 @@ interface BookDao {
     /** [flowLocal] 的一次性查询（失效信号防抖后由 mapLatest 调用）。 */
     @Query("SELECT * FROM books WHERE type & ${BookType.local} > 0")
     suspend fun getLocal(): List<Book>
+
+    /** 本地书排序指标计算所需的轻量投影（包含私密分组内的本地书，不拉取大文本简介）。 */
+    @Query(
+        """
+        SELECT bookUrl
+        FROM books
+        WHERE type & ${BookType.local} > 0
+          AND type & ${BookType.notShelf} = 0
+        """
+    )
+    suspend fun getLocalShelfBookUrls(): List<String>
 
     @Query(
         """
@@ -373,6 +386,7 @@ interface BookDao {
     fun flowManga(): Flow<List<Book>>
 
     @Query("SELECT * FROM books WHERE type & ${BookType.video} > 0")
+    @Transaction
     fun flowVideo(): Flow<List<Book>>
 
     @Query(
@@ -388,35 +402,13 @@ interface BookDao {
 
     @Query(
         """
-        SELECT
-            bookUrl,
-            name,
-            author,
-            origin,
-            originName,
-            coverUrl,
-            customCoverUrl,
-            durChapterTitle,
-            durChapterTime,
-            durChapterPos,
-            latestChapterTitle,
-            latestChapterTime,
-            lastCheckCount,
-            totalChapterNum,
-            durChapterIndex,
-            type,
-            `group`,
-            `order`,
-            canUpdate,
-            ifnull(customIntro, ifnull(listIntro, intro)) as intro,
-            kind,
-            customTag,
-            wordCount
+        SELECT $BOOK_SHELF_ITEM_COLUMNS
         FROM books
         WHERE type & ${BookType.video} > 0
         AND $PUBLIC_BOOK_FILTER
         """
     )
+    @Transaction
     fun flowBookShelfVideo(): Flow<List<BookShelfItem>>
 
     @Query("SELECT * FROM books WHERE type & ${BookType.text} > 0")
@@ -641,6 +633,34 @@ interface BookDao {
     @Query("update books set `group` = `group` - :group where `group` & :group > 0")
     fun removeGroup(group: Long)
 
+    // ── 书架折叠收纳（同系列多卷）的归属与卷序 ──
+
+    @Query("update books set seriesId = :seriesId, seriesOrder = :seriesOrder where bookUrl = :bookUrl")
+    suspend fun upSeries(bookUrl: String, seriesId: String, seriesOrder: Int)
+
+    @Query("update books set seriesId = :newName where seriesId = :oldName")
+    suspend fun renameSeries(oldName: String, newName: String)
+
+    @Query("update books set seriesId = null, seriesOrder = 0 where seriesId = :seriesName")
+    suspend fun clearSeries(seriesName: String)
+
+    @Query("update books set seriesId = null, seriesOrder = 0 where bookUrl in (:bookUrls)")
+    suspend fun clearSeriesForBooks(bookUrls: List<String>)
+
+    @Query("select distinct seriesId from books where seriesId != '' and seriesId is not null")
+    suspend fun getAllSeriesNames(): List<String>
+
+    @Query("select ifnull(max(seriesOrder), -1) from books where seriesId = :seriesName")
+    suspend fun maxSeriesOrder(seriesName: String): Int
+
+    /** 按传入顺序连续写入卷序，供「收纳为系列 / 移入系列」使用。 */
+    @Transaction
+    suspend fun assignSeries(bookUrls: List<String>, seriesId: String, startOrder: Int) {
+        bookUrls.forEachIndexed { index, bookUrl ->
+            upSeries(bookUrl, seriesId, startOrder + index)
+        }
+    }
+
     @Query("delete from books where type & ${BookType.notShelf} > 0")
     fun deleteNotShelfBook()
 
@@ -814,12 +834,7 @@ interface BookDao {
 
     @Query(
         """
-        SELECT bookUrl, name, author, origin, originName,
-            coverUrl, customCoverUrl, durChapterTitle, durChapterTime,
-            durChapterPos, latestChapterTitle, latestChapterTime,
-            lastCheckCount, totalChapterNum, durChapterIndex,
-            type, `group`, `order`, canUpdate,
-            ifnull(customIntro, ifnull(listIntro, intro)) as intro, kind, customTag, wordCount
+        SELECT $BOOK_SHELF_ITEM_COLUMNS
         FROM books
         WHERE type & ${BookType.text} > 0
             AND $PUBLIC_BOOK_FILTER

@@ -23,8 +23,8 @@ class BookshelfSettingsMappingTest {
     }
 
     @Test
-    fun `Bookshelf 53 键写读映射逐字段对应`() {
-        assertEquals(53, BookshelfSettings().toPrefMap().size)
+    fun `Bookshelf 55 键写读映射逐字段对应`() {
+        assertEquals(55, BookshelfSettings().toPrefMap().size)
         bookshelfMappingSamples().forEach { expected ->
             assertEquals(expected.expectedPrefMap(), expected.toPrefMap())
             assertEquals(
@@ -131,6 +131,7 @@ private fun bookshelfMappingSamples(): List<BookshelfSettings> {
         bookshelfGridCoverWidth = 125,
         bookshelfGridFixedColumns = false,
         bookshelfGridFixedCoverWidth = false,
+        bookshelfGridImmersive = false,
         bookshelfSearchActionDirectToSearch = false,
         autoRefreshBook = false,
         saveTabPosition = 987654321L,
@@ -160,8 +161,10 @@ private fun bookshelfMappingSamples(): List<BookshelfSettings> {
         base.copy(bookshelfTitleSmallFont = true),
         base.copy(bookshelfTitleCenter = true),
         base.copy(bookshelfCoverShadow = true),
+        base.copy(bookshelfDimensionalShelf = true),
         base.copy(bookshelfGridFixedColumns = true),
         base.copy(bookshelfGridFixedCoverWidth = true),
+        base.copy(bookshelfGridImmersive = true),
         base.copy(bookshelfSearchActionDirectToSearch = true),
         base.copy(autoRefreshBook = true),
     )
@@ -210,6 +213,7 @@ private fun BookshelfSettings.expectedPrefMap(): Map<String, Any?> = mapOf(
     PreferKey.bookshelfTitleCenter to bookshelfTitleCenter,
     PreferKey.bookshelfTitleMaxLines to bookshelfTitleMaxLines,
     PreferKey.bookshelfCoverShadow to bookshelfCoverShadow,
+    PreferKey.bookshelfDimensionalShelf to bookshelfDimensionalShelf,
     PreferKey.bookshelfCardColor to bookshelfCardColor,
     PreferKey.bookshelfCardColorDark to bookshelfCardColorDark,
     PreferKey.bookshelfGroupListStyle to bookshelfGroupListStyle,
@@ -218,6 +222,7 @@ private fun BookshelfSettings.expectedPrefMap(): Map<String, Any?> = mapOf(
     PreferKey.bookshelfGridCoverWidth to bookshelfGridCoverWidth,
     PreferKey.bookshelfGridFixedColumns to bookshelfGridFixedColumns,
     PreferKey.bookshelfGridFixedCoverWidth to bookshelfGridFixedCoverWidth,
+    PreferKey.bookshelfGridImmersive to bookshelfGridImmersive,
     PreferKey.bookshelfSearchActionDirectToSearch to bookshelfSearchActionDirectToSearch,
     PreferKey.autoRefresh to autoRefreshBook,
     PreferKey.bookshelfSelectedGroupId to saveTabPosition,

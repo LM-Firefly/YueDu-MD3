@@ -88,6 +88,9 @@ class ReadAloudPlayerViewModel(
             is ReadAloudPlayerIntent.SetSpeed -> viewModelScope.launch {
                 coordinator.setSpeed(intent.value)
             }
+            is ReadAloudPlayerIntent.SetTtsFollowSys -> viewModelScope.launch {
+                coordinator.setFollowSys(intent.value)
+            }
             is ReadAloudPlayerIntent.SetTimer -> viewModelScope.launch {
                 coordinator.setTimer(intent.minutes)
             }
@@ -175,6 +178,9 @@ class ReadAloudPlayerViewModel(
 
                 ReadAloudConfigOption.BgmAssign ->
                     readAloudSettingsGateway.update { it.copy(bgmAssign = selected) }
+
+                ReadAloudConfigOption.ReadChapterTitle ->
+                    readAloudSettingsGateway.update { it.copy(readChapterTitle = selected) }
 
                 ReadAloudConfigOption.ContentSplit -> {
                     val (mode, symbols) = ReadAloudContentSplitSetting.decode(value)
@@ -285,6 +291,8 @@ class ReadAloudPlayerViewModel(
             isPaused = source.isPaused,
             readAloudRunning = BaseReadAloudService.isRun,
             speed = source.speed,
+            ttsFollowSys = source.ttsFollowSys,
+            maxPlaybackSpeed = source.maxPlaybackSpeed,
             timerMinutes = source.timerMinutes,
             timerMode = source.timerMode,
             timerChapters = source.timerChapters,
@@ -326,6 +334,7 @@ private fun toReadAloudSettingsUiState(
     useMultiSpeaker = aloud.useMultiSpeaker,
     multiRoleCast = aloud.multiRoleCast,
     bgmAssign = aloud.bgmAssign,
+    readChapterTitle = aloud.readChapterTitle,
     readAloudContentSplitMode = aloud.contentSplitMode,
     readAloudContentSplitSymbols = aloud.contentSplitSymbols,
     preDownloadNum = read.preDownloadNum,

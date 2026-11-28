@@ -122,11 +122,11 @@ class ThemeConfigViewModel(
                 transform = { it.copy(showStatusBar = intent.visible) },
                 effect = ThemeConfigEffect.NotifyMain,
             )
-            is ThemeConfigIntent.SetSwipeAnimation -> updateAppShell {
-                it.copy(swipeAnimation = intent.enabled)
-            }
             is ThemeConfigIntent.SetShowBottomView -> updateAppShell {
                 it.copy(showBottomView = intent.visible)
+            }
+            is ThemeConfigIntent.SetUsePagerTopBar -> updateAppShell {
+                it.copy(usePagerTopBar = intent.enabled)
             }
             is ThemeConfigIntent.SetUseFloatingBottomBar -> updateAppShell {
                 it.copy(useFloatingBottomBar = intent.enabled)

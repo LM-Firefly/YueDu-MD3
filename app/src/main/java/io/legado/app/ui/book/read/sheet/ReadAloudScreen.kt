@@ -26,11 +26,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.legado.app.R
 import io.legado.app.domain.model.settings.ReadAloudTimerMode
+import io.legado.app.domain.model.readaloud.ReadAloudSpeedLimit
 import io.legado.app.ui.book.read.ReadBookIntent
 import io.legado.app.ui.book.read.ReadBookUiState
 import io.legado.app.ui.theme.LegadoTheme
@@ -59,7 +61,11 @@ fun ReadAloudContent(
     modifier: Modifier = Modifier,
 ) {
     val ttsSpeechRate = state.readAloudTtsSpeechRate
-    var speechRatePreview by remember(ttsSpeechRate) { mutableFloatStateOf(ttsSpeechRate.toFloat()) }
+    val speedMax = ReadAloudSpeedLimit.sliderMax(state.readAloudMaxPlaybackSpeed)
+    val speedValue = ttsSpeechRate.coerceIn(0, speedMax)
+    var speechRatePreview by remember(speedValue, speedMax) {
+        mutableFloatStateOf(speedValue.toFloat())
+    }
     // 总音量同样只在松手时提交：拖动中每像素写 prefs 并回灌会让滑块来回跳
     var bgmVolumePreview by remember(state.bgmVolume) {
         mutableFloatStateOf(state.bgmVolume * 100f)
@@ -161,14 +167,18 @@ fun ReadAloudContent(
         TinySliderSettingItem(
             title = stringResource(R.string.read_aloud_speed),
             description = stringResource(R.string.read_aloud_speed_summary),
-            value = ttsSpeechRate.toFloat(),
-            valueRange = 0f..80f,
-            steps = 79,
+            value = speedValue.toFloat(),
+            valueRange = 0f..speedMax.toFloat(),
+            steps = speedMax - 1,
             enabled = !state.readAloudTtsFollowSys,
             // 拖动中写设置会与外部 value 回流打架（滑块来回跳），松手才提交
             onValueChange = { speechRatePreview = it },
             onValueChangeFinished = {
-                onIntent(ReadBookIntent.SetReadAloudTtsSpeechRate(speechRatePreview.toInt()))
+                onIntent(
+                    ReadBookIntent.SetReadAloudTtsSpeechRate(
+                        speechRatePreview.toInt().coerceAtMost(speedMax)
+                    )
+                )
             },
         )
 
@@ -241,6 +251,9 @@ private fun ActionButton(
         AppText(
             text = label,
             style = LegadoTheme.typography.labelSmall,
+            // 下方文字与按钮的 contentDescription 重复，清掉语义只留按钮一个焦点，
+            // 避免“设置/后台”这类入口被朗读两遍。
+            modifier = Modifier.clearAndSetSemantics { },
             // 底栏有五个入口，标签在窄屏上会换行；单行 + 省略号保证按钮行高一致
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

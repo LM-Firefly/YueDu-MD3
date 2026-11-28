@@ -72,13 +72,13 @@ import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.AppTextField
 import io.legado.app.ui.widget.components.alert.AppAlertDialog
 import io.legado.app.ui.widget.components.button.ConfirmDismissButtonsRow
-import io.legado.app.ui.widget.components.button.series.MediumTonalButton
 import io.legado.app.ui.widget.components.icon.AppIcons
 import io.legado.app.ui.widget.components.log.AppLogSheet
 import io.legado.app.ui.widget.components.menu.AppAction
 import io.legado.app.ui.widget.components.menu.AppActionGroup
 import io.legado.app.ui.widget.components.menu.AppActionMenu
 import io.legado.app.ui.widget.components.modalBottomSheet.AppModalBottomSheet
+import io.legado.app.ui.widget.components.modalBottomSheet.SheetAction
 import io.legado.app.ui.widget.components.progressIndicator.AppLinearProgressIndicator
 import io.legado.app.ui.widget.components.topbar.GlassSmallTopAppBar
 import io.legado.app.ui.widget.components.topbar.TopBarActionButton
@@ -170,6 +170,7 @@ fun RssReadRouteScreen(
     val content by viewModel.contentState.collectAsStateWithLifecycle()
     val analyzeUrl by viewModel.urlState.collectAsStateWithLifecycle()
     val isSpeaking by viewModel.isSpeakingState.collectAsStateWithLifecycle()
+    val canPlayVideo by viewModel.canPlayVideo.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val fallbackUserAgent = settings.userAgent
 
@@ -486,7 +487,7 @@ fun RssReadRouteScreen(
                                                     icon = Icons.Default.Share,
                                                 )
                                             )
-                                            if (viewModel.rssArticle?.type == 2) {
+                                            if (canPlayVideo) {
                                                 add(
                                                     AppAction(
                                                         id = RssReadMenuPlayVideo,
@@ -705,13 +706,11 @@ private fun FavoriteEditSheet(
         show = show,
         onDismissRequest = onDismissRequest,
         title = stringResource(R.string.favorite),
-        endAction = {
-            MediumTonalButton(
-                onClick = onDelete,
-                icon = Icons.Default.CleaningServices,
-                contentDescription = stringResource(R.string.delete)
-            )
-        }
+        endSheetAction = SheetAction(
+            onClick = onDelete,
+            icon = Icons.Default.CleaningServices,
+            contentDescription = stringResource(R.string.delete),
+        )
     ) {
 
         Column {

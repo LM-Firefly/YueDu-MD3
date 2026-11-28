@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
@@ -73,10 +74,8 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.FirstBaseline
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -85,6 +84,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.legado.app.R
+import io.legado.app.core.ui.bookshelf.DimensionalBookshelf
+import io.legado.app.core.ui.bookshelf.DimensionalShelfBook
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.domain.model.HomeDashboardSection
@@ -93,6 +94,9 @@ import io.legado.app.lib.permission.Permissions
 import io.legado.app.lib.permission.PermissionsCompat
 import io.legado.app.ui.config.backupConfig.BackupOptionSheet
 import io.legado.app.ui.config.backupConfig.RestoreOptionSheet
+import io.legado.app.ui.main.LocalMainPageIndex
+import io.legado.app.ui.main.LocalMainPagerTopBarHost
+import io.legado.app.ui.main.MainPagerPageChromeEffect
 import io.legado.app.ui.main.homepage.HomepageFeedActions
 import io.legado.app.ui.main.homepage.HomepageManageActions
 import io.legado.app.ui.main.homepage.HomepageModuleFeed
@@ -100,6 +104,7 @@ import io.legado.app.ui.main.homepage.HomepageModuleManageSheet
 import io.legado.app.ui.main.homepage.HomepageUiState
 import io.legado.app.ui.main.homepage.HomepageViewModel
 import io.legado.app.ui.theme.LegadoTheme
+import io.legado.app.ui.theme.extendIntoHorizontalPadding
 import io.legado.app.ui.widget.components.AppPullToRefresh
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.alert.AppAlertDialog
@@ -344,6 +349,11 @@ fun HomeRouteScreen(
         onToggleHomepageManage = homepageViewModel::toggleManageMode,
         onNavigateToReadRecord = onNavigateToReadRecord,
         onNavigateToReadRecordOverview = onNavigateToReadRecordOverview,
+        onDashboardBookDetails = { book ->
+            book.bookUrl?.let { url ->
+                onNavigateToBookInfo(book.name, book.author, url, book.origin, book.coverPath, null)
+            }
+        },
         onHomepageBookLongClick = { book, sharedCoverKey ->
             previewBook = book
             previewSharedCoverKey = sharedCoverKey
@@ -399,11 +409,14 @@ fun HomeScreen(
     onToggleHomepageManage: () -> Unit,
     onNavigateToReadRecord: () -> Unit = {},
     onNavigateToReadRecordOverview: () -> Unit = {},
+    onDashboardBookDetails: (HomeRecentBookUi) -> Unit = {},
     onHomepageBookLongClick: (SearchBook, String?) -> Unit = { _, _ -> },
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
     val scrollBehavior = GlassTopAppBarDefaults.defaultScrollBehavior()
+    val pagerTopBarHost = LocalMainPagerTopBarHost.current
+    val mainPageIndex = LocalMainPageIndex.current
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -437,70 +450,88 @@ fun HomeScreen(
         }
     }
 
+    val homeTopBarActions: @Composable RowScope.() -> Unit = {
+        TopBarActionButton(
+            onClick = onToggleHomepageManage,
+            imageVector = AppIcons.Settings,
+            contentDescription = stringResource(R.string.homepage_module_manage),
+        )
+        AppActionMenu(
+            groups = persistentListOf(
+                AppActionGroup(
+                    id = "home_settings",
+                    actions = persistentListOf(
+                        AppAction(
+                            "dashboard_settings",
+                            stringResource(R.string.home_dashboard_settings),
+                        ),
+                    ),
+                ),
+                AppActionGroup(
+                    id = "home_pages",
+                    actions = selectedSets.mapIndexed { index, source ->
+                        AppAction(
+                            id = "page:$index",
+                            label = source.sourceName,
+                            selected = index == pagerState.currentPage,
+                        )
+                    }.toImmutableList(),
+                ),
+            ),
+            onAction = { id ->
+                when {
+                    id == "dashboard_settings" ->
+                        onIntent(HomeIntent.DashboardSettingsClick)
+                    id.startsWith("page:") -> {
+                        val index = id.removePrefix("page:").toIntOrNull()
+                        if (index != null && index in selectedSets.indices) {
+                            scope.launch { pagerState.animateScrollToPage(index) }
+                        }
+                    }
+                }
+            },
+        ) {
+            AppIcon(
+                imageVector = AppIcons.MoreVert,
+                contentDescription = stringResource(R.string.more_menu),
+                modifier = this.modifier,
+            )
+        }
+    }
+
+    if (pagerTopBarHost != null) {
+        MainPagerPageChromeEffect(
+            host = pagerTopBarHost,
+            pageIndex = mainPageIndex,
+            subtitle = currentPageSourceName,
+            actions = homeTopBarActions,
+        )
+    }
+
     AppScaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = if (pagerTopBarHost != null) {
+            Modifier
+        } else {
+            Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+        },
         contentWindowInsets = WindowInsets(0),
         topBar = {
-            GlassMediumFlexibleTopAppBar(
-                title = stringResource(R.string.home),
-                subtitle = currentPageSourceName,
-                scrollBehavior = scrollBehavior,
-                actions = {
-                    TopBarActionButton(
-                        onClick = onToggleHomepageManage,
-                        imageVector = AppIcons.Settings,
-                        contentDescription = stringResource(R.string.homepage_module_manage),
-                    )
-                    AppActionMenu(
-                        groups = persistentListOf(
-                            AppActionGroup(
-                                id = "home_settings",
-                                actions = persistentListOf(
-                                    AppAction(
-                                        "dashboard_settings",
-                                        stringResource(R.string.home_dashboard_settings),
-                                    ),
-                                ),
-                            ),
-                            AppActionGroup(
-                                id = "home_pages",
-                                actions = selectedSets.mapIndexed { index, source ->
-                                    AppAction(
-                                        id = "page:$index",
-                                        label = source.sourceName,
-                                        selected = index == pagerState.currentPage,
-                                    )
-                                }.toImmutableList(),
-                            ),
-                        ),
-                        onAction = { id ->
-                            when {
-                                id == "dashboard_settings" ->
-                                    onIntent(HomeIntent.DashboardSettingsClick)
-                                id.startsWith("page:") -> {
-                                    val index = id.removePrefix("page:").toIntOrNull()
-                                    if (index != null && index in selectedSets.indices) {
-                                        scope.launch { pagerState.animateScrollToPage(index) }
-                                    }
-                                }
-                            }
-                        },
-                    ) {
-                        AppIcon(
-                            imageVector = AppIcons.MoreVert,
-                            contentDescription = stringResource(R.string.more_menu),
-                            modifier = this.modifier,
-                        )
-                    }
-                },
-            )
+            if (pagerTopBarHost == null) {
+                GlassMediumFlexibleTopAppBar(
+                    title = stringResource(R.string.home),
+                    subtitle = currentPageSourceName,
+                    scrollBehavior = scrollBehavior,
+                    actions = homeTopBarActions,
+                )
+            }
         },
     ) { paddingValues ->
         AppPullToRefresh(
             isRefreshing = homepageState.isRefreshing,
             onRefresh = onRefreshHomepage,
             modifier = Modifier.fillMaxSize(),
-            scrollBehavior = scrollBehavior,
+            // 横划顶栏由 OxygenX 自己处理收拢，宿主不再把旧顶栏的收拢进度交给刷新门控。
+            scrollBehavior = if (pagerTopBarHost != null) null else scrollBehavior,
         ) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val dashboardScrollState = rememberScrollState()
@@ -551,9 +582,9 @@ fun HomeScreen(
                             onIntent = onIntent,
                             onNavigateToReadRecord = onNavigateToReadRecord,
                             onNavigateToReadRecordOverview = onNavigateToReadRecordOverview,
+                            onBookDetails = onDashboardBookDetails,
                             sharedTransitionScope = sharedTransitionScope,
                             animatedVisibilityScope = animatedVisibilityScope,
-                            modifier = Modifier.padding(horizontal = 16.dp),
                         )
                     }
 
@@ -652,19 +683,47 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeDashboardContent(
+internal fun HomeDashboardContent(
     state: HomeUiState,
     onIntent: (HomeIntent) -> Unit,
     onNavigateToReadRecord: () -> Unit,
     onNavigateToReadRecordOverview: () -> Unit,
+    onBookDetails: (HomeRecentBookUi) -> Unit,
     modifier: Modifier = Modifier,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null,
 ) {
+    val sidePadding = 16.dp
     Column(
-        modifier = modifier,
+        modifier = modifier.padding(horizontal = sidePadding),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (HomeDashboardSection.DimensionalBookshelf in state.visibleSections &&
+            state.dimensionalShelfBooks.isNotEmpty()
+        ) {
+            val books = state.dimensionalShelfBooks
+            val shelfBooks = remember(books) {
+                books.map { book ->
+                    val url = requireNotNull(book.bookUrl)
+                    DimensionalShelfBook(
+                        key = url,
+                        bookUrl = url,
+                        title = book.name,
+                        author = book.author,
+                        cover = book.coverPath,
+                        origin = book.origin,
+                    )
+                }.toImmutableList()
+            }
+            DimensionalBookshelf(
+                books = shelfBooks,
+                onOpen = { onIntent(HomeIntent.RecentHistoryBookClick(shelfBooks[it].bookUrl)) },
+                onPreview = { onBookDetails(books[it]) },
+                modifier = Modifier.extendIntoHorizontalPadding(sidePadding),
+                preferCache = true,
+            )
+        }
+
         if (HomeDashboardSection.RecentBook in state.visibleSections) {
             RecentBookCard(
                 book = state.recentBook,
@@ -1140,12 +1199,10 @@ private fun SemiCircleProgress(
     val progressColor = LegadoTheme.colorScheme.primary
 
     Box(
-        modifier = modifier.semantics {
-            progressBarRangeInfo = ProgressBarRangeInfo(
-                current = animatedProgress.coerceIn(0f, 1f),
-                range = 0f..1f,
-            )
-        },
+        // 装饰性进度环不暴露 progressBarRangeInfo：裸的进度语义会在 TalkBack 里
+        // 形成一个朗读“进度条”却无任何交互的空焦点；进度已由环内文本表达，
+        // 合并成一个节点即可。
+        modifier = modifier.semantics(mergeDescendants = true) {},
         contentAlignment = Alignment.BottomCenter,
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -1433,6 +1490,7 @@ private fun HomeDashboardSection.labelRes(): Int = when (this) {
     HomeDashboardSection.RecentBooks -> R.string.home_recent_books
     HomeDashboardSection.DailyGoal -> R.string.home_today_reading_goal
     HomeDashboardSection.WebDavBackup -> R.string.home_webdav_backup
+    HomeDashboardSection.DimensionalBookshelf -> R.string.dimensional_bookshelf
 }
 
 private fun bookAccessibilityLabel(

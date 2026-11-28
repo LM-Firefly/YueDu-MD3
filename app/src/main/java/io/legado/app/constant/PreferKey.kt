@@ -159,7 +159,6 @@ object PreferKey {
     const val readUrlOpenInBrowser = "readUrlInBrowser"
     const val defaultBookTreeUri = "defaultBookTreeUri"
     const val importBookPath = "importBookPath"
-    const val checkSource = "checkSource"
     const val uploadRule = "uploadRule"
     const val tocUiUseReplace = "tocUiUseReplace"
     const val tocCountWords = "tocCountWords"
@@ -213,6 +212,9 @@ object PreferKey {
     const val swipeToAddBookmark = "swipeToAddBookmark"
     const val bookmarkBadgeImage = "bookmarkBadgeImage"
     const val bookmarkBadgeSize = "bookmarkBadgeSize"
+    const val bookmarkBadgePosition = "bookmarkBadgePosition"
+    const val bookmarkBadgeOffsetX = "bookmarkBadgeOffsetX"
+    const val bookmarkBadgeOffsetY = "bookmarkBadgeOffsetY"
     const val volumeKeyPage = "volumeKeyPage"
     const val volumeKeyPageOnPlay = "volumeKeyPageOnPlay"
     const val mouseWheelPage = "mouseWheelPage"
@@ -310,9 +312,15 @@ object PreferKey {
     const val multiRoleCast = "multiRoleCast"
     /** 背景音乐分配：正文段首配乐胶囊 + 朗读时的独立配乐轨。 */
     const val bgmAssign = "bgmAssign"
+    /**
+     * 朗读章节标题：与正文「标题位置=隐藏」独立——关掉标题显示、标题仍可能被念出来，
+     * 所以朗读侧单独给一个开关。
+     */
+    const val readAloudChapterTitle = "readAloudChapterTitle"
     const val themePref = "themePref"
     const val bookshelfSortOrder = "bookshelfSortOrder"
     const val showBottomView = "showBottomView"
+    const val usePagerTopBar = "usePagerTopBar"
     const val useFloatingBottomBar = "useFloatingBottomBar"
     const val useFloatingBottomBarLiquidGlass = "useFloatingBottomBarLiquidGlass"
     const val mangaScrollMode = "mangaScrollMode"
@@ -365,6 +373,7 @@ object PreferKey {
     const val bookshelfTitleCenter = "bookshelfTitleCenter"
     const val bookshelfTitleMaxLines = "bookshelfTitleMaxLines"
     const val bookshelfCoverShadow = "bookshelfCoverShadow"
+    const val bookshelfDimensionalShelf = "bookshelfDimensionalShelf"
     const val bookshelfSearchActionDirectToSearch = "bookshelfSearchActionDirectToSearch"
     const val bookshelfCardColor = "bookshelfCardColor"
     const val bookshelfCardColorDark = "bookshelfCardColorDark"
@@ -374,6 +383,7 @@ object PreferKey {
     const val bookshelfGridCoverWidth = "bookshelfGridCoverWidth"
     const val bookshelfGridFixedColumns = "bookshelfGridFixedColumns"
     const val bookshelfGridFixedCoverWidth = "bookshelfGridFixedCoverWidth"
+    const val bookshelfGridImmersive = "bookshelfGridImmersive"
 
 
     const val tabletInterface = "tabletInterface"

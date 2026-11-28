@@ -111,7 +111,7 @@ internal val LocalTopBarMergeState = staticCompositionLocalOf { false }
 
 @Composable
 private fun currentTopBarButtonStyle(): TopBarButtonStyle =
-    if (LegadoTheme.composeEngine == ComposeEngine.Coui) TopBarButtonStyle.Plain
+    if (LegadoTheme.composeEngine == ComposeEngine.Coui || LegadoTheme.composeEngine == ComposeEngine.Oxygen) TopBarButtonStyle.Plain
     else TopBarButtonStyle.fromStorage(LocalAppUiConfiguration.current.theme.topBarButtonStyle)
 
 private val TopBarButtonStyle.seriesStyle: SeriesIconButtonStyle
@@ -252,8 +252,34 @@ private fun TopBarButton(
     onLongClick: (() -> Unit)? = null,
     onLongClickLabel: String? = null,
     iconTint: Color = Color.Unspecified,
+    oxygenNavigationIconSize: Dp? = null,
 ) {
     val engine = LegadoTheme.composeEngine
+    if (engine == ComposeEngine.Oxygen) {
+        io.oxygenx.material3.ProvideMaterial3Content {
+            if (text != null) {
+                io.oxygenx.ui.basic.TextButton(onClick, modifier) {
+                    io.legado.app.ui.widget.components.text.AppText(text)
+                }
+            } else {
+                io.oxygenx.ui.navigation.TopAppBarAction(
+                    onClick = onClick,
+                    onLongClick = onLongClick,
+                    onLongClickLabel = onLongClickLabel,
+                    modifier = modifier,
+                    contentColor = iconTint,
+                ) {
+                    AppIcon(
+                        imageVector,
+                        contentDescription,
+                        modifier = oxygenNavigationIconSize?.let { Modifier.size(it) } ?: Modifier,
+                    )
+                }
+            }
+        }
+        return
+    }
+
     if (engine == ComposeEngine.Coui && ThemeResolver.isCouiSupported() &&
         LocalAppCouiNativeToolbar.current
     ) {
@@ -453,11 +479,15 @@ fun TopBarNavigationButton(
     imageVector: ImageVector = AppIcons.Back,
     contentDescription: String? = stringResource(id = R.string.back)
 ) {
+    val engine = LegadoTheme.composeEngine
     TopBarButton(
         onClick = onClick,
         imageVector = imageVector,
         contentDescription = contentDescription,
-        modifier = if (LegadoTheme.composeEngine == ComposeEngine.Material) {
+        oxygenNavigationIconSize = if (engine == ComposeEngine.Oxygen) {
+            io.oxygenx.ui.navigation.LocalTopAppBarNavigationIconSize.current
+        } else null,
+        modifier = if (engine == ComposeEngine.Material) {
             modifier.padding(horizontal = 12.dp)
         } else modifier,
     )
@@ -522,6 +552,20 @@ fun TopBarActionSurface(
     content: @Composable () -> Unit,
 ) {
     val engine = LegadoTheme.composeEngine
+    if (engine == ComposeEngine.Oxygen) {
+        io.oxygenx.material3.ProvideMaterial3Content {
+            io.oxygenx.ui.navigation.TopAppBarAction(
+                onClick = onClick,
+                onLongClick = onLongClick,
+                onLongClickLabel = onLongClickLabel,
+                modifier = modifier.semantics { if (contentDescription != null) this.contentDescription = contentDescription },
+                enabled = enabled,
+                content = content,
+            )
+        }
+        return
+    }
+
     if (engine == ComposeEngine.Coui && ThemeResolver.isCouiSupported() &&
         LocalAppCouiNativeToolbar.current
     ) {
@@ -754,6 +798,7 @@ fun TopBarAnimatedActionButton(
                     onClick = { onToggle(!checked) },
                     modifier = buttonModifier.semantics {
                         contentDescription = if (checked) activeText else inactiveText
+                        selected = checked
                     },
                 ) {
                     Row(
@@ -795,6 +840,7 @@ fun TopBarAnimatedActionButton(
             inactiveText = inactiveText,
             modifier = modifier.height(size).defaultMinSize(minWidth = size).semantics {
                 contentDescription = if (checked) activeText else inactiveText
+                selected = checked
             },
             iconSize = 24.dp,
             textStyle = LegadoTheme.typography.labelMedium,
@@ -837,7 +883,12 @@ fun TopBarAnimatedActionButton(
             iconUnchecked = iconUnchecked,
             activeText = activeText,
             inactiveText = inactiveText,
-            modifier = modifier.height(36.dp),
+            // 图标本身不携带语义（AnimatedIcon 的 contentDescription 为 null），
+            // 名称与选中态必须落在按钮节点上，否则 TalkBack 会跳过这三个入口。
+            modifier = modifier.height(36.dp).semantics {
+                contentDescription = if (checked) activeText else inactiveText
+                selected = checked
+            },
             iconSize = 20.dp,
             textStyle = LegadoTheme.typography.labelMedium,
             textStartPadding = 8.dp,

@@ -1,6 +1,7 @@
 package io.legado.app.ui.theme
 
 import android.app.Application
+import android.os.Looper
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
@@ -31,12 +32,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
@@ -47,10 +50,14 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
+import com.itos.coui.layout.CouiPageDefaults
+import com.itos.coui.switch.CouiSwitchDefaults
 import com.itos.coui.theme.CouiColorScheme
 import com.itos.coui.theme.CouiPresets
 import com.itos.coui.theme.CouiTheme
+import com.itos.coui.topappbar.ProvideCouiTopAppBarBlur
 import io.legado.app.R
 import io.legado.app.domain.model.settings.AppShellSettings
 import io.legado.app.domain.model.settings.AppUiConfiguration
@@ -78,6 +85,7 @@ import io.legado.app.ui.widget.components.topbar.GlassTopAppBarDefaults
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBarScrollBehavior
 import io.legado.app.ui.widget.components.topbar.TopBarActionButton
 import io.legado.app.ui.widget.components.topbar.TopBarAnimatedActionButton
+import java.time.Duration
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
@@ -87,6 +95,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.annotation.LooperMode
@@ -163,6 +172,7 @@ class AppThemeEngineTest {
                 val dark = LegadoTheme.isDark
                 val primary = LegadoTheme.colorScheme.primary
                 val backend = when (engine) {
+                    ComposeEngine.Oxygen -> io.oxygenx.theme.OxygenTheme.colorScheme.primary
                     ComposeEngine.Material -> MaterialTheme.colorScheme.primary
                     ComposeEngine.Mochi -> MochiTheme.colorScheme.primary
                     ComposeEngine.Miuix -> MiuixTheme.colorScheme.primary
@@ -182,6 +192,8 @@ class AppThemeEngineTest {
 
         listOf(
             "material" to ComposeEngine.Material,
+            "oxygen" to ComposeEngine.Oxygen,
+            "OXYGEN" to ComposeEngine.Oxygen,
             "miuix" to ComposeEngine.Miuix,
             "MIUIX" to ComposeEngine.Miuix,
             "mochi" to ComposeEngine.Mochi,
@@ -356,6 +368,49 @@ class AppThemeEngineTest {
 
     @Test
     @Config(sdk = [34])
+    fun couiSingleLineSwitchFitsTheRowAndSupportsTapAndDrag() {
+        RuntimeEnvironment.getApplication().injectAsAppCtx()
+        val checked = mutableStateOf(false)
+        val changes = mutableListOf<Boolean>()
+        compose.setContent {
+            AppTheme(AppUiConfiguration(appShell = AppShellSettings(composeEngine = "coui"))) {
+                SwitchSettingItem("Reading hints", checked = checked.value) {
+                    checked.value = it
+                    changes += it
+                }
+            }
+        }
+
+        val row = compose.onNodeWithText("Reading hints")
+        row.assertHeightIsEqualTo(CouiPageDefaults.rowMinHeight).assertIsOff()
+        row.performClick().assertIsOn()
+        val (rowPadding, halfSwitchWidth) = with(compose.density) {
+            CouiPageDefaults.rowPadding.toPx() to CouiSwitchDefaults.width.toPx() / 2f
+        }
+        row.performTouchInput { click(Offset(rowPadding, centerY)) }.assertIsOff()
+        row.performTouchInput {
+            click(Offset(width - rowPadding - halfSwitchWidth, centerY))
+        }.assertIsOn()
+
+        // The native switch uses Android spring animations for both toggles and drags.
+        val mainLooper = shadowOf(Looper.getMainLooper())
+        val settleTime = Duration.ofMillis(600)
+        mainLooper.idleFor(settleTime)
+        row.performTouchInput {
+            down(Offset(width - rowPadding - halfSwitchWidth, centerY))
+            moveBy(Offset(-halfSwitchWidth, 0f))
+        }
+        mainLooper.idleFor(settleTime)
+        row.performTouchInput { up() }
+        mainLooper.idleFor(settleTime)
+        row.assertIsOff()
+        compose.runOnIdle {
+            assertEquals(listOf(true, false, true, false), changes)
+        }
+    }
+
+    @Test
+    @Config(sdk = [34])
     fun couiSettingsPreserveControlSemanticsAndCommitCallbacks() {
         RuntimeEnvironment.getApplication().injectAsAppCtx()
         val checked = mutableStateOf(false)
@@ -455,6 +510,9 @@ class AppThemeEngineTest {
 
     @Test
     @Config(sdk = [34])
+    // COUI 面板材质走 Kawase RuntimeShader，Robolectric 的 NATIVE 解析不了该 shader；
+    // LEGACY 只跳过绘制，语义、点击与排版照常，和 CouiAlertDialogTest 同口径。
+    @GraphicsMode(GraphicsMode.Mode.LEGACY)
     fun couiSheetDropdownsOpenAndCommitIndependently() {
         RuntimeEnvironment.getApplication().injectAsAppCtx()
         val tiny = mutableStateOf("initial")
@@ -507,6 +565,10 @@ class AppThemeEngineTest {
                     theme = ThemeSettings(enableBlur = blur.value),
                 ),
             ) {
+                // 上游 alpha16 起顶栏默认走 Compose 渐变模糊，其 AGSL 在 Robolectric 下
+                // 编译失败（'color' is not a valid layout qualifier）；本测试验证外壳采样与
+                // 动作透传，与模糊实现无关，显式退回 COUI 后端。
+                ProvideCouiTopAppBarBlur(useComposeBlur = false) {
                 val behavior = GlassTopAppBarDefaults.defaultScrollBehavior()
                 SideEffect { scrollBehavior = behavior }
                 val actions: @Composable RowScope.() -> Unit = {
@@ -527,6 +589,7 @@ class AppThemeEngineTest {
                     val receivesSource = LocalAppCouiTopBarHost.current?.backdrop != null
                     SideEffect { bodyReceivesSource = receivesSource }
                     Box(Modifier.fillMaxSize().padding(padding))
+                }
                 }
             }
         }
@@ -571,6 +634,8 @@ class AppThemeEngineTest {
                     theme = ThemeSettings(enableBlur = blur.value),
                 ),
             ) {
+                // 同上：Robolectric 无法编译上游新 Compose 渐变模糊的 AGSL，退回 COUI 后端。
+                ProvideCouiTopAppBarBlur(useComposeBlur = false) {
                 val checked = remember { mutableStateOf(false) }
                 AppScaffold(topBar = {
                     GlassSmallTopAppBar("Page", actions = {
@@ -591,6 +656,7 @@ class AppThemeEngineTest {
                         )
                     })
                 }) { padding -> Box(Modifier.fillMaxSize().padding(padding)) }
+                }
             }
         }
 

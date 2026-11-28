@@ -52,6 +52,7 @@ import io.legado.app.domain.model.readaloud.SpeechEngineRoute
 import io.legado.app.domain.model.readaloud.SpeechRoleType
 import io.legado.app.domain.model.readaloud.SpeechVoiceRouter
 import io.legado.app.domain.model.readaloud.SystemTtsVoiceConfig
+import io.legado.app.domain.model.readaloud.shouldSpeakChapterTitle
 import io.legado.app.domain.model.settings.ReadAloudContentSplitMode
 import io.legado.app.domain.model.settings.ReadAloudSettings
 import io.legado.app.exception.NoStackTraceException
@@ -70,6 +71,7 @@ import io.legado.app.help.readaloud.playback.CloudTtsEmotionMapper
 import io.legado.app.help.readaloud.playback.CloudTtsRoleInstructionMapper
 import io.legado.app.help.readaloud.playback.HttpTtsAudioSynthesizer
 import io.legado.app.help.readaloud.playback.HttpTtsEmotionMapper
+import io.legado.app.help.readaloud.playback.PlaybackSpeedLimits
 import io.legado.app.help.readaloud.playback.ReadAloudAudioStore
 import io.legado.app.help.readaloud.playback.SystemTtsFileSynthesizer
 import io.legado.app.help.readaloud.playback.httpTtsAudioCacheSourceKey
@@ -134,9 +136,12 @@ class HttpReadAloudService : BaseReadAloudService(),
     /**
      * 全局语速倍率, 由设置里的朗读语速换算而来, 在播放端 (ExoPlayer) 变速,
      * 对所有来源的音频 (http/系统/云端合成) 统一生效。
+     *
+     * ExoPlayer 的默认音频链路在 DefaultAudioSink.setPlaybackParameters() 里把倍率夹到
+     * 8.0×；这里先按同一上限收敛，保证进度估算与 UI 显示的倍率一致。
      */
     private val globalPlaybackSpeed: Float
-        get() = (speechRatePlay + 5) / 10f
+        get() = ((speechRatePlay + 5) / 10f).coerceAtMost(PlaybackSpeedLimits.EXOPLAYER_MAX)
 
     /**
      * 源级合成语速倍率, 仅当源接口支持语速参数 ({{speakSpeed}}) 时影响返回的音频。
@@ -212,9 +217,13 @@ class HttpReadAloudService : BaseReadAloudService(),
         }
     }
 
-    /** 某一句应该有的播放参数：这一句的音高/语速 × 全局语速。 */
+    /** 某一句应该有的播放参数：这一句的音高/语速 × 全局语速，最终再按 ExoPlayer 链路封顶。 */
     private fun playbackParametersFor(index: Int) =
-        VoiceEffectAudio.parameters(cueEffect(index), globalPlaybackSpeed)
+        VoiceEffectAudio.parameters(
+            cueEffect(index),
+            globalPlaybackSpeed,
+            PlaybackSpeedLimits.EXOPLAYER_MAX,
+        )
 
     /**
      * 换句时把这一句的音高/语速设到播放器上。
@@ -1080,15 +1089,25 @@ class HttpReadAloudService : BaseReadAloudService(),
             paragraphs = readAloudChapter.canonicalSpeechParagraphs(splitByPage, splitPolicy),
             splitPolicy = splitPolicy,
         )
-        val queue = runCatching { buildPlaybackQueue(book.bookUrl, plan).withChapterTitle(displayTitle) }
-            .getOrDefault(ReadAloudPlaybackQueue.Empty)
+        // 与实时朗读共用同一条标题判定：预合成文件名与播放队列必须逐句对齐，
+        // 否则开关关掉后播放端少一条 cue，整章文件下标会错位
+        val paragraphs = readAloudChapter.readAloudParagraphs(splitByPage, splitPolicy)
+        val speakTitle = shouldSpeakChapterTitle(
+            readTitleEnabled = readAloudSettings.readChapterTitle,
+            title = displayTitle,
+            hasReadableParagraphs = paragraphs.isNotEmpty(),
+            startsAtChapterBeginning = true,
+        )
+        val queue = runCatching {
+            buildPlaybackQueue(book.bookUrl, plan)
+                .let { if (speakTitle) it.withChapterTitle(displayTitle) else it }
+        }.getOrDefault(ReadAloudPlaybackQueue.Empty)
         val contentList = if (!queue.isEmpty) {
             queue.cues.map { it.text }
         } else {
             // 与实时朗读同一份单元集合：不发声段不进列表，预合成文件名才会与播放时对上
-            listOf(displayTitle.trim()).filter { it.isNotEmpty() } +
-                    readAloudChapter.readAloudParagraphs(splitByPage, splitPolicy)
-                        .map { it.text }
+            val titleUnits = if (speakTitle) listOf(displayTitle.trim()).filter { it.isNotEmpty() } else emptyList()
+            titleUnits + paragraphs.map { it.text }
         }
         return PreDownloadChapter(displayTitle, queue, contentList)
     }

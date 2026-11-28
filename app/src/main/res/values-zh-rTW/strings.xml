@@ -310,6 +310,13 @@
     <string name="bookmark_badge_custom">自訂圖片</string>
     <string name="bookmark_badge_reset">恢復預設書籤角標</string>
     <string name="bookmark_badge_size">角標大小</string>
+    <string name="bookmark_badge_position">角標位置</string>
+    <string name="bookmark_badge_position_top_start">左上角</string>
+    <string name="bookmark_badge_position_top_end">右上角</string>
+    <string name="bookmark_badge_position_custom">自訂</string>
+    <string name="bookmark_badge_offset_x">水平偏移</string>
+    <string name="bookmark_badge_offset_y">垂直偏移</string>
+    <string name="bookmark_badge_offset_origin">以正文區左上角為原點</string>
     <string name="menu_mark">筆記</string>
     <string name="bookmark_mark">劃線標記</string>
     <string name="bookmark_mark_selection">選中文字</string>
@@ -384,7 +391,6 @@
     <string name="book_source_export_failed">匯出失敗：%1$s</string>
     <string name="book_source_upload_success">上傳成功：%1$s</string>
     <string name="book_source_upload_failed">上傳失敗：%1$s</string>
-    <string name="check_select_source">校驗所選</string>
     <string name="progress_show">%1$s      進度 %2$d/%3$d</string>
     <string name="tts_fix">請安裝並選擇中文TTS！</string>
     <string name="tts_init_failed">TTS初始化失敗！</string>
@@ -1029,7 +1035,8 @@
     <string name="show_discovery">顯示發現</string>
     <string name="show_home">顯示首頁</string>
     <string name="main_navigation_settings">首頁與導覽</string>
-    <string name="main_navigation_settings_summary">設定首頁、發現、訂閱、預設主頁和導航欄圖示</string>
+    <string name="theme_main_navigation_order">導航項目顯示與排序</string>
+    <string name="theme_navigation_item_visibility">顯示%1$s</string>
     <string name="navigation_order">導覽順序</string>
     <string name="style">樣式</string>
     <string name="group_style">分組樣式</string>
@@ -1041,8 +1048,8 @@
     <string name="autobackup_fail">自動備份失敗\n%s</string>
     <string name="end">結束</string>
     <string name="custom_group_summary">關閉取代分組/開啟新增分組</string>
-    <string name="pref_media_button_per_next">媒體按鈕•上一首|下一首</string>
-    <string name="pref_media_button_per_next_summary">上一段|下一段/上一章|下一章</string>
+    <string name="pref_media_button_per_next">媒體按鈕按章節切換</string>
+    <string name="pref_media_button_per_next_summary">開啟後，通知欄、鎖定畫面與耳機鍵的上一個/下一個用於切換章節；關閉時用於段落快進/後退</string>
     <string name="read_aloud_by_page_summary">及時翻頁，翻頁時會停頓一下</string>
     <string name="check_source_show_debug_message">校驗書源顯示詳細資訊</string>
     <string name="check_source_show_debug_message_summary">書源校驗時顯示網路請求步驟和時間</string>
@@ -1108,12 +1115,14 @@
 
     <!-- check source config string -->
     <string name="check_source_config">校驗設定</string>
-    <string name="check_source_item">校驗項目</string>
     <string name="check_source_timeout">單個書源校驗超時(秒)</string>
+    <string name="check_source_thread_count">校驗並發數（1-64）</string>
+    <string name="check_source_quick_mode">快速完整校驗模式</string>
+    <string name="domain">域名</string>
+    <string name="write_source_comment">寫入源註釋</string>
     <string name="timeout">超時</string>
     <string name="seconds">秒</string>
     <string name="less_than">小於</string>
-    <string name="check_source_config_summary">校驗超時：%1$s秒\n校驗項目：%2$s</string>
     <string name="record_debug_log">記錄除錯日誌</string>
     <string name="sub_dir">子資料夾</string>
     <string name="general">全域</string>
@@ -1342,6 +1351,7 @@
     <string name="result_analyzed">解析示例</string>
     <string name="bookshelf_px_4">綜合排序</string>
     <string name="bookshelf_px_5">按作者</string>
+    <string name="bookshelf_px_6">按本機檔案大小</string>
     <string name="effective_replaces">起效的替换</string>
     <string name="export_book">导出书籍</string>
     <string name="export_book_notification_content">正在导出(%1$s),还有%2$d本待导出</string>
@@ -1989,13 +1999,15 @@
     <string name="custom_mode">自訂模式</string>
     <string name="be_swiped">仍可滑動翻頁</string>
     <string name="show_bottom_nav">顯示導航欄</string>
+    <string name="use_pager_top_bar">橫劃頂欄</string>
+    <string name="use_pager_top_bar_summary">主頁面使用 OxygenX 橫劃頂欄，並隱藏底部導航欄</string>
     <string name="floating_bottom_bar">懸浮底欄</string>
     <string name="floating_bottom_bar_summary">底部導航欄使用獨立膠囊樣式</string>
     <string name="coui_floating_bottom_bar_summary">COUI 的底部導覽固定使用懸浮樣式</string>
     <string name="top_bar_button_liquid_glass">頂欄按鈕液態玻璃</string>
     <string name="top_bar_button_liquid_glass_summary">為頂欄按鈕啟用背景模糊與折射，需要 Android 13 或更新版本</string>
-    <string name="floating_bottom_bar_liquid_glass">液態玻璃效果</string>
-    <string name="floating_bottom_bar_liquid_glass_summary">為懸浮底欄啟用液態玻璃高亮效果。需要模糊和 Android 13+</string>
+    <string name="floating_bottom_bar_liquid_glass">懸浮底欄液態玻璃</string>
+    <string name="floating_bottom_bar_liquid_glass_summary">為懸浮底欄套用液態玻璃，需要 Android 13 或更新版本。</string>
     <string name="nav_label_mode">導航欄標籤模式</string>
     <string name="read">閱讀</string>
     <string name="privacy">隱私</string>
@@ -2107,6 +2119,14 @@
     <string name="palette_style">調色板樣式</string>
     <string name="material_version">色彩規格</string>
     <string name="tip_compose_set">這些選項僅影響使用 Compose 重寫的介面。停用的選項為佔位符，將在實作後啟用。</string>
+    <string name="theme_fonts_and_background">字型與背景</string>
+    <string name="theme_top_bar_group">頂欄</string>
+    <string name="theme_layout_and_motion">版面與動畫</string>
+    <string name="theme_cards_and_lists">卡片與清單</string>
+    <string name="theme_book_relationships">關聯書籍</string>
+    <string name="theme_top_bar_background_blur">頂欄背景模糊</string>
+    <string name="theme_top_bar_background_blur_summary">內容捲過頂欄時模糊背景，需要 Android 13 或更新版本。</string>
+    <string name="theme_app_background_summary">日間和夜間背景圖片及背景模糊</string>
     <string name="is_blur_enable">啟用元素模糊</string>
     <string name="use_underline">強調文字始終使用底線</string>
     <string name="adapt_special_style">適配特殊樣式</string>
@@ -2460,6 +2480,8 @@
     <string name="bookshelf_grid_fixed_columns_summary">關閉後按封面寬度自動計算列數</string>
     <string name="bookshelf_grid_fixed_cover_width">固定封面寬度</string>
     <string name="bookshelf_grid_fixed_cover_width_summary">關閉後封面鋪滿列寬，隨列數自動縮放</string>
+    <string name="bookshelf_grid_immersive">沉浸網格</string>
+    <string name="bookshelf_grid_immersive_summary">封面間距 1dp，去掉左右螢幕邊距與封面圓角（緊湊、僅封面樣式生效）</string>
     <string name="day_card_bg_color">日間卡片背景色</string>
     <string name="night_card_bg_color">夜間卡片背景色</string>
     <string name="compact_details">精簡詳情</string>
@@ -2571,6 +2593,9 @@
     <string name="switch_to_light_mode_action">切換至淺色模式</string>
     <string name="switch_action">切換</string>
     <string name="cover_albums">封面圖集</string>
+    <string name="cover_picker_online_section">線上封面</string>
+    <string name="cover_picker_album_no_images">此封面圖集暫無圖片</string>
+    <string name="cover_picker_select_cover">選擇封面：%1$s</string>
     <string name="manage_cover_albums">管理封面圖集</string>
     <string name="select_cover_album">選擇封面圖集</string>
     <string name="cover_album_none">應用程式內建封面</string>
@@ -3122,4 +3147,32 @@
     <string name="hyper_os4_components">HyperOS 4 風格元件</string>
     <string name="hyper_os4_components_summary">在 Miuix 主題下使用玻璃頂欄、標籤頁與下拉選單。需要 Android 13 與系統模糊支援。</string>
     <string name="paragraph_comment_height_percent">%1$d%%</string>
+    <!-- 書架折疊收納（同系列多卷） -->
+    <string name="bookshelf_series_count">%1$d 卷</string>
+    <string name="bookshelf_series_create">收納為系列</string>
+    <string name="bookshelf_series_remove">移出系列</string>
+    <string name="bookshelf_series_rename">重新命名系列</string>
+    <string name="bookshelf_series_dissolve">解散系列</string>
+    <string name="bookshelf_series_dissolve_message">解散「%1$s」後，%2$d 本書會回到書架，確定嗎？</string>
+    <string name="bookshelf_series_name_label">系列名</string>
+    <string name="bookshelf_series_name_empty">系列名不能為空</string>
+    <string name="bookshelf_series_name_conflict">已存在同名系列</string>
+    <string name="bookshelf_series_created">已將 %2$d 本收納為「%1$s」</string>
+    <string name="bookshelf_series_dissolved">已解散「%1$s」</string>
+    <string name="bookshelf_series_removed">已將 %1$d 本移出系列</string>
+    <string name="bookshelf_series_manage">管理系列書籍</string>
+    <string name="bookshelf_series_count_read">%1$d 卷 · 已讀 %2$d</string>
+    <string name="bookshelf_series_progress_summary">已讀 %1$d/%2$d</string>
+    <string name="bookshelf_series_reading_volume">在讀第 %1$d 卷</string>
+    <string name="bookshelf_series_collapse">收合</string>
+    <string name="bookshelf_series_pick_cover">設定封面</string>
+    <string name="bookshelf_series_reset_cover">恢復卷封面</string>
+    <string name="bookshelf_series">書籍系列</string>
+    <string name="dimensional_bookshelf">立體書架</string>
+    <string name="dimensional_bookshelf_summary">在一般書籍版面上方顯示可橫向滑動的立體書架</string>
+    <string name="dimensional_bookshelf_open_book">開啟書籍</string>
+    <string name="dimensional_bookshelf_preview_book">查看書籍</string>
+    <string name="dimensional_bookshelf_book_position">第 %1$d 本，共 %2$d 本</string>
+    <string name="dimensional_bookshelf_previous_book">上一本</string>
+    <string name="dimensional_bookshelf_next_book">下一本</string>
 </resources>

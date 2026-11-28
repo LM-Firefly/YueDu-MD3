@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="oxygen_ui_engine" translatable="false">OxygenX</string>
     <!--App-->
     <string name="app_name">Legado</string>
     <string name="app_name_a">Legado·A</string>
@@ -407,6 +408,13 @@
     <string name="bookmark_badge_custom">Custom image</string>
     <string name="bookmark_badge_reset">Reset bookmark badge</string>
     <string name="bookmark_badge_size">Badge size</string>
+    <string name="bookmark_badge_position">Badge position</string>
+    <string name="bookmark_badge_position_top_start">Top left</string>
+    <string name="bookmark_badge_position_top_end">Top right</string>
+    <string name="bookmark_badge_position_custom">Custom</string>
+    <string name="bookmark_badge_offset_x">Horizontal offset</string>
+    <string name="bookmark_badge_offset_y">Vertical offset</string>
+    <string name="bookmark_badge_offset_origin">Measured from the top-left corner of the text area</string>
     <string name="menu_mark">Mark line</string>
     <string name="bookmark_mark">Mark line</string>
     <string name="bookmark_mark_selection">Selected text</string>
@@ -485,7 +493,6 @@
     <string name="book_source_export_failed">Export failed: %1$s</string>
     <string name="book_source_upload_success">Upload completed: %1$s</string>
     <string name="book_source_upload_failed">Upload failed: %1$s</string>
-    <string name="check_select_source">Check the selected source</string>
     <string name="progress_show">%1$s      Progress %2$d/%3$d</string>
     <string name="tts_fix">Please install and select Chinese TTS!</string>
     <string name="tts_init_failed">TTS initialization failed!</string>
@@ -1253,7 +1260,8 @@
     <string name="show_discovery">Show Discovery</string>
     <string name="show_home">Show Home</string>
     <string name="main_navigation_settings">Home and navigation</string>
-    <string name="main_navigation_settings_summary">Configure Home, Discovery, Subscriptions, start page, and navigation icons</string>
+    <string name="theme_main_navigation_order">Navigation Visibility and Order</string>
+    <string name="theme_navigation_item_visibility">Show %1$s</string>
     <string name="navigation_order">Navigation order</string>
     <string name="style">Style</string>
     <string name="group_style">Group style</string>
@@ -1275,8 +1283,8 @@
     <string name="autobackup_fail">Autobackup failed\n%s</string>
     <string name="end">end</string>
     <string name="custom_group_summary">Turn off Replace Group / Turn on Add Group</string>
-    <string name="pref_media_button_per_next">Media Buttons • Previous | Next</string>
-    <string name="pref_media_button_per_next_summary">Previous Paragraph|Next Paragraph/Previous Chapter|Next Chapter</string>
+    <string name="pref_media_button_per_next">Media buttons skip by chapter</string>
+    <string name="pref_media_button_per_next_summary">On: previous/next on the notification, lock screen and headset switch chapters. Off: they rewind/fast-forward by paragraph.</string>
     <string name="read_aloud_by_page_summary">Turning pages in time, with a pause when the page is turned</string>
     <string name="check_source_show_debug_message">Check book source shows debug message</string>
     <string name="check_source_show_debug_message_summary">Show network status and timestamp during source checking</string>
@@ -1357,12 +1365,14 @@
 
     <!-- check source config string -->
     <string name="check_source_config">Check setting</string>
-    <string name="check_source_item">Check item</string>
     <string name="check_source_timeout">Single book source check timeout (seconds)</string>
+    <string name="check_source_thread_count">Check concurrency (1-64)</string>
+    <string name="check_source_quick_mode">Fast full check mode</string>
+    <string name="domain">Domain</string>
+    <string name="write_source_comment">Write source comment</string>
     <string name="timeout">Timeout</string>
     <string name="seconds">Seconds</string>
     <string name="less_than">Less than</string>
-    <string name="check_source_config_summary">Check timeout: %1$ss\nCheck item:%2$s</string>
     <string name="record_debug_log">Record debug log</string>
     <string name="sub_dir">Sub Dir</string>
     <string name="general">General</string>
@@ -1659,6 +1669,7 @@
     <string name="result_analyzed">Analyzed</string>
     <string name="bookshelf_px_4">Comprehensive</string>
     <string name="bookshelf_px_5">Sort by author</string>
+    <string name="bookshelf_px_6">By local file size</string>
     <string name="effective_replaces">Effective Replacement</string>
     <string name="export_book">Export Book</string>
     <string name="export_book_notification_content">Exporting (%1$s), with %2$d to be exported.</string>
@@ -1995,13 +2006,15 @@
     <string name="custom_mode">Custom Mode</string>
     <string name="be_swiped">Pages can still be swiped</string>
     <string name="show_bottom_nav">Show Navigation Bar</string>
+    <string name="use_pager_top_bar">Horizontal Pager Top Bar</string>
+    <string name="use_pager_top_bar_summary">Use OxygenX pager top bar for the main pages and hide the bottom navigation bar</string>
     <string name="floating_bottom_bar">Floating Bottom Bar</string>
     <string name="floating_bottom_bar_summary">Use a detached capsule style for the bottom navigation bar</string>
     <string name="coui_floating_bottom_bar_summary">COUI always uses a floating bottom bar when bottom navigation is shown</string>
     <string name="top_bar_button_liquid_glass">Liquid Glass Top Bar Buttons</string>
     <string name="top_bar_button_liquid_glass_summary">Enable backdrop blur and refraction on top bar buttons. Requires Android 13 or later.</string>
-    <string name="floating_bottom_bar_liquid_glass">Liquid Glass Effect</string>
-    <string name="floating_bottom_bar_liquid_glass_summary">Enable the liquid glass highlight for the floating bar. Requires blur and Android 13+</string>
+    <string name="floating_bottom_bar_liquid_glass">Floating Bottom Bar Liquid Glass</string>
+    <string name="floating_bottom_bar_liquid_glass_summary">Apply liquid glass to the floating bottom bar. Requires Android 13 or later.</string>
     <string name="nav_label_mode">Navigation Bar Label Mode</string>
     <string name="read">Read</string>
     <string name="privacy">Privacy</string>
@@ -2123,6 +2136,14 @@
     <string name="palette_style">Palette Style</string>
     <string name="material_version">Color Specification</string>
     <string name="tip_compose_set">These options only affect screens rewritten in Compose. Disabled options are placeholders and will be enabled after implementation.</string>
+    <string name="theme_fonts_and_background">Fonts and Background</string>
+    <string name="theme_top_bar_group">Top Bar</string>
+    <string name="theme_layout_and_motion">Layout and Motion</string>
+    <string name="theme_cards_and_lists">Cards and Lists</string>
+    <string name="theme_book_relationships">Related Books</string>
+    <string name="theme_top_bar_background_blur">Top Bar Background Blur</string>
+    <string name="theme_top_bar_background_blur_summary">Blur content as it scrolls behind the top bar. Requires Android 13 or later.</string>
+    <string name="theme_app_background_summary">Day and night background images and background blur</string>
     <string name="is_blur_enable">Enable Element Blur</string>
     <string name="use_underline">Always Use Underline for Emphasized Text</string>
     <string name="adapt_special_style">Adapt Special Styles</string>
@@ -2680,6 +2701,8 @@
     <string name="bookshelf_grid_fixed_columns_summary">When off, columns follow the cover width</string>
     <string name="bookshelf_grid_fixed_cover_width">Fixed Cover Width</string>
     <string name="bookshelf_grid_fixed_cover_width_summary">When off, covers fill the column width and scale with the column count</string>
+    <string name="bookshelf_grid_immersive">Immersive Grid</string>
+    <string name="bookshelf_grid_immersive_summary">1dp gaps between covers, no side margins, square corners (compact and cover-only styles)</string>
     <string name="day_card_bg_color">Day Card Background Color</string>
     <string name="night_card_bg_color">Night Card Background Color</string>
     <string name="compact_details">Compact Details</string>
@@ -2794,6 +2817,9 @@
     <string name="switch_to_light_mode_action">Switch to light mode</string>
     <string name="switch_action">Switch</string>
     <string name="cover_albums">Cover albums</string>
+    <string name="cover_picker_online_section">Online covers</string>
+    <string name="cover_picker_album_no_images">No images in this cover album</string>
+    <string name="cover_picker_select_cover">Select cover: %1$s</string>
     <string name="manage_cover_albums">Manage cover albums</string>
     <string name="select_cover_album">Select cover album</string>
     <string name="cover_album_none">Built-in default cover</string>
@@ -3132,6 +3158,8 @@
     <string name="multi_role_cast">Role casting</string>
     <string name="bgm_assign">Background music</string>
     <string name="bgm_assign_summary">Show a music capsule at paragraph starts and play background music per scene while reading; the capsule is visual only and is never spoken</string>
+    <string name="read_aloud_chapter_title">Read chapter titles</string>
+    <string name="read_aloud_chapter_title_summary">Read the chapter title before the body. When off, reading starts at the body; volume-only chapters still read their title. Independent of whether titles are shown in the text; takes effect from the next chapter</string>
     <string name="cast_bgm_scene_title">Scene music</string>
     <string name="cast_bgm_track">Music track</string>
     <string name="cast_bgm_scene_follow">Random from pool</string>
@@ -4025,4 +4053,34 @@
     <string name="a11y_reorder_position">Position %1$d of %2$d</string>
     <string name="hyper_os4_components">HyperOS 4 components</string>
     <string name="hyper_os4_components_summary">Use the glass top app bar, tabs and dropdowns in the Miuix theme. Requires Android 13 and system blur.</string>
+    <!-- 书架折叠收纳（同系列多卷） -->
+    <string name="bookshelf_series_count">%1$d volumes</string>
+    <string name="bookshelf_series_create">Group into series</string>
+    <string name="bookshelf_series_remove">Remove from series</string>
+    <string name="bookshelf_series_rename">Rename series</string>
+    <string name="bookshelf_series_dissolve">Dissolve series</string>
+    <string name="bookshelf_series_dissolve_message">Dissolve %1$s? %2$d books will return to the shelf.</string>
+    <string name="bookshelf_series_name_label">Series name</string>
+    <string name="bookshelf_series_name_empty">Series name cannot be empty</string>
+    <string name="bookshelf_series_name_conflict">A series with that name already exists</string>
+    <string name="bookshelf_series_created">Grouped %2$d books as %1$s</string>
+    <string name="bookshelf_series_dissolved">Dissolved %1$s</string>
+    <string name="bookshelf_series_removed">Removed %1$d books from the series</string>
+    <string name="bookshelf_series_manage">Manage books in series</string>
+    <string name="bookshelf_series_count_read">%1$d volumes · %2$d read</string>
+    <string name="bookshelf_series_progress_summary">%1$d/%2$d read</string>
+    <string name="bookshelf_series_reading_volume">Reading vol. %1$d</string>
+    <string name="bookshelf_series_collapse">Collapse</string>
+    <string name="bookshelf_series_pick_cover">Set cover</string>
+    <string name="bookshelf_series_reset_cover">Use volume covers</string>
+    <string name="bookshelf_series">Book series</string>
+    <string name="dimensional_bookshelf">3D bookshelf</string>
+    <string name="dimensional_bookshelf_summary">Show an interactive shelf above the book collection</string>
+    <string name="dimensional_bookshelf_open_book">Open book</string>
+    <string name="dimensional_bookshelf_preview_book">Preview book</string>
+    <string name="dimensional_bookshelf_book_position">Book %1$d of %2$d</string>
+    <string name="dimensional_bookshelf_spine_number" translatable="false">%1$02d</string>
+    <string name="dimensional_bookshelf_counter" translatable="false">%1$02d / %2$02d</string>
+    <string name="dimensional_bookshelf_previous_book">Previous book</string>
+    <string name="dimensional_bookshelf_next_book">Next book</string>
 </resources>

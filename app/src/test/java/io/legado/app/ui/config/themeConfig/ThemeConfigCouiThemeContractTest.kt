@@ -1,5 +1,6 @@
 package io.legado.app.ui.config.themeConfig
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -174,16 +175,10 @@ class ThemeConfigCouiThemeContractTest {
             "不支持模糊时开关仍显示为已开启",
             themeConfig.contains("checked = theme.useHyperOs4Components && ThemeResolver.isBlurSupported(),"),
         )
-        assertTrue(
-            "模糊开关未只在 Material / Mochi 下保留",
-            themeConfig.contains(
-                "if (composeEngine == ComposeEngine.Material || composeEngine == ComposeEngine.Mochi) {",
-            ),
-        )
-        assertFalse(
-            "COUI / Miuix 仍可通过模糊开关关闭材质",
-            themeConfig.contains("ComposeEngine.Coui -> ThemeResolver.isCouiSupported()"),
-        )
+        val bars = sourceOf(TOP_BOTTOM_BAR_SECTION).substringBefore("internal fun BottomBarSettingsSection")
+        assertEquals(2, Regex("SearchableSetting\\(\"theme.is_blur_enable\"\\)").findAll(bars).count())
+        assertTrue(bars.contains("ComposeEngine.Material -> {"))
+        assertTrue(bars.contains("ComposeEngine.Mochi -> {"))
 
         val resolver = sourceOf(THEME_RESOLVER)
         assertTrue("未提供统一的模糊能力判定", resolver.contains("internal fun isBlurSupported()"))
@@ -201,6 +196,36 @@ class ThemeConfigCouiThemeContractTest {
             "Miuix 顶栏模糊仍被 enableBlur 门控",
             scaffold.contains("miuixEngine && nativeSamplingSupported && hasBars && themeSettings.enableBlur"),
         )
+    }
+
+    @Test
+    fun navigationVisibilityAndOrderShareASheetFromTheInlineNavigationSettings() {
+        val page = sourceOf(THEME_CONFIG)
+        assertTrue("导航排序入口未打开独立面板", page.contains("ThemeConfigSheet.NavigationOrder"))
+        assertFalse("顶栏与底栏仍在用浮层承载", page.contains("ThemeConfigSheet.TopBottomBar"))
+        assertTrue("首页与导航未内联渲染", page.contains("MainNavigationSettingsSection("))
+        assertTrue("顶栏未内联渲染", page.contains("TopBarSettingsSection("))
+        assertTrue("底栏未内联渲染", page.contains("BottomBarSettingsSection("))
+        assertTrue("导航图标入口丢失", page.contains("ThemeConfigSheet.NavIcons"))
+        assertFalse(
+            "旧浮层实现仍留在源码树",
+            repoContains(SHEET_MAIN_NAVIGATION) || repoContains(SHEET_TOP_BOTTOM_BAR),
+        )
+
+        val navigation = sourceOf(MAIN_NAVIGATION_SECTION)
+        assertTrue("默认主页未使用同页下拉项", navigation.contains("SearchableSetting(\"theme.default_home_page\")"))
+        assertTrue("导航标签模式未使用同页下拉项", navigation.contains("DropdownListSettingItem("))
+        assertFalse("导航显示开关仍在外观页", navigation.substringBefore("internal fun MainNavigationOrderSheet").contains("SwitchSettingItem("))
+        val order = navigation.substringAfter("internal fun MainNavigationOrderSheet")
+        assertTrue("排序面板未使用公共浮层", order.contains("AppModalBottomSheet("))
+        assertTrue("导航项丢失拖拽排序", order.contains("longPressDraggableHandle("))
+        assertTrue("排序面板缺少显示开关", order.contains("AdaptiveSwitch("))
+
+        val bars = sourceOf(TOP_BOTTOM_BAR_SECTION)
+        assertTrue("折叠应用栏未使用同页开关", bars.contains("SwitchSettingItem("))
+        assertTrue("模糊/不透明度未使用同页滑块", bars.contains("SliderSettingItem("))
+        assertTrue("引擎档位未使用同页下拉项", bars.contains("DropdownListSettingItem("))
+        assertTrue("COUI 锁定悬浮底栏的禁用语义丢失", bars.contains("enabled = !isCoui"))
     }
 
     /**
@@ -302,11 +327,26 @@ class ThemeConfigCouiThemeContractTest {
 
     private fun sourceOf(path: String): String = repoFileOf("app/src/main/java/$path")
 
-    private fun repoFileOf(path: String): String {
+    private fun repoFileOf(path: String): String = repoPath(path).readText()
+
+    /** 只判断路径是否存在：被删掉的文件不能沿用 [repoPath] 的「找不到就抛错」语义。 */
+    private fun repoContains(path: String): Boolean {
+        var directory: File? = File("").absoluteFile
+        while (directory != null) {
+            if (File(directory, path).exists()) return true
+            val isRepoRoot = File(directory, "settings.gradle.kts").isFile &&
+                File(directory, "app/src/main/java").isDirectory
+            if (isRepoRoot) return false
+            directory = directory.parentFile
+        }
+        return false
+    }
+
+    private fun repoPath(path: String): File {
         var directory: File? = File("").absoluteFile
         while (directory != null) {
             val candidate = File(directory, path)
-            if (candidate.isFile) return candidate.readText()
+            if (candidate.isFile) return candidate
             directory = directory.parentFile
         }
         error("从 ${File("").absolutePath} 向上找不到 $path")
@@ -314,6 +354,14 @@ class ThemeConfigCouiThemeContractTest {
 
     private companion object {
         const val THEME_CONFIG = "io/legado/app/ui/config/themeConfig/ThemeConfigScreen.kt"
+        const val MAIN_NAVIGATION_SECTION =
+            "io/legado/app/ui/config/themeConfig/MainNavigationSettingsSection.kt"
+        const val TOP_BOTTOM_BAR_SECTION =
+            "io/legado/app/ui/config/themeConfig/TopBottomBarSettingsSection.kt"
+        const val SHEET_MAIN_NAVIGATION =
+            "app/src/main/java/io/legado/app/ui/config/themeConfig/MainNavigationSettingsSheet.kt"
+        const val SHEET_TOP_BOTTOM_BAR =
+            "app/src/main/java/io/legado/app/ui/config/themeConfig/TopBottomBarSettingsSheet.kt"
         const val SETTING_ITEM = "io/legado/app/ui/widget/components/settingItem/SettingItem.kt"
         const val LIST_SETTING_ITEM = "io/legado/app/ui/widget/components/settingItem/ListSettingItem.kt"
         const val APP_THEME = "io/legado/app/ui/theme/AppTheme.kt"

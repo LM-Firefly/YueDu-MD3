@@ -94,7 +94,7 @@ import io.legado.app.ui.widget.components.coui.LocalCouiFloatingNavigation
 import io.legado.app.ui.widget.components.coui.couiFloatingCapsule
 import ui.feice.mochi.effect.glass.LocalMochiBackdrop
 import ui.feice.mochi.effect.glass.MochiGlassSurface
-import ui.feice.mochi.theme.MochiTheme
+import ui.feice.mochi.theme.MochiGlassDefaults
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -171,7 +171,7 @@ fun FloatingBottomBar(
     val mochiBackdrop = if (engine == ComposeEngine.Mochi && isBlurEnabled) LocalMochiBackdrop.current else null
     val customColors = themeSettings.customColors(LegadoTheme.isDark)
     val hasCustomColors = themeSettings.appTheme == "12" &&
-        themeSettings.enableDeepPersonalization
+        themeSettings.enableDeepPersonalization && (engine != ComposeEngine.Oxygen || themeSettings.useMiuixMonet)
     val accentColor = if (hasCustomColors && customColors.primary != 0) {
         Color(customColors.primary)
     } else {
@@ -373,7 +373,7 @@ fun FloatingBottomBar(
                 .then(if (compactProgress > 0f) Modifier.clip(capsuleShape) else Modifier),
         ) {
             if (mochiBackdrop != null) {
-                MochiGlassSurface(Modifier.matchParentSize(), material = MochiTheme.materials.bar, backdrop = mochiBackdrop) {}
+                MochiGlassSurface(Modifier.matchParentSize(), material = MochiGlassDefaults.Regular, backdrop = mochiBackdrop) {}
             }
             Row(
                 Modifier
