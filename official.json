@@ -1,89 +1,89 @@
 {
-  "tag_name": "3.26.27",
-  "name": "Release 3.26.27",
-  "body": "### 下载哪个包\n\n- YueDu.MD3-3.26.27-core-*.apk：基础包，不含本地推理运行时；云端 OCR、AI 识图/翻译可用。\n- YueDu.MD3-3.26.27-comic-*.apk：漫画增强版，内置本地 OCR、擦字与气泡检测，体积明显更大。\n- 原 full 版用户：产品标记已从 full 改为 comic，应用内更新不会跨包升级，请手动下载一次 comic 包，之后恢复正常更新。\n\n### 更新内容\n\n* chore: 爸爸的爸爸是妈妈\n* fix(rss): 从文章返回或切回分类时不再重复刷新订阅源列表 (#2598)\n* build(miuix): 合入上游 main (d8efe187) 并适配 blur/material API\n* fix(read-aloud): 纯符号段不再进朗读单元，修复无声片段报错与上一句回退\n* fix(ui): 修复 Miuix 玻璃 sheet 目录首帧空白与阅读页配色不跟随\n* fix(reader): 修复整宽 SVG 卡片首次分页按错误宽高比占位\n* 阅读排版：同一行连续同字距的正文整段画一次 (#2606)\n* build: miuix submodule 改用 HapeLee fork 并跟踪玻璃采样优化分支\n* perf(ui): 玻璃分类 TabRow 仅对可见范围采样 backdrop\n* fix(bookshelf): 修正分组派生状态缓存与编辑态信息重复展示\n* feat(ui): Miuix 多选浮动栏还原组件库 catalog 形态\n* fix(ui): 修复 COUI 多选悬浮栏自采样导致的 native 闪退\n* feat(theme): COUI/Miuix 主题细节与 Mochi sheet 内容自适应\n* fix(menu): 设置项下拉复用 RoundDropdownMenu\n* feat(dialog): COUI 引擎改用原生弹窗并保留材质\n* fix(test): 修正 HyperOS 4 玻璃标签栏溢出滚动断言\n* 同步 COUI fork 悬浮栏默认模糊并收口输入框适配\n* feat(theme): COUI 主题设置对齐 Miuix 并移除文字动画示例\n* build(forks): 把 Miuix 纳入 UI fork 来源校验并统一版本 commit 前缀\n* refactor(menu): 四引擎菜单统一入口收尾并修复受控玻璃锚点回归\n* feat(ui): 为 COUI 引擎补齐图标映射并隐藏行首图标\n* feat(reader): 高亮规则支持白天/夜间两套颜色 (#2601)\n* feat(ui): 为其余主题的滚动标签栏补齐边缘渐隐\n* fix(ui): 恢复 COUI FAB 拖拽形变并固定白色图标\n* fix(ui): 升级 COUI 修复首次导航进入时的 FAB 透明\n* fix(build): 本地 fork 构建复用项目 Android SDK 配置\n* fix(ui): 接入 COUI 原生 FAB 并移除首帧补绘\n* build: 固定 UI fork 并在 CI 准备源码依赖\n* feat(menu): 多选悬浮栏「更多」菜单原生化并统一 medium 档位\n* fix(menu): 补两处纯展示 trigger 的 COUI 锚点 modifier 透传\n* refactor(menu): 紧凑方卡触发与 BaseCard 共用形状解析结果\n* refactor(menu): 设置项下拉改受控弹层并统一四引擎锚点\n* fix(settingItem): 设置行下拉锚点统一到右侧取值区\n* refactor(menu): 迁移 CloudTts 区域混合菜单与首页分组筛选\n* refactor(menu): SmallTonalButton/MediumPlainButton 支持纯展示并迁移两处列表项菜单\n* feat(menu): 补齐 AppActionMenu 的 Row 锚点并迁移三处列表项命令菜单\n* feat(menu): AppChoiceDropdown 补 Icon 锚点并迁移两处顶栏分组筛选\n* refactor(menu): AllBookmarkScreen 顶栏导出菜单改用 AppActionMenu\n* feat(menu): 统一四引擎菜单入口并迁移顶栏/设置行/纯单选菜单\n* fix(ui): 为 Material 标签尾部按钮保留 16dp 边距\n* fix(ui): 优化 TabRow OS4 样式、阴影与引擎边距\n* feat(reader): 支持本地书行内图片与链接 (#2599)\n* feat(theme): 主题相关适配\n* fix(photo): 图片保存的压缩与相册写入移出主线程\n* fix(theme): 修复 Mochi 主题在 materialkolor 6.0.0 下的运行期崩溃\n* feat(theme): 接入 COUI 主题及组件适配\n* fix(cache): 恢复缓存维护跳过提示并补章级取消检查\n* fix(reader): 收口 iOS 仿真渲染资源生命周期（#2589 P2-1/R1）\n* feat(markdown): 处理 P2 后续（content URI 兄弟图、目录块级上下文、内嵌图短占位）\n* fix(markdown): 缓存清理收口到 BookHelp.clearCache，保持 ReadBookViewModel 行数棘轮\n* fix(markdown): 收口合并前审查项（缓存失效、HTML 清洗与图片上限）\n* Update README with project notes and acknowledgments (#2597)\n* fix(video): 收尾 P3 审查建议（URL 归一化、缓存断言与全屏回退）\n* fix(video): 为带请求头的本地 MPD 补 DASH mimeType\n* feat(theme): 接入 Miuix HyperOS 4 玻璃组件\n* fix(reader): make cross-page selection configurable\n* fix(reader): support text selection across pages within a chapter\n* Fix AiChat cursor dark theme\n* fix(markdown): 修正 BOM 字节序解码与图片地址规则语法拦截\n* fix(video): preserve fullscreen orientation between episodes\n* fix(video): support local file media sources\n* fix(markdown): 修复图片地址脚本执行与章节切分边界\n* test(reader): expect badge top edge at header bottom edge\n* fix(reader): anchor bookmark badge exactly at header bottom edge\n* fix(backup): also ignore floating bottom bar preferences\n* perf(reader): optimize iOS curl rendering\n* chore: 移除误提交的构建日志\n* fix(cache): 修复缓存维护的并发快照与查询失败处理\n* feat(reader): 支持本地 EPUB 和 MOBI 富文本外观\n* fix(manga): 保留混合压缩包导入并支持空目录重选\n* fix(reader): 补齐段评高度百分比中文资源\n* test(settings): 补齐段评高度持久化映射校验\n* fix(read-aloud): 播放出错时保护已下载音频\n* fix(read-aloud): 到达失败句后再暂停流式朗读\n* chore: 蚁人在哪呀\n* feat(reader): 支持调整段评弹窗高度\n* fix(restore): 保留跨源冲突中的本机书籍\n* feat(ui): 分离主题顶栏按钮和模糊效果\n* feat: 支持本地 Markdown 书籍阅读\n* fix(theme): 修复 Mochi 切回 M3 时的崩溃\n* fix(backup): keep theme preferences when ignoring theme config\n* test(manga): 按完整页码语义查询翻译页脚\n* fix(settings): 使用配置感知资源构建搜索索引\n* test(reader): update bookmark badge position expectations\n* fix(reader): pass header bottom edge as badge anchor\n* fix(reader): anchor bookmark badge to header bottom edge\n* fix(reader): 下沉朗读进度初值并收紧行数门禁\n* fix(manga): 统一本地漫画图片 URL，修复 Coil 解析失败\n* fix(manga): 桌面快捷方式「最后阅读」支持本地漫画\n* perf(ui): 共享封面圆角改绘制期取值，修复阅读打开/退出卡顿\n* fix(manga): 处理本地漫画导入和阅读的审查意见\n* fix(read-aloud): 保存设置子页的返回状态\n* fix(read-aloud): 为进度事件绑定书籍章节与会话\n* fix(read-aloud): 校验下载音频并区分目录状态\n* fix(read-aloud): 统一句中续读的发声坐标\n* fix(read-aloud): 保留合成失败后的整章重试\n* fix(read-aloud): 对齐离线下载与实时分页输入\n* chore: 你咳痰的声音好好听呀\n* feat(ui): 完善 Mochi 组件和动画适配\n* feat(cache): 完善缓存维护，修复入口无响应与字数整理触发\n* feat(theme): 接入 Mochi 主题和 Compose 组件分支\n* feat(settings): 增加设置项搜索与定位\n* fix(read-aloud): 隔离播放浮层输入并恢复设置面板\n* fix(reader): 正文重排后更新卷页快照\n* fix(reader): 避让横屏侧边导航栏\n* fix(read-aloud): 让翻页和高亮跟随实际媒体位置\n* fix(read-aloud): 优先播放下载音频并同步处理合成异常\n* fix(read-aloud): 区分整章下载和部分完成\n* fix(read-aloud): 分段提交系统 TTS 长文本并限制重试\n* fix(read-aloud): 保留加载中的暂停并隔离旧章定位\n* fix(reader): 隔离切书前后的进度保存\n* fix(read-aloud): 修复分卷标题朗读后无法续章\n* fix(manga): 修复本地漫画文件夹 EISDIR\n* feat(manga): 支持导出图片文件夹和 CBZ\n* chore: 给忒乐忒乐棒棒娜巴拉尼，卡特克贝贝呗，噗啾噔得了噔得了嘛哈嘛哈，尼哈啦尼哈啦喵，忒嘣了忒嘣了卡拉卡拉灵，厦喀勒哦哦哦哦，啊喔汪汪喵喵喵喵哦\n* feat(update): 启动自动检查更新并补齐更新源设置\n* refactor(build): 产品维度 full 更名为 comic 并统一发布与文案口径\n* fix(reader): 优化间距\n* refactor(ai): 模型配置弹窗改用 Tiny 系列设置项\n* chore(lint): 重建 lint 基线，清掉失效条目并固化剩余历史告警\n* chore(lint): 抑制 WebViewClient 渲染进程规则的 Kotlin 误报\n* fix(lint): 补繁中方向数组缺项并处理 WebView 渲染进程崩溃\n* perf(bookshelf): 批量导入分块提交与书架 Flow 失效防抖 (#2554)\n* fix(theme): 自定义字体加粗静默丢失与 content:// PFD 提前关闭 (#2553)\n* fix(restore): 审视修订——跟随双门槛与在架行优先\n* refactor(rss): 将订阅源导入弹窗迁移到 Compose\n* fix(rss): 支持订阅源网页选择上传文件 (#2550)\n* fix(reader): 修复 EPUB 跨章首图留白和漫画首帧拉伸 (#2547)\n* fix(tts): 预取同声线朗读并修复队列接播\n* perf(cache): 队列等待数与可启动判定改按区间计算\n* refactor(reader): 离线缓存逻辑摘成 ReadBookCacheDelegate\n* perf(reader): 预下载改为一次性防抖，缓存重试改分级退避\n* feat(reader): 离线缓存弹窗显示范围预览与待缓存章数\n* feat(reader): 离线缓存只入队待下载章节并去重已缓存计数\n* feat(reader): 重做离线缓存弹窗并补齐派发反馈\n* feat(bubble): 兼容 Legado-Arc 导入深链并改用 Sheet 编辑气泡\n* fix(restore): 在线书按作品分组决策——跨设备累积重复不引入、换源结果跟随云端\n* feat(bookshelf): 网格支持固定列数与固定封面宽度两种自适应模式\n* fix(ui): 修复覆盖卡片边框下相邻卡片边框贴合 (#2551)\n* fix(reader): 修复滚动模式 epub 图片闪灰并自适应图片缓存容量 (#2547)\n* fix(a11y): 修复阅读与听书控件的无障碍语义 (#2534)\n* fix(login): avoid Miuix squircle offscreen rendering around WebView (#2546)\n* fix(reader): 修复英文符号断行与行尾标点越界\n* fix(reorder): 修复列表拖拽状态与书源排序同步\n* feat(about): 添加第三方开源许可页面 (#2548)\n* refactor(reader): 简化 iOS Curl 内核并修复 Google Curl 阴影 (#2533)\n* fix: 恢复段评网页兼容性并修复悬浮底栏避让 (#2545)\n* ci(verify): core/full 改为并行 job；版本号 3.26.20\n* fix(test): 移除合并解冲突留下的重复 import\n* ci(verify): 拆分 core / full 两个变体的构建，避免并行编译 OOM\n* docs: 修复 Deploy Docs 构建失败\n* (Optimise)Formatter: 富文本渲染; RTF rendering (#2521)\n* fix(reader): 长按翻译按钮重新翻译当前章节 (#2526)\n* fix(reader): keep underlines inside the content clip (#2529)\n* fix(reader): 段评弹层关闭 sheet 手势，修复内嵌网页滑不动\n* fix(manga): 阅读器文字改用 LegadoTheme\n* feat(manga): core/full 双包拆分与翻译面板整理\n* feat(manga): 引擎抽取、全局清理与字号自适应排版\n* feat(manga): 漫画一些问题\n* feat(manga): 设置面板分类 tab 移到底部，点击区域改为整屏配置\n* fix(reader): 点击区域改为格子内下拉，修复与更多面板的层级冲突\n* test(tts): isolate endpoint smoke test from playback settings\n* fix(explore): retain layout flows across recompositions\n* feat(manga): add configurable translation, OCR, inpainting and reader tools\n* Bump web v3.26.103012\n* feat: 更新依赖版本并接入 version-catalog-update 插件\n* 视频播放: 播放页信息区重构、画中画与进度保存串行化\n* 视频播放: 播放页菜单按书源能力门控并收进 UiState\n* 视频播放: 补齐书源登录、自定义按钮与编辑书源菜单\n* 视频播放收尾: 目录事务化、Insets 适配与残留清理\n* 视频播放对齐上游(5/5): RSS 文章视频\n* 视频播放对齐上游(4/4): 加入书架后预取详情与目录\n* 视频播放对齐上游(3/4): 测试适配新架构并修复进度覆盖\n* 视频播放对齐上游(2/4): 悬浮小窗 + 后台保活\n* 视频播放对齐上游(1/4): 播放会话下沉到 VideoPlay + 前台服务托管\n* fix: 修复版本升级时默认数据迁移被跳过 (#2498)\n* feat(cache): 新增缓存维护，支持清理孤立章节缓存与重算字数 (#2509)\n* fix(cache): 缓存维护的取消语义、重入防护与删除口径\n* fix(reader): Google/视差翻页的就绪等待加上限、保留帧自愈、重捕获不闪烁\n* fix(reader): iOS 仿真翻页的就绪等待加上限，重捕获时保持卷曲\n* feat(reader): 段评气泡包（书源 dp: 约定 / 气泡管理 / 阅读内快速切换）(#2513)\n* fix(reader): retain committed page state during rapid turns\n* feat(reader): add Google curl and parallax page turns\n* fix(reader): apply page turn speed to iOS curl\n* feat(reader): add iOS-style simulated page turning\n* feat(cache): 新增缓存维护，支持清理孤立章节缓存与重算字数\n* Bump cronet from 156.0.8078.25 to 156.0.8078.48 - Changes in the [Git log](https://chromium.googlesource.com/chromium/src/+log/156.0.8078.25..156.0.8078.48)\n* fix(shelf): 书架多行列表 Flow 加事务，修跨 CursorWindow 补窗并发竞争崩溃\n* fix(video): 修复分页规则兼容、解析线程与后台进度保存\n* fix(video): 评审修复——效果重放、失败重试与控制层联动\n* fix(book-info): kind 标签按链接格式校验后再拆分跳转\n* fix(explore): 翻页参数兜底只对标签跳转的运行时地址生效\n* feat(explore): 发现页网格改瀑布流布局，网格封面接入比例自适应\n* fix(import): 批量导入预览列表改用 entryId 作 item key，重复条目不再崩溃\n* fix(cast): 胶囊只剩两个（英文撇号钉死引号栈）+ 分配窗口加复制按钮 (#2479)\n* feat(book-info): 作者名拆分为多个可点击标签\n* feat(explore): 书源级翻页参数 pageParam\n* chore: 忽略本地 resource 目录\n* fix(video): 支持 HLS 播放并隐藏单章上下章按钮\n* feat(book-info): 分类标签可点击跳转发现页\n* fix(video): 视频路由补私密闸门并同步 Fragment 入口\n* fix(video): 修复整分支评审的 Critical/Important 问题\n* feat(bookshelf): 视频类型标签\n* fix(video): 补视频路由导航与全屏判定\n* feat(video): 视频播放路由与入口\n* fix(video): 缓冲中切后台也暂停播放\n* fix(video): 配置变化不暂停，后台加载不自动开播\n* fix(video): 后台暂停并保证播放器初始化幂等\n* feat(video): 视频播放界面\n* fix(video): 修复播放进度覆盖与保存可靠性\n* feat(video): 视频播放器 ViewModel 与契约\n* fix(bookshelf): 修正视频分组预览与网络未分组查询\n* feat(bookshelf): 新增视频分组\n* fix(source): 补齐视频类型的本地化与类型转换\n* feat(source): 新增视频类型书源\n* docs: 视频书源实现计划\n* docs: 视频类型书源支持设计文档\n* feat(explore): 发现顶栏改为单书源搜索入口，书源选择改为可筛选底部 sheet\n* fix(manga): 整章拼接超长条漫图拆段渲染，修复 Constraints 尺寸溢出崩溃 (#2475)\n* fix(book-info): 简介纯文本分支二次转义，& < > 显示为 HTML 实体 (#2466)\n* fix(reader): 开标点连同 Latin 单词整体换行，不再拆词\n* fix(book-info): useweb 简介经 FrameLayout 容器承载，规避 Vulkan drawVk 原生崩溃 (#2468)\n* feat(highlight): 高亮规则新增边框样式，预览渲染修复与示例句加长\n* feat(book-info): 关联书籍移至简介下方，支持无规则时按作者搜索兜底\n* fix(reader): 关联书籍位置\n* fix: 关联书籍调试之\n* opt: memory usage (#2478)\n* perf(reader): 排版宽度链路去装箱，字形级宽度改 FloatArray\n* feat(cast): AI 分配角色带上「过了几章没开口」与下一章开头 (#2476)\n* fix(cast): 人物档案读取被夹到 80 个，配音页与人物列表少列人 (#2474)\n* feat(ui): 搜索/发现/详情页封面按原图宽高比自适应（默认固定 5:7，设置可关） (#2473)\n* reader: cut pagination peak memory (streaming, merge, buffer release)\n* feat(reader): 可配置 AI 对话入口携带阅读上下文 & 修复换图标入口 IME 双重避让 (#2472)\n* feat(reader): add configurable AI chat entry with reading context\n* fix(ui): prevent double IME avoidance on alternate launcher activities\n* feat(reader): 阅读主题列表弹窗（网格/流式/管理/导入导出） (#2465)\n* feat(reader): 分页失败原因带上异常 message 与栈顶\n* fix(reader): 引号跨段时角色气泡不再把整章排版打挂\n* feat: 内置词典规则更新为汉典并清理失效的百度汉语规则 (#2450)\n\n## What's Changed\n* Bump cronet from 156.0.8078.25 to 156.0.8078.48 by @github-actions[bot] in https://github.com/LM-Firefly/YueDu-MD3/pull/262\n\n\n**Full Changelog**: https://github.com/LM-Firefly/YueDu-MD3/compare/3.26.18...3.26.27",
+  "tag_name": "3.26.31",
+  "name": "Release 3.26.31",
+  "body": "### 下载哪个包\n\n- YueDu.MD3-3.26.31-core-*.apk：基础包，不含本地推理运行时；云端 OCR、AI 识图/翻译可用。\n- YueDu.MD3-3.26.31-comic-*.apk：漫画增强版，内置本地 OCR、擦字与气泡检测，体积明显更大。\n- 原 full 版用户：产品标记已从 full 改为 comic，应用内更新不会跨包升级，请手动下载一次 comic 包，之后恢复正常更新。\n\n### 更新内容\n\n* refactor(bookshelf): 失效信号改走 domain 广播并清理死配置\n* fix(readaloud): 空闲链路解析移出主线程并下沉语速换算\n* feat(bookshelf): 添加首页和书架的循环立体书架\n* fix(coui): 恢复单行开关设置项高度\n* feat(theme): 重整外观设置与导航项管理\n* feat(bookshelf): 书架新增按本地文件大小排序 (#2661)\n* fix(readaloud): 修复听书语速不生效与最高速度被限制在 2× (#2660)\n* chore(oxygenx): 更新依赖快照至 0.0.2-local.10\n* chore(release): 更新版本至 3.26.31\n* fix(coui): 在搜索栏渲染探测前检查 SDK 版本\n* fix(book-info): 各主题避免对 WebView 简介采样\n* fix(explore): 合并重复的尾部指示器，并恢复 ThemeModeSelector 的 M3 分段按钮\n* refactor(theme): 页面 M3 令牌与裸组件统一到项目主题\n* fix(reader): 笔记浮层取色面板改为窗口级呈现并统一图标着色\n* feat(manga): CBZ 漫画生成默认封面\n* fix(reader): 滚动模式斜滑按 Y 分量认领纵向滚动\n* fix(readaloud): 跟随系统语速被显式 setSpeechRate(1f) 覆盖导致失效\n* chore: 忽略 .codebuddy 工作目录\n* refactor(ai): 推理档位控件改名为 AiReasoningLevelButton\n* refactor(sheet): 各页面改用声明式 SheetAction\n* build(deps): 升级 miuix fork 至 0.9.5-beta03-c71a0bebaad2\n* build(deps): 升级 mochi fork 至 0.3.1-legado.fbcdf655007d\n* build(deps): 同步 coui 上游 0.0.1-alpha16\n* build(deps): 升级 coui fork 至 3aab8437e0e2\n* refactor(sheet): 首页模块管理与云 TTS 头部触发器改声明式 SheetAction\n* refactor(sheet): 面板头部操作统一为声明式 SheetAction，移除 Composable 槽\n* fix(reader): 书签角标支持左上/右上/自定义位置，下滑加书签不再弹提示\n* feat(bookshelf): 书架同系列多卷折叠收纳\n* fix(reader): 替换净化补齐富文本段并保护图片与分页标记\n* fix(main): 修正横划顶栏模式底部页签的显隐动画\n* feat(bookshelf): 紧凑/仅封面网格新增沉浸模式\n* feat(main): 主壳接入横划顶栏，OxygenX 快照升级至 0.0.2-local.9\n* fix(rss): 视频订阅源点击直接进播放页并携带源请求头\n* feat(theme): 外观页内联首页与导航、顶栏与底栏设置\n* refactor(media-notification): 统一媒体服务的前台类型与通知属性\n* fix(read-aloud): 收敛媒体通知上一/下一语义，通知按钮不再与系统媒体控件冲突\n* fix(book-content): 过滤段评气泡地址，避免解析与导出链路报错 (#2593)\n* chore(release): 更新版本至 3.26.30\n* fix(book-info): 修复 HyperOS4 下 WebView 简介闪退 (#2610)\n* feat(theme): 接入 OxygenX 并完善搜索和书架交互\n* fix: 修复旧注音缓存升级与有声书后台换章 (#2632)\n* feat(reader): 支持本地书籍 ruby 标签解析、排版与绘制 (#2626)\n* fix(audio): 修复有声书系统媒体控制 (#2627)\n* test(manga): 导出用例启动 Koin 设置网关\n* fix(manga): 本地漫画图片 URL 与归档路径改用规范形式\n* ci: Gradle 构建仅在依赖下载失败时自动重试\n* Update user agreement and software description in README\n* build(miuix): 升级 Miuix fork 到 v0.9.5-beta01 并对齐 Kotlin 2.4.21\n* fix(replace): 规则表写入统一失效净化缓存，修复改规则不生效\n* feat(read-aloud): 新增「朗读章节标题」开关，与正文标题显示解耦\n* feat(replace-rule): 列表项菜单改用声明式入口渲染各引擎原生行\n* chore(release): 版本号 3.26.29\n* build(coui): 升级 COUI fork 到 5527b0a\n* fix(reader): 整段合并绘制按 API 29 守卫 getTextRunAdvances，修复 lint 失败与 Android 8/9 隐患\n* fix(service): 修复 Web 服务因 dataSync 配额耗尽崩溃，改用 specialUse 前台类型\n* docs(reader): 说明 preserveBodyIndent 只控制虚拟缩进\n* test(reader): 锁定列表/引用不再叠加正文缩进\n* fix(reader): 列表与引用首行不再重复正文缩进\n* fix(reader): 保留整段绘制并校验原生字距几何，修复行尾裁字\n* fix(book): 段评气泡不再参与章节图片缓存判定 (#2593)\n* fix(book-source): 导入解析失败回落到本地化提示并补解析基线\n* fix(book-source): stream-parse large JSON imports to avoid OOM\n* fix(reader): 整段绘制按 minikin 量化字距并补回首字前半个字距\n* fix(book-source): 修复校验书源崩溃并补齐丢失的校验能力\n* feat: 为 EPUB/MOBI 本地书添加章节字数统计 (#2624)\n* chore(release): 版本号 3.26.28\n* fix(a11y): 修复屏幕阅读器焦点缺失、重复朗读与勾选态不播报 (#2558)\n* feat(book): 封面换源支持图集自选与书源范围筛选\n* ci(release): 更新日志基线改用 describe 取最近正式版 tag\n* fix(read-record): 修复阅读总览自采样 native 闪退并恢复顶栏模糊\n* fix(reader): 修正整段绘制的字距几何与多字符元素合并 (#2606)\n* fix(ui): COUI 标签栏投影不再被渐隐层裁断，滚动分支保留 LazyRow\n* Bump web v3.26.111511\n\n**Full Changelog**: https://github.com/LM-Firefly/YueDu-MD3/compare/3.26.27...3.26.31",
   "prerelease": false,
-  "created_at": "2026-11-15T03:56:40Z",
+  "created_at": "2026-11-28T10:05:47Z",
   "assets": [
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.27/mapping-comic.txt",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.31/mapping-comic.txt",
       "content_type": "text/plain",
-      "created_at": "2026-11-15T04:26:52Z",
+      "created_at": "2026-11-28T10:32:14Z",
       "download_count": 0,
-      "id": 749814968,
+      "id": 804169797,
       "name": "mapping-comic.txt",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/749814968"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/804169797"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.27/mapping-core.txt",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.31/mapping-core.txt",
       "content_type": "text/plain",
-      "created_at": "2026-11-15T04:26:52Z",
+      "created_at": "2026-11-28T10:32:14Z",
       "download_count": 0,
-      "id": 749814964,
+      "id": 804169794,
       "name": "mapping-core.txt",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/749814964"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/804169794"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.27/YueDu.MD3-3.26.27-comic-arm64-v8a.apk",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.31/YueDu.MD3-3.26.31-comic-arm64-v8a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-11-15T04:26:52Z",
+      "created_at": "2026-11-28T10:32:14Z",
       "download_count": 0,
-      "id": 749814970,
-      "name": "YueDu.MD3-3.26.27-comic-arm64-v8a.apk",
+      "id": 804169795,
+      "name": "YueDu.MD3-3.26.31-comic-arm64-v8a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/749814970"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/804169795"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.27/YueDu.MD3-3.26.27-comic-armeabi-v7a.apk",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.31/YueDu.MD3-3.26.31-comic-armeabi-v7a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-11-15T04:26:52Z",
+      "created_at": "2026-11-28T10:32:14Z",
       "download_count": 0,
-      "id": 749814965,
-      "name": "YueDu.MD3-3.26.27-comic-armeabi-v7a.apk",
+      "id": 804169793,
+      "name": "YueDu.MD3-3.26.31-comic-armeabi-v7a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/749814965"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/804169793"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.27/YueDu.MD3-3.26.27-comic-universal.apk",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.31/YueDu.MD3-3.26.31-comic-universal.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-11-15T04:26:52Z",
+      "created_at": "2026-11-28T10:32:14Z",
       "download_count": 0,
-      "id": 749814966,
-      "name": "YueDu.MD3-3.26.27-comic-universal.apk",
+      "id": 804169787,
+      "name": "YueDu.MD3-3.26.31-comic-universal.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/749814966"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/804169787"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.27/YueDu.MD3-3.26.27-core-arm64-v8a.apk",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.31/YueDu.MD3-3.26.31-core-arm64-v8a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-11-15T04:26:52Z",
+      "created_at": "2026-11-28T10:32:14Z",
       "download_count": 0,
-      "id": 749814961,
-      "name": "YueDu.MD3-3.26.27-core-arm64-v8a.apk",
+      "id": 804169791,
+      "name": "YueDu.MD3-3.26.31-core-arm64-v8a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/749814961"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/804169791"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.27/YueDu.MD3-3.26.27-core-armeabi-v7a.apk",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.31/YueDu.MD3-3.26.31-core-armeabi-v7a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-11-15T04:26:52Z",
+      "created_at": "2026-11-28T10:32:14Z",
       "download_count": 0,
-      "id": 749814967,
-      "name": "YueDu.MD3-3.26.27-core-armeabi-v7a.apk",
+      "id": 804169788,
+      "name": "YueDu.MD3-3.26.31-core-armeabi-v7a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/749814967"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/804169788"
     },
     {
-      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.27/YueDu.MD3-3.26.27-core-universal.apk",
+      "browser_download_url": "https://github.com/LM-Firefly/YueDu-MD3/releases/download/3.26.31/YueDu.MD3-3.26.31-core-universal.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-11-15T04:26:52Z",
+      "created_at": "2026-11-28T10:32:14Z",
       "download_count": 0,
-      "id": 749814969,
-      "name": "YueDu.MD3-3.26.27-core-universal.apk",
+      "id": 804169786,
+      "name": "YueDu.MD3-3.26.31-core-universal.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/749814969"
+      "url": "https://api.github.com/repos/LM-Firefly/YueDu-MD3/releases/assets/804169786"
     }
   ]
 }
